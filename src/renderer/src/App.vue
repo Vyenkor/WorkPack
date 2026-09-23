@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import ItemChecklist from './components/ItemChecklist.vue'
 import RulesEditor from './components/RulesEditor.vue'
 import {
@@ -38,6 +38,11 @@ const pendingFilter = reactive({ keyword: '', type: 'all' as BusinessType | 'all
 const modal = ref<ModalName>(null)
 const toast = ref({ visible: false, message: '', tone: 'success' as 'success' | 'error' })
 let toastTimer: ReturnType<typeof setTimeout> | undefined
+const modalCard = ref<HTMLElement | null>(null)
+const modalBaseline = ref('')
+const savedItemId = ref('')
+const savedEventId = ref('')
+let inlineFeedbackTimer: ReturnType<typeof setTimeout> | undefined
 
 const projectForm = reactive({ id: '', name: '', customer: '', contact: '', owner: '', note: '', templateIds: [] as string[], directoryToken: '', directoryPath: '' })
 const eventForm = reactive({ id: '', projectId: '', templateId: '', name: '', date: new Date().toISOString().slice(0, 10), owner: '' })
@@ -75,8 +80,49 @@ const currentBreadcrumb = computed(() => {
   if (view.value !== 'project') return ({ home: '工作台', projects: '项目管理', pending: '待处理文件', templates: '文件模板' } as Record<Exclude<MainView, 'project'>, string>)[view.value]
   return activeProject.value?.name ?? '项目详情'
 })
+const modalDirty = computed(() => Boolean(modal.value && modalBaseline.value && JSON.stringify(currentModalData()) !== modalBaseline.value))
 
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T }
+function currentModalData() {
+  if (modal.value === 'project') return clone(projectForm)
+  if (modal.value === 'event') return clone(eventForm)
+  if (modal.value === 'template') return clone(templateForm)
+  if (modal.value === 'item') return clone(itemForm)
+  return null
+}
+function markModalClean() { modalBaseline.value = JSON.stringify(currentModalData()) }
+function requestCloseModal() {
+  if (modalDirty.value && !window.confirm('当前表单有未保存修改，确定关闭吗？')) return
+  modal.value = null
+}
+function focusableModalElements() {
+  return Array.from(modalCard.value?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])
+}
+function handleModalKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') { event.preventDefault(); requestCloseModal(); return }
+  if (event.key !== 'Tab') return
+  const elements = focusableModalElements()
+  if (!elements.length) return
+  const first = elements[0], last = elements[elements.length - 1]
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+}
+function focusModal() { nextTick(() => focusableModalElements()[0]?.focus()) }
+function handleModalClick(event: MouseEvent) {
+  if (!modal.value) return
+  const target = event.target as HTMLElement
+  const closeButton = target.closest('.modal-close, .modal-actions button:not([type="submit"])')
+  if (!closeButton) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  requestCloseModal()
+}
+function showInlineFeedback(eventId: string, itemId = '') {
+  savedEventId.value = eventId
+  savedItemId.value = itemId
+  if (inlineFeedbackTimer) clearTimeout(inlineFeedbackTimer)
+  inlineFeedbackTimer = setTimeout(() => { savedEventId.value = ''; savedItemId.value = '' }, 1800)
+}
 function showToast(message: string, tone: 'success' | 'error' = 'success') {
   if (toastTimer) clearTimeout(toastTimer)
   toast.value = { visible: true, message, tone }
@@ -98,8 +144,8 @@ function typeIcon(type: BusinessType) { return type === 'shipping' ? '↗' : typ
 function statusText(status: Status, step: Step) { return status === 'done' ? `已${stepLabels[step]}` : status === 'na' ? '不适用' : `待${stepLabels[step]}` }
 function todayLabel() { return new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) }
 
-async function refresh() {
-  loading.value = true
+async function refresh(showLoading: boolean | Event = true) {
+  if (showLoading) loading.value = true
   errorMessage.value = ''
   try {
     snapshot.value = await window.workpack.snapshot()
@@ -107,14 +153,14 @@ async function refresh() {
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '无法读取本地数据'
   } finally {
-    loading.value = false
+    if (showLoading) loading.value = false
   }
 }
 async function run<T>(action: () => Promise<T>, success?: string): Promise<T | boolean> {
   busy.value = true
   try {
     const result = await action()
-    await refresh()
+    await refresh(false)
     const completed = result === undefined ? true : result === false || result === 0 ? false : result
     if (success && completed !== false) showToast(success)
     return completed
@@ -148,7 +194,7 @@ function runGlobalSearch() {
 function resetProjectForm(project?: Project) {
   Object.assign(projectForm, project ? { id: project.id, name: project.name, customer: project.customer, contact: project.contact, owner: project.owner, note: project.note, templateIds: [...project.templateIds], directoryToken: '', directoryPath: project.folder } : { id: '', name: '', customer: '', contact: '', owner: '', note: '', templateIds: [], directoryToken: '', directoryPath: '' })
 }
-function openProjectModal(project?: Project) { resetProjectForm(project); modal.value = 'project' }
+function openProjectModal(project?: Project) { resetProjectForm(project); modal.value = 'project'; markModalClean() }
 async function chooseProjectFolder() {
   try {
     const result = await window.workpack.chooseDirectory()
@@ -168,7 +214,7 @@ async function saveProject() {
 }
 
 function resetEventForm(project: Project, event?: BusinessEvent) { Object.assign(eventForm, event ? { id: event.id, projectId: project.id, templateId: event.templateId, name: event.name, date: event.date, owner: event.owner } : { id: '', projectId: project.id, templateId: project.templateIds[0] ?? '', name: '', date: new Date().toISOString().slice(0, 10), owner: project.owner }) }
-function openEventModal(project = activeProject.value, event?: BusinessEvent) { if (!project) return; resetEventForm(project, event); modal.value = 'event' }
+function openEventModal(project = activeProject.value, event?: BusinessEvent) { if (!project) return; resetEventForm(project, event); modal.value = 'event'; markModalClean() }
 async function saveEvent() {
   if (!eventForm.name.trim() || !eventForm.templateId || !eventForm.owner.trim()) { showToast('请填写事项名称、模板和经办人', 'error'); return }
   const input = { id: eventForm.id, projectId: eventForm.projectId, templateId: eventForm.templateId, name: eventForm.name, date: eventForm.date, owner: eventForm.owner }
@@ -185,7 +231,7 @@ async function saveEvent() {
 function resetTemplateForm(template?: Template) {
   Object.assign(templateForm, template ? { id: template.id, name: template.name, type: template.type, rules: clone(template.rules) } : { id: '', name: '', type: 'shipping', rules: [] })
 }
-function openTemplateModal(template?: Template) { resetTemplateForm(template); modal.value = 'template' }
+function openTemplateModal(template?: Template) { resetTemplateForm(template); modal.value = 'template'; markModalClean() }
 async function saveTemplate() {
   if (!templateForm.name.trim() || !templateForm.rules.every(rule => rule.name.trim())) { showToast('请填写模板名称及每个文件项名称', 'error'); return }
   const saved = await run(() => window.workpack.saveTemplate({ id: templateForm.id || undefined, name: templateForm.name, type: templateForm.type, rules: clone(templateForm.rules) }), templateForm.id ? '模板规则已更新' : '模板已创建')
@@ -197,7 +243,10 @@ async function deleteTemplate(template: Template) {
 }
 async function importTemplateAssets(template: Template) {
   const saved = await run(() => window.workpack.importTemplates(template.id), '模板文件已导入')
-  if (saved === false) return
+  if (saved !== false) {
+    const latest = snapshot.value.templates.find(candidate => candidate.id === template.id)
+    if (latest) openTemplateModal(latest)
+  }
 }
 async function removeTemplateAsset(assetId: string) {
   if (!window.confirm('只移除这条模板文件记录吗？原文件不会被删除。')) return
@@ -208,7 +257,7 @@ async function exportTemplate(template: Template) {
 }
 
 function resetItemForm(event: BusinessEvent, item?: Item) { Object.assign(itemForm, item ? { id: item.id, eventId: event.id, name: item.name, note: item.note, required: [...item.required] } : { id: '', eventId: event.id, name: '', note: '', required: [...steps] }) }
-function openItemModal(event: BusinessEvent, item?: Item) { resetItemForm(event, item); modal.value = 'item' }
+function openItemModal(event: BusinessEvent, item?: Item) { resetItemForm(event, item); modal.value = 'item'; markModalClean() }
 async function saveItem() {
   if (!itemForm.name.trim() || !itemForm.required.length) { showToast('请填写文件名称，并至少选择一个完成步骤', 'error'); return }
   const saved = await run(() => window.workpack.saveItem({ id: itemForm.id || undefined, eventId: itemForm.eventId, name: itemForm.name, note: itemForm.note, required: [...itemForm.required] }), itemForm.id ? '清单项已更新' : '清单项已添加')
@@ -223,7 +272,20 @@ async function removeEvent(event: BusinessEvent) {
   const removed = await run(() => window.workpack.deleteEvent(event.id), '业务事项已删除')
   if (removed) closeEventDetail()
 }
-async function setItemStatus(id: string, step: Step, status: Status) { await run(() => window.workpack.setStatus({ id, step, status }), '文件清单状态已更新') }
+async function setItemStatus(id: string, step: Step, status: Status) {
+  const item = snapshot.value.projects.flatMap(project => project.events.flatMap(event => event.items)).find(candidate => candidate.id === id)
+  const result = await run(() => window.workpack.setStatus({ id, step, status }))
+  if (result !== false && item) showInlineFeedback(item.eventId, id)
+}
+async function completeItem(id: string) {
+  const item = snapshot.value.projects.flatMap(project => project.events.flatMap(event => event.items)).find(candidate => candidate.id === id)
+  const result = await run(() => window.workpack.completeItem(id))
+  if (result !== false && item) showInlineFeedback(item.eventId, id)
+}
+async function completeEvent(event: BusinessEvent) {
+  const result = await run(() => window.workpack.completeEvent(event.id))
+  if (result !== false) showInlineFeedback(event.id)
+}
 async function importAttachments(id: string) { await run(() => window.workpack.importAttachments(id), '附件已添加') }
 async function openAttachment(id: string) { await run(() => window.workpack.openAttachment(id)) }
 async function relocateAttachment(id: string) { await run(() => window.workpack.relocateAttachment(id), '附件已重新关联') }
@@ -231,7 +293,18 @@ async function removeAttachment(id: string) { if (window.confirm('确定移除�
 async function openProjectFolder(project: Project) { await run(() => window.workpack.openProject(project.id)) }
 async function relocateProject(project: Project) { const moved = await run(() => window.workpack.relocateProject(project.id), '项目目录已重新定位'); if (moved) await refresh() }
 
-onMounted(refresh)
+watch(modal, value => {
+  if (value) focusModal()
+  else modalBaseline.value = ''
+})
+onMounted(() => {
+  refresh()
+  document.addEventListener('click', handleModalClick, true)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleModalClick, true)
+  if (inlineFeedbackTimer) clearTimeout(inlineFeedbackTimer)
+})
 </script>
 
 <template>
@@ -269,12 +342,12 @@ onMounted(refresh)
 
           <section v-else-if="view === 'templates'" class="page-section"><div class="page-heading"><div><span class="eyebrow">TEMPLATE LIBRARY</span><h1>文件模板</h1><p>维护可复用的文件清单规则和空白模板文件。</p></div><button class="button primary" @click="openTemplateModal()">＋ 新建模板</button></div><div class="notice-banner"><span class="notice-icon">i</span><span>模板文件会保存在 WorkPack 的本机数据目录中。新建业务事项时会复制当前模板规则，之后修改模板不会影响已有事项。</span></div><div class="template-grid"><article v-for="template in snapshot.templates" :key="template.id" class="template-card"><div class="template-card-head"><span class="template-icon" :class="template.type">{{ typeIcon(template.type) }}</span><div><span class="type-label">{{ typeLabel(template.type) }}</span><h2>{{ template.name }}</h2></div><button class="more-button" @click="openTemplateModal(template)">···</button></div><p class="template-description">用于{{ typeLabel(template.type) }}环节的资料归集和完成跟踪。</p><div class="template-stats"><span><strong>{{ template.rules.length }}</strong> 个文件项</span><span><strong>{{ template.assets.length }}</strong> 个模板文件</span></div><div class="rule-preview"><span v-for="rule in template.rules.slice(0, 3)" :key="rule.id">{{ rule.name }}<small>{{ rule.required.length }} 个步骤</small></span><span v-if="template.rules.length > 3" class="more-rules">+{{ template.rules.length - 3 }} 项</span></div><div class="asset-area"><div class="asset-heading"><strong>模板文件</strong><span>{{ template.assets.filter(asset => asset.exists).length }}/{{ template.assets.length }} 可用</span></div><div v-if="!template.assets.length" class="asset-empty">尚未导入模板文件</div><div v-for="asset in template.assets" :key="asset.id" class="asset-row"><span class="file-icon">□</span><span class="asset-name" :title="asset.path">{{ asset.name }}</span><span :class="asset.exists ? 'asset-ok' : 'asset-missing'">{{ asset.exists ? '可用' : '失效' }}</span><button class="asset-remove" title="移除记录" @click="removeTemplateAsset(asset.id)">×</button></div></div><div class="template-actions"><button class="button secondary small" @click="openTemplateModal(template)">编辑规则</button><button class="button secondary small" @click="importTemplateAssets(template)">导入文件</button><button class="button secondary small" :disabled="!template.assets.length" @click="exportTemplate(template)">导出</button><button class="button danger-link small" @click="deleteTemplate(template)">删除</button></div></article><div v-if="!snapshot.templates.length" class="empty"><div class="empty-icon">▧</div><h3>还没有文件模板</h3><p>新建模板后即可用于业务事项。</p></div></div></section>
 
-          <section v-else-if="view === 'project' && activeProject" class="page-section project-detail"><div class="detail-heading"><button class="back-button" @click="go('projects')">← 项目管理</button><div class="detail-title-row"><div><span class="eyebrow">PROJECT DETAIL</span><h1>{{ activeProject.name }}</h1><p>{{ activeProject.customer }}<span class="dot-separator">·</span>{{ activeProject.owner }} 负责</p></div><div class="heading-actions"><button class="button secondary" @click="openProjectFolder(activeProject)">打开项目文件夹</button><button class="button secondary" @click="openProjectModal(activeProject)">编辑项目</button><button class="button primary" @click="openEventModal(activeProject)">＋ 新建事项</button></div></div></div><div v-if="!activeProject.folderExists" class="warning-banner"><span>⚠</span><span>项目目录已失效或被移动。请重新定位原项目文件夹，恢复附件和模板文件访问。</span><button class="button warning small" @click="relocateProject(activeProject)">重新定位</button></div><div class="project-overview-grid"><article><span>项目负责人</span><strong>{{ activeProject.owner }}</strong><small>{{ activeProject.contact || '未填写联系方式' }}</small></article><article><span>整体资料进度</span><strong>{{ projectProgress(activeProject).percent }}%</strong><small>{{ projectProgress(activeProject).done }} / {{ projectProgress(activeProject).total }} 个必要步骤</small></article><article><span>业务事项</span><strong>{{ activeProject.events.length }}</strong><small>待处理 {{ activeProject.events.reduce((sum, event) => sum + eventPending(event), 0) }} 项</small></article><article><span>项目文件夹</span><strong class="folder-value" :title="activeProject.folder">{{ activeProject.folder }}</strong><small :class="activeProject.folderExists ? 'text-success' : 'text-warning'">{{ activeProject.folderExists ? '目录可访问' : '目录不可用' }}</small></article></div><div v-if="activeEvent && activeEventOnly" class="event-detail panel"><div class="event-detail-heading"><div><div class="event-actions"><button class="back-button small-back" @click="closeEventDetail">← 返回事项列表</button><button class="button secondary small" @click="openEventModal(activeProject, activeEvent)">编辑事项</button><button class="button danger-link small" @click="removeEvent(activeEvent)">删除事项</button></div><div class="event-title"><span class="event-type-icon" :class="activeEvent.type">{{ typeIcon(activeEvent.type) }}</span><div><span class="type-label">{{ typeLabel(activeEvent.type) }} · {{ formatFullDate(activeEvent.date) }}</span><h2>{{ activeEvent.name }}</h2><p>经办人：{{ activeEvent.owner }}<span class="dot-separator">·</span>使用模板：{{ templateFor(activeEvent.templateId)?.name || '已删除模板' }}</p></div></div></div><div class="event-progress-large"><strong>{{ eventProgress(activeEvent).percent }}%</strong><span>完成度</span><div class="progress-track"><i :style="{ width: `${eventProgress(activeEvent).percent}%` }"></i></div></div></div><div class="checklist-heading"><div><h3>文件清单</h3><p>完成率同时要求必要步骤完成，且准备步骤有可用文件。</p></div><button class="button secondary small" @click="openItemModal(activeEvent)">＋ 添加文件项</button></div><ItemChecklist :items="activeEvent.items" :busy="busy" @status="setItemStatus" @edit="item => openItemModal(activeEvent!, item)" @remove="removeItem" @upload="importAttachments" @open="openAttachment" @relocate="relocateAttachment" @detach="removeAttachment" /></div><div v-else class="event-list-section"><div class="section-heading"><div><h2>业务事项</h2><p>每次发货、收货或培训都是一份独立的文件清单。</p></div><span class="section-count">{{ activeProject.events.length }} 个事项</span></div><div v-if="!activeProject.events.length" class="empty panel"><div class="empty-icon">◇</div><h3>还没有业务事项</h3><p>创建一次发货、收货或培训事项，开始生成文件清单。</p><button class="button primary" @click="openEventModal(activeProject)">＋ 新建事项</button></div><div v-else class="event-cards"><article v-for="event in activeProject.events" :key="event.id" class="event-card" @click="openEvent(activeProject, event)"><div class="event-card-head"><span class="event-type-icon" :class="event.type">{{ typeIcon(event.type) }}</span><div><span class="type-label">{{ typeLabel(event.type) }} · {{ formatDate(event.date) }}</span><h3>{{ event.name }}</h3></div><span class="row-arrow">→</span></div><div class="event-card-meta"><span>经办人 {{ event.owner }}</span><span>{{ event.items.length }} 个文件项</span><span v-if="eventPending(event)" class="tag orange">待处理 {{ eventPending(event) }}</span><span v-else class="tag green">已完成</span></div><div class="progress-meta"><span>完成进度</span><strong>{{ eventProgress(event).percent }}%</strong></div><div class="progress-track"><i :style="{ width: `${eventProgress(event).percent}%` }"></i></div><div class="event-card-files"><span v-for="item in event.items.slice(0, 4)" :key="item.id" :class="{ done: !gaps(item).length }">{{ item.name }}</span><span v-if="event.items.length > 4">+{{ event.items.length - 4 }} 项</span></div></article></div></div></section>
+          <section v-else-if="view === 'project' && activeProject" class="page-section project-detail"><div class="detail-heading"><button class="back-button" @click="go('projects')">← 项目管理</button><div class="detail-title-row"><div><span class="eyebrow">PROJECT DETAIL</span><h1>{{ activeProject.name }}</h1><p>{{ activeProject.customer }}<span class="dot-separator">·</span>{{ activeProject.owner }} 负责</p></div><div class="heading-actions"><button class="button secondary" @click="openProjectFolder(activeProject)">打开项目文件夹</button><button class="button secondary" @click="openProjectModal(activeProject)">编辑项目</button><button class="button primary" @click="openEventModal(activeProject)">＋ 新建事项</button></div></div></div><div v-if="!activeProject.folderExists" class="warning-banner"><span>⚠</span><span>项目目录已失效或被移动。请重新定位原项目文件夹，恢复附件和模板文件访问。</span><button class="button warning small" @click="relocateProject(activeProject)">重新定位</button></div><div class="project-overview-grid"><article><span>项目负责人</span><strong>{{ activeProject.owner }}</strong><small>{{ activeProject.contact || '未填写联系方式' }}</small></article><article><span>整体资料进度</span><strong>{{ projectProgress(activeProject).percent }}%</strong><small>{{ projectProgress(activeProject).done }} / {{ projectProgress(activeProject).total }} 个必要步骤</small></article><article><span>业务事项</span><strong>{{ activeProject.events.length }}</strong><small>待处理 {{ activeProject.events.reduce((sum, event) => sum + eventPending(event), 0) }} 项</small></article><article><span>项目文件夹</span><strong class="folder-value" :title="activeProject.folder">{{ activeProject.folder }}</strong><small :class="activeProject.folderExists ? 'text-success' : 'text-warning'">{{ activeProject.folderExists ? '目录可访问' : '目录不可用' }}</small></article></div><div v-if="activeEvent && activeEventOnly" class="event-detail panel"><div class="event-detail-heading"><div><div class="event-actions"><button class="back-button small-back" @click="closeEventDetail">← 返回事项列表</button><button class="button secondary small" @click="openEventModal(activeProject, activeEvent)">编辑事项</button><button class="button danger-link small" @click="removeEvent(activeEvent)">删除事项</button></div><div class="event-title"><span class="event-type-icon" :class="activeEvent.type">{{ typeIcon(activeEvent.type) }}</span><div><span class="type-label">{{ typeLabel(activeEvent.type) }} · {{ formatFullDate(activeEvent.date) }}</span><h2>{{ activeEvent.name }}</h2><p>经办人：{{ activeEvent.owner }}<span class="dot-separator">·</span>使用模板：{{ templateFor(activeEvent.templateId)?.name || '已删除模板' }}</p></div></div></div><div class="event-progress-large"><strong>{{ eventProgress(activeEvent).percent }}%</strong><span>完成度</span><div class="progress-track"><i :style="{ width: `${eventProgress(activeEvent).percent}%` }"></i></div></div></div><div class="checklist-heading"><div><h3>文件清单</h3><p>完成率同时要求必要步骤完成，且准备步骤有可用文件。</p></div><div class="heading-actions"><span v-if="savedEventId === activeEvent.id" class="inline-saved">已保存可用步骤</span><button class="button secondary small" :disabled="busy || !activeEvent.items.length" @click="completeEvent(activeEvent)">一键完成可用步骤</button><button class="button secondary small" @click="openItemModal(activeEvent)">＋ 添加文件项</button></div></div><ItemChecklist :items="activeEvent.items" :busy="busy" :saved-item-id="savedItemId" @status="setItemStatus" @complete="completeItem" @edit="item => openItemModal(activeEvent!, item)" @remove="removeItem" @upload="importAttachments" @open="openAttachment" @relocate="relocateAttachment" @detach="removeAttachment" /></div><div v-else class="event-list-section"><div class="section-heading"><div><h2>业务事项</h2><p>每次发货、收货或培训都是一份独立的文件清单。</p></div><span class="section-count">{{ activeProject.events.length }} 个事项</span></div><div v-if="!activeProject.events.length" class="empty panel"><div class="empty-icon">◇</div><h3>还没有业务事项</h3><p>创建一次发货、收货或培训事项，开始生成文件清单。</p><button class="button primary" @click="openEventModal(activeProject)">＋ 新建事项</button></div><div v-else class="event-cards"><article v-for="event in activeProject.events" :key="event.id" class="event-card" @click="openEvent(activeProject, event)"><div class="event-card-head"><span class="event-type-icon" :class="event.type">{{ typeIcon(event.type) }}</span><div><span class="type-label">{{ typeLabel(event.type) }} · {{ formatDate(event.date) }}</span><h3>{{ event.name }}</h3></div><span class="row-arrow">→</span></div><div class="event-card-meta"><span>经办人 {{ event.owner }}</span><span>{{ event.items.length }} 个文件项</span><span v-if="eventPending(event)" class="tag orange">待处理 {{ eventPending(event) }}</span><span v-else class="tag green">已完成</span></div><div class="progress-meta"><span>完成进度</span><strong>{{ eventProgress(event).percent }}%</strong></div><div class="progress-track"><i :style="{ width: `${eventProgress(event).percent}%` }"></i></div><div class="event-card-files"><span v-for="item in event.items.slice(0, 4)" :key="item.id" :class="{ done: !gaps(item).length }">{{ item.name }}</span><span v-if="event.items.length > 4">+{{ event.items.length - 4 }} 项</span></div></article></div></div></section>
         </template>
       </main>
     </section>
 
-    <div v-if="modal" class="modal-backdrop" @click.self="modal = null"><section class="modal-card" :class="{ 'modal-wide': modal === 'template' || modal === 'item' }" role="dialog" aria-modal="true">
+    <div v-if="modal" class="modal-backdrop" @click.self="requestCloseModal"><section ref="modalCard" class="modal-card" :class="{ 'modal-wide': modal === 'template' || modal === 'item' }" role="dialog" aria-modal="true" tabindex="-1" @keydown="handleModalKeydown">
       <template v-if="modal === 'project'"><div class="modal-heading"><div><span class="eyebrow">PROJECT</span><h2>{{ projectForm.id ? '编辑项目' : '新建项目' }}</h2><p>先建立项目，再在其中记录每次业务事项。</p></div><button class="modal-close" @click="modal = null">×</button></div><form class="form-grid" @submit.prevent="saveProject"><label>项目名称<input v-model="projectForm.name" required maxlength="100" placeholder="例如：华东智造产线升级项目"></label><label>客户名称<input v-model="projectForm.customer" required maxlength="100" placeholder="客户公司或单位"></label><label>负责人<input v-model="projectForm.owner" required maxlength="100" placeholder="项目负责人"></label><label>联系方式<input v-model="projectForm.contact" maxlength="4000" placeholder="电话、邮箱或其他联系方式"></label><label class="full-width">项目备注<textarea v-model="projectForm.note" rows="3" maxlength="4000" placeholder="记录项目背景、交付范围等信息"></textarea></label><div class="full-width folder-picker"><div><span class="form-label">项目文件夹</span><p v-if="projectForm.id" class="form-help">编辑项目时，项目文件夹保持不变。若目录失效，请在项目详情中重新定位。</p><p v-else class="form-help">选择上级文件夹，WorkPack 会自动创建同名项目文件夹。</p><span v-if="projectForm.directoryPath" class="selected-path">{{ projectForm.directoryPath }}</span></div><button v-if="!projectForm.id" type="button" class="button secondary" @click="chooseProjectFolder">选择上级文件夹</button></div><fieldset class="full-width"><legend>默认适用模板</legend><p class="form-help">创建事项时只能选择已加入项目的模板，后续可在编辑项目时调整。</p><div class="template-checks"><label v-for="template in snapshot.templates" :key="template.id" class="template-check"><input v-model="projectForm.templateIds" type="checkbox" :value="template.id"><span class="template-icon tiny" :class="template.type">{{ typeIcon(template.type) }}</span><span><strong>{{ template.name }}</strong><small>{{ typeLabel(template.type) }} · {{ template.rules.length }} 个文件项</small></span></label><span v-if="!snapshot.templates.length" class="form-help">请先创建文件模板。</span></div></fieldset><div class="modal-actions"><button type="button" class="button secondary" @click="modal = null">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存项目' }}</button></div></form></template>
 
       <template v-else-if="modal === 'event'"><div class="modal-heading"><div><span class="eyebrow">BUSINESS EVENT</span><h2>{{ eventForm.id ? '编辑业务事项' : '新建业务事项' }}</h2><p>{{ eventForm.id ? '可修改事项名称、日期和经办人。模板及清单保持不变。' : '系统会根据所选模板生成本次事项的独立清单。' }}</p></div><button class="modal-close" @click="modal = null">×</button></div><form class="form-grid" @submit.prevent="saveEvent"><label class="full-width">事项名称<input v-model="eventForm.name" required maxlength="100" placeholder="例如：第一批控制柜发货"></label><label>事项类型及模板<select v-model="eventForm.templateId" :disabled="Boolean(eventForm.id)" required><option value="" disabled>请选择项目模板</option><option v-for="template in activeProject?.templateIds.map(templateFor).filter(Boolean)" :key="template!.id" :value="template!.id">{{ typeLabel(template!.type) }} · {{ template!.name }}</option></select></label><label>业务日期<input v-model="eventForm.date" required type="date"></label><label>经办人<input v-model="eventForm.owner" required maxlength="100"></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="modal = null">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : eventForm.id ? '保存事项' : '创建事项' }}</button></div></form></template>

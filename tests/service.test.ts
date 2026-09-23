@@ -120,6 +120,10 @@ describe('WorkPackService', () => {
       const current = service.snapshot().projects[0].events[0].items[0]
       expect(current.required).toEqual(steps.filter(step => step !== 'signed'))
       expect(current.states.signed).toBe('na')
+      service.completeEvent(service.snapshot().projects[0].events[0].id)
+      const completed = service.snapshot().projects[0].events[0].items[0]
+      expect(completed.states.prepared).toBe('pending')
+      expect(completed.states.filled).toBe('done')
       expect(progress([{ ...current, states: { prepared: 'done', filled: 'done', signed: 'done', archived: 'done' }, attachments: [] }]).percent).toBeLessThan(100)
     } finally { service.close() }
   })

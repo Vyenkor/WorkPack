@@ -327,6 +327,27 @@ export class WorkPackService {
       this.db.prepare('DELETE FROM events WHERE id=?').run(event.id)
     })()
   }
+  private completeItems(items: Row[], root: string) {
+    for (const item of items) {
+      const states = JSON.parse(item.states) as Record<string, string>
+      const attachments = this.db.prepare('SELECT path FROM attachments WHERE item_id=?').all(item.id) as Row[]
+      const hasFile = attachments.some(attachment => {
+        try { return present(inside(root, attachment.path)) } catch { return false }
+      })
+      for (const step of steps) if (states[step] === 'pending' && (step !== 'prepared' || hasFile)) states[step] = 'done'
+      this.db.prepare('UPDATE items SET states=?, required=? WHERE id=?').run(JSON.stringify(states), JSON.stringify(steps.filter(step => states[step] !== 'na')), item.id)
+    }
+  }
+  completeItem(value: string) {
+    const { item, project } = this.projectForItem(value)
+    const root = this.root(project)
+    this.db.transaction(() => this.completeItems([item], root))()
+  }
+  completeEvent(value: string) {
+    const event = this.get('events', value), project = this.get('projects', event.project_id), root = this.root(project)
+    const items = this.db.prepare('SELECT * FROM items WHERE event_id=?').all(event.id) as Row[]
+    this.db.transaction(() => this.completeItems(items, root))()
+  }
   saveItem(input: unknown) {
     const data = itemSchema.parse(input)
     this.get('events', data.eventId)

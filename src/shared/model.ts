@@ -32,6 +32,8 @@ export interface WorkPackAPI {
   createEvent(input: EventInput): Promise<string>
   updateEvent(input: EventUpdateInput): Promise<void>
   deleteEvent(id: string): Promise<void>
+  completeItem(id: string): Promise<void>
+  completeEvent(id: string): Promise<void>
   saveItem(input: ItemInput): Promise<void>
   deleteItem(id: string): Promise<void>
   setStatus(input: { id: string; step: Step; status: Status }): Promise<void>

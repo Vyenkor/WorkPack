@@ -62,6 +62,8 @@ function registerIPC() {
   handle('createEvent', value => service.createEvent(value))
   handle('updateEvent', value => service.updateEvent(value))
   handle('deleteEvent', value => { stringId.parse(value); service.deleteEvent(value) })
+  handle('completeItem', value => { stringId.parse(value); service.completeItem(value) })
+  handle('completeEvent', value => { stringId.parse(value); service.completeEvent(value) })
   handle('saveItem', value => service.saveItem(value))
   handle('deleteItem', value => service.deleteItem(stringId.parse(value)))
   handle('setStatus', value => service.setStatus(value))

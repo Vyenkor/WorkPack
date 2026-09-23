@@ -68,3 +68,20 @@ button, input, textarea, select { outline-color: #78b396; }
 .status-select { min-width: 68px; font-size: 11px; }
 .asset-select { display: grid; gap: 6px; color: #78877d; font-size: 10px; }
 .asset-select select { max-width: 340px; padding: 7px 8px; color: #65736a; border: 1px solid #dfe8e1; border-radius: 6px; background: #fff; font-size: 10px; }
+
+html, body, #app { width: 100%; min-width: 0; height: 100%; overflow-x: hidden; }
+body { overflow: hidden; }
+.app-shell { width: 100%; height: 100vh; min-height: 0; min-width: 0; overflow: hidden; }
+.sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.content-shell { height: 100vh; min-width: 0; overflow-x: hidden; overflow-y: auto; }
+.topbar { position: sticky; top: 0; z-index: 8; }
+.view, .page-section, .event-detail, .panel { min-width: 0; max-width: 100%; }
+.table-wrap { width: 100%; max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+.checklist th:last-child, .checklist td:last-child { position: sticky; right: 0; z-index: 2; min-width: 112px; background: #fff; box-shadow: -8px 0 12px rgba(30, 57, 42, .06); }
+.checklist th:last-child { z-index: 3; background: #fafcfb; }
+.workspace-switch > b, .user-more { display: none; }
+.more-button { font-size: 0; letter-spacing: 0; }
+.more-button::after { content: '编辑'; color: #2b8b63; font-size: 11px; letter-spacing: 0; }
+.tag.muted { color: #7f8d84; background: #eef2ef; }
+.inline-saved { color: #3b9468; font-size: 10px; white-space: nowrap; }
+.checklist-heading .heading-actions { flex-wrap: wrap; justify-content: flex-end; }

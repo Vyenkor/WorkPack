@@ -9,10 +9,11 @@ const name = z.string().trim().min(1, '名称不能为空').max(100)
 const text = z.string().max(4000)
 const id = z.string().uuid()
 const required = z.array(z.enum(steps)).max(4).refine(a => new Set(a).size === a.length)
-const rule = z.object({ id, name, note: text, required })
+const rule = z.object({ id, name, note: text, required, assetId: id.optional() })
 const projectSchema = z.object({ id: id.optional(), name, customer: name, contact: text, owner: name, note: text, templateIds: z.array(id).max(100) })
 const templateSchema = z.object({ id: id.optional(), name, type: z.enum(types), rules: z.array(rule).max(200).refine(a => new Set(a.map(r => r.id)).size === a.length) })
 const eventSchema = z.object({ projectId: id, templateId: id, name, date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s => { const d = new Date(s); return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s }, '日期无效'), owner: name })
+const eventUpdateSchema = eventSchema.extend({ id })
 const itemSchema = z.object({ id: id.optional(), eventId: id, name, note: text, required })
 const statusSchema = z.object({ id, step: z.enum(steps), status: z.enum(['pending', 'done', 'na']) })
 type Row = Record<string, any>
@@ -40,6 +41,11 @@ function inside(root: string, relative: string): string {
 function present(file: string) { try { return fs.statSync(file).isFile() } catch { return false } }
 function folderPresent(file: string) { try { return fs.statSync(file).isDirectory() } catch { return false } }
 function stateMap(requiredSteps: string[]) { return Object.fromEntries(steps.map(s => [s, requiredSteps.includes(s) ? 'pending' : 'na'])) }
+function compactFileName(value: string) { return path.parse(value).name.toLowerCase().replace(/模板|空白|文件|表格|资料/g, '').replace(/[\s._\-（）()]/g, '') }
+function assetMatchesRule(assetName: string, ruleName: string) {
+  const asset = compactFileName(assetName), rule = compactFileName(ruleName)
+  return Boolean(asset && rule && (asset === rule || asset.includes(rule) || rule.includes(asset)))
+}
 
 /** All disk access is in the main process. Rollbacks only remove paths created by this operation. */
 export class WorkPackService {
@@ -254,11 +260,71 @@ export class WorkPackService {
   createEvent(input: unknown) {
     const data = eventSchema.parse(input), project = this.get('projects', data.projectId), template = this.get('templates', data.templateId)
     if (!JSON.parse(project.template_ids).includes(data.templateId)) throw new Error('所选模板尚未加入项目，请先编辑项目模板设置')
-    this.root(project)
-    const eventId = randomUUID()
-    this.db.transaction(() => {
+    const root = this.root(project), eventId = randomUUID(), rules = JSON.parse(template.rules) as Array<{ id: string; name: string; note: string; required: string[]; assetId?: string }>
+    const assets = this.db.prepare('SELECT * FROM assets WHERE template_id=?').all(data.templateId) as Row[]
+    const usedAssets = new Set<string>()
+    this.atomic((files, dirs) => this.db.transaction(() => {
       this.db.prepare('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?, ?)').run(eventId, data.projectId, data.templateId, template.type, data.name, data.date, data.owner)
-      for (const r of JSON.parse(template.rules)) this.db.prepare('INSERT INTO items VALUES (?, ?, ?, ?, ?, ?)').run(randomUUID(), eventId, r.name, r.note, JSON.stringify(r.required), JSON.stringify(stateMap(r.required)))
+      for (const rule of rules) {
+        const itemId = randomUUID()
+        const states = stateMap(rule.required)
+        this.db.prepare('INSERT INTO items VALUES (?, ?, ?, ?, ?, ?)').run(itemId, eventId, rule.name, rule.note, JSON.stringify(rule.required), JSON.stringify(states))
+        const asset = assets.find(candidate => !usedAssets.has(candidate.id) && (candidate.id === rule.assetId || assetMatchesRule(candidate.name, rule.name)))
+        if (asset) {
+          const source = inside(this.templateRoot, asset.path)
+          if (present(source)) {
+            const target = this.mkdir(root, path.join(typeLabels[template.type as keyof typeof typeLabels], `${data.date}_${eventId}`, itemId), dirs)
+            const copied = this.copy(source, target, files)
+            this.db.prepare('INSERT INTO attachments VALUES (?, ?, ?, ?, ?)').run(randomUUID(), itemId, path.basename(copied), path.relative(root, copied), new Date().toISOString())
+            usedAssets.add(asset.id)
+            if (states.prepared !== 'na') {
+              states.prepared = 'done'
+              this.db.prepare('UPDATE items SET states=? WHERE id=?').run(JSON.stringify(states), itemId)
+            }
+          }
+        }
+      }
+    })())
+    return eventId
+  }
+  updateEvent(input: unknown) {
+    const data = eventUpdateSchema.parse(input), event = this.get('events', data.id)
+    if (event.project_id !== data.projectId || event.template_id !== data.templateId) throw new Error('事项所属项目或模板不能修改')
+    const project = this.get('projects', data.projectId), root = this.root(project)
+    const oldDir = inside(root, path.join(typeLabels[event.type as keyof typeof typeLabels], `${event.date}_${event.id}`))
+    const newDir = inside(root, path.join(typeLabels[event.type as keyof typeof typeLabels], `${data.date}_${event.id}`))
+    let renamed = false
+    try {
+      if (oldDir !== newDir && fs.existsSync(oldDir)) {
+        if (fs.existsSync(newDir)) throw new Error('新的事项日期目录已存在，请使用其他日期')
+        fs.renameSync(oldDir, newDir)
+        renamed = true
+      }
+      this.db.transaction(() => {
+        if (renamed) {
+          const attachments = this.db.prepare('SELECT a.* FROM attachments a JOIN items i ON i.id=a.item_id WHERE i.event_id=?').all(data.id) as Row[]
+          for (const attachment of attachments) {
+            const current = inside(root, attachment.path), relative = path.relative(oldDir, current)
+            this.db.prepare('UPDATE attachments SET path=? WHERE id=?').run(path.relative(root, inside(newDir, relative)), attachment.id)
+          }
+        }
+        this.db.prepare('UPDATE events SET name=?, date=?, owner=? WHERE id=?').run(data.name, data.date, data.owner, data.id)
+      })()
+    } catch (error) {
+      if (renamed) {
+        try { fs.renameSync(newDir, oldDir) }
+        catch { throw new Error(`事项保存失败且附件目录未能还原，请检查：${newDir}`) }
+      }
+      throw error
+    }
+  }
+  deleteEvent(value: string) {
+    const event = this.get('events', value)
+    this.db.transaction(() => {
+      const items = this.db.prepare('SELECT id FROM items WHERE event_id=?').all(event.id) as Row[]
+      for (const item of items) this.db.prepare('DELETE FROM attachments WHERE item_id=?').run(item.id)
+      this.db.prepare('DELETE FROM items WHERE event_id=?').run(event.id)
+      this.db.prepare('DELETE FROM events WHERE id=?').run(event.id)
     })()
   }
   saveItem(input: unknown) {

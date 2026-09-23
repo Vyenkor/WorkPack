@@ -60,6 +60,8 @@ function registerIPC() {
   handle('removeTemplateAsset', value => service.removeTemplateAsset(stringId.parse(value)))
   handle('exportTemplates', async value => { z.array(stringId).min(1).parse(value); const folder = await selectFolder(); return folder ? service.exportTemplates(value, folder) : 0 })
   handle('createEvent', value => service.createEvent(value))
+  handle('updateEvent', value => service.updateEvent(value))
+  handle('deleteEvent', value => { stringId.parse(value); service.deleteEvent(value) })
   handle('saveItem', value => service.saveItem(value))
   handle('deleteItem', value => service.deleteItem(stringId.parse(value)))
   handle('setStatus', value => service.setStatus(value))

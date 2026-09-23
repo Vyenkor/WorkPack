@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { WorkPackService } from '../src/main/service'
-import { steps } from '../src/shared/model'
+import { progress, steps } from '../src/shared/model'
 
 const temporaryDirectories: string[] = []
 function tempDirectory() {
@@ -46,6 +46,9 @@ describe('WorkPackService', () => {
       project = service.snapshot().projects[0]
       const event = project.events[0]
       expect(event.items.map(item => item.name)).toEqual(template.rules.map(rule => rule.name))
+      expect(event.items[0].attachments).toHaveLength(1)
+      expect(event.items[0].attachments[0].exists).toBe(true)
+      expect(event.items[0].states.prepared).toBe('done')
 
       const changedRules = template.rules.map((rule, index) => index === 0 ? { ...rule, name: '修改后的模板文件' } : rule)
       service.saveTemplate({ id: template.id, name: template.name, type: template.type, rules: changedRules })
@@ -117,6 +120,37 @@ describe('WorkPackService', () => {
       const current = service.snapshot().projects[0].events[0].items[0]
       expect(current.required).toEqual(steps.filter(step => step !== 'signed'))
       expect(current.states.signed).toBe('na')
+      expect(progress([{ ...current, states: { prepared: 'done', filled: 'done', signed: 'done', archived: 'done' }, attachments: [] }]).percent).toBeLessThan(100)
+    } finally { service.close() }
+  })
+
+  it('updates event details and moves generated work copies with the date', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const template = service.snapshot().templates.find(item => item.type === 'shipping')!
+      const source = path.join(root, '客户签收单模板.docx')
+      fs.writeFileSync(source, 'template')
+      service.importTemplates(template.id, [source])
+      const parent = path.join(root, 'projects')
+      fs.mkdirSync(parent)
+      service.saveProject(inputForProject(template.id), parent)
+      const project = service.snapshot().projects[0]
+      const eventId = service.createEvent({ projectId: project.id, templateId: template.id, name: '待修改事项', date: '2026-09-23', owner: '测试负责人' })
+      const event = service.snapshot().projects[0].events[0]
+      expect(event.items.some(item => item.attachments.length)).toBe(true)
+
+      service.updateEvent({ id: eventId, projectId: project.id, templateId: template.id, name: '已修改事项', date: '2026-09-24', owner: '新经办人' })
+      let current = service.snapshot().projects[0].events[0]
+      expect(current.name).toBe('已修改事项')
+      expect(current.date).toBe('2026-09-24')
+      expect(current.owner).toBe('新经办人')
+      const attachmentItem = current.items.find(item => item.attachments.length)!
+      expect(attachmentItem.attachments[0].path).toContain('2026-09-24_')
+      expect(attachmentItem.attachments[0].exists).toBe(true)
+
+      service.deleteEvent(eventId)
+      expect(service.snapshot().projects[0].events).toHaveLength(0)
     } finally { service.close() }
   })
 })

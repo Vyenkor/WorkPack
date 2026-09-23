@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WorkPack · 项目资料管理 Demo</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><span></span><span></span><span></span></div>
+        <div><strong>WorkPack</strong><small>项目资料管理</small></div>
+      </div>
+      <div class="workspace-switch"><span class="workspace-avatar">W</span><span>我的工作空间<small>演示环境</small></span><b>⌄</b></div>
+      <p class="nav-caption">工作空间</p>
+      <nav class="nav" aria-label="主导航">
+        <button type="button" data-view="home"><span class="nav-icon">▦</span>工作台</button>
+        <button type="button" data-view="projects"><span class="nav-icon">▤</span>项目管理</button>
+        <button type="button" data-view="pending"><span class="nav-icon">◷</span>待处理文件 <span id="navPending" class="nav-count"></span></button>
+        <button type="button" data-view="templates"><span class="nav-icon">▧</span>文件模板</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="flow-card">
+          <span class="flow-caption">清晰的工作流程</span>
+          <strong>项目 → 事项 → 文件</strong>
+          <p>把每次业务需要的文件整理清楚，逐项跟踪完成情况。</p>
+        </div>
+        <button type="button" class="reset-button" id="resetDemo">↺ &nbsp;恢复演示数据</button>
+        <div class="sidebar-user"><span class="user-avatar">陈</span><span><strong>陈佳</strong><small>项目负责人</small></span><span class="user-more">···</span></div>
+      </div>
+    </aside>
+    <div class="content-shell">
+      <header class="topbar">
+        <div id="breadcrumb" class="breadcrumb">工作台</div>
+        <div class="topbar-actions">
+          <label class="global-search"><span>⌕</span><input id="globalSearch" type="search" placeholder="搜索项目或客户，按回车查询" aria-label="搜索项目或客户"><kbd>↵</kbd></label>
+          <span class="today-label">2026年9月23日</span>
+          <span class="top-avatar">陈</span>
+        </div>
+      </header>
+      <main id="view" class="view"></main>
+    </div>
+  </div>
+  <div id="modalRoot"></div>
+  <div id="toastRoot" role="status" aria-live="polite"></div>
+</body>
+</html>

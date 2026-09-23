@@ -8,6 +8,13 @@ CHECKLIST = (ROOT / "src" / "renderer" / "src" / "components" / "ItemChecklist.v
 
 
 class RendererCopyTest(unittest.TestCase):
+    def test_template_library_is_presented_as_workflows(self):
+        self.assertIn("templates: '流程'", APP)
+        self.assertIn("<h1>流程</h1>", APP)
+        self.assertIn("新建流程", APP)
+        self.assertIn("编辑流程", APP)
+        self.assertNotIn("<h1>模板</h1>", APP)
+
     def test_removes_redundant_page_and_card_copy(self):
         redundant = [
             "按项目查看事项与文件状态。",

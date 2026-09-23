@@ -91,3 +91,4 @@ body { overflow: hidden; }
 .project-card-footer .project-delete { margin-left: auto; color: #bd625b; }
 .project-card-footer .project-delete + .link { margin-left: 0; }
 .pending-table-head, .pending-row { grid-template-columns: 1.25fr 1.4fr 1.5fr .7fr; }
+.eyebrow { display: none; }

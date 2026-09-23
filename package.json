@@ -1,0 +1,71 @@
+{
+  "name": "workpack",
+  "version": "0.1.0",
+  "description": "WorkPack 项目业务文件管理",
+  "main": "out/main/index.js",
+  "author": "WorkPack",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "build": "npm run typecheck && electron-vite build",
+    "postinstall": "electron-builder install-app-deps",
+    "test": "node scripts/test.cjs",
+    "test:e2e": "npm run build && playwright test",
+    "pack": "npm run build && electron-builder --win --dir",
+    "dist": "npm run build && electron-builder --win nsis"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.0.0",
+    "element-plus": "^2.11.0",
+    "vue": "^3.5.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "electron": "42.11.7",
+    "electron-builder": "^26.0.0",
+    "electron-vite": "^5.0.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0",
+    "vitest": "^3.2.0",
+    "vue-tsc": "^3.0.0"
+  },
+  "build": {
+    "appId": "com.workpack.desktop",
+    "productName": "WorkPack",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "WorkPack"
+    },
+    "artifactName": "WorkPack-${version}-Setup.${ext}"
+  }
+}

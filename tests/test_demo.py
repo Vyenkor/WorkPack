@@ -27,6 +27,10 @@ class DemoTest(unittest.TestCase):
             "openProjectModal",
             "openEventModal",
             "openEventDetail",
+            "chooseProjectFolder",
+            "createProjectFolder",
+            "downloadTemplateAsset",
+            "exportTemplateGroup",
             "文件清单状态已更新",
             "模拟上传",
         ]
@@ -43,6 +47,16 @@ class DemoTest(unittest.TestCase):
         self.assertIn("发货资料模板", script)
         self.assertIn("收货资料模板", script)
         self.assertIn("培训资料模板", script)
+
+    def test_project_folder_and_template_file_flow_are_visible(self):
+        script = (DEMO / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("选择上级文件夹", script)
+        self.assertIn("导入项目的模板文件", script)
+        self.assertIn("showDirectoryPicker", script)
+        self.assertIn("getDirectoryHandle", script)
+        self.assertIn("data-template-upload", script)
+        self.assertIn("data-export-asset", script)
 
 
 if __name__ == "__main__":

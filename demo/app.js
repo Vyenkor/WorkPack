@@ -4,6 +4,11 @@ const templateMap = {
     name: "发货资料模板",
     icon: "↗",
     description: "用于设备、备件等发货环节的资料归集",
+    assets: [
+      { name:"发货清单模板.docx", size:"42 KB", source:"demo" },
+      { name:"客户签收单模板.docx", size:"38 KB", source:"demo" },
+      { name:"设备发货明细.xlsx", size:"26 KB", source:"demo" }
+    ],
     files: [
       ["发货清单", "记录设备名称、数量及序列号", ["prepared", "filled", "signed", "archived"]],
       ["客户签收单", "由客户确认收货并签字", ["prepared", "filled", "signed", "archived"]],
@@ -16,6 +21,11 @@ const templateMap = {
     name: "收货资料模板",
     icon: "↙",
     description: "用于设备到货验收及异常记录",
+    assets: [
+      { name:"收货登记表.xlsx", size:"31 KB", source:"demo" },
+      { name:"到货验收单.docx", size:"45 KB", source:"demo" },
+      { name:"异常情况记录表.docx", size:"29 KB", source:"demo" }
+    ],
     files: [
       ["收货登记表", "登记到货时间和物品明细", ["prepared", "filled", "signed", "archived"]],
       ["到货验收单", "核对数量、外观及包装情况", ["prepared", "filled", "signed", "archived"]],
@@ -27,6 +37,11 @@ const templateMap = {
     name: "培训资料模板",
     icon: "◇",
     description: "用于现场培训及参训人员确认",
+    assets: [
+      { name:"培训计划模板.docx", size:"36 KB", source:"demo" },
+      { name:"培训签到表.xlsx", size:"24 KB", source:"demo" },
+      { name:"培训记录模板.docx", size:"41 KB", source:"demo" }
+    ],
     files: [
       ["培训计划", "说明时间、地点和培训内容", ["prepared", "filled", "archived"]],
       ["培训签到表", "参训人员现场签字", ["prepared", "filled", "signed", "archived"]],
@@ -35,6 +50,12 @@ const templateMap = {
     ]
   }
 };
+
+const uploadedTemplateFiles = new Map();
+const initialTemplateAssets = Object.fromEntries(Object.keys(templateMap).map(function (type) {
+  return [type, structuredClone(templateMap[type].assets)];
+}));
+let selectedDirectoryHandle = null;
 
 function createFiles(type, presets) {
   return templateMap[type].files.map(function (row, index) {
@@ -56,6 +77,7 @@ const seedProjects = [
   {
     id: 1, code: "WP-2026-018", name: "华东智造产线升级项目", customer: "华东智造有限公司",
     contact: "王工 · 138 0000 6821", owner: "陈佳", templates: ["shipping", "receiving", "training"],
+    folder: "D:\\项目资料\\华东智造产线升级项目", importedFiles: 9,
     note: "二期自动化产线设备交付及人员培训",
     events: [
       { id: 101, type: "shipping", name: "第一批控制柜发货", date: "2026-09-18", owner: "陈佳",
@@ -74,6 +96,7 @@ const seedProjects = [
   {
     id: 2, code: "WP-2026-016", name: "瑞科实验室设备交付", customer: "瑞科检测技术有限公司",
     contact: "刘经理 · 139 0000 3018", owner: "林晓", templates: ["shipping", "training"],
+    folder: "D:\\项目资料\\瑞科实验室设备交付", importedFiles: 6,
     note: "视觉检测平台交付及使用培训",
     events: [
       { id: 201, type: "shipping", name: "视觉检测平台发货", date: "2026-09-12", owner: "林晓",
@@ -95,6 +118,7 @@ const seedProjects = [
   {
     id: 3, code: "WP-2026-012", name: "北辰自动化培训支持", customer: "北辰自动化科技有限公司",
     contact: "赵主管 · 137 0000 5569", owner: "周远", templates: ["training"],
+    folder: "D:\\项目资料\\北辰自动化培训支持", importedFiles: 3,
     note: "面向工程团队的设备调试与维护培训",
     events: [
       { id: 301, type:"training", name:"设备维护培训", date:"2026-09-08", owner:"周远",
@@ -109,6 +133,7 @@ const seedProjects = [
   {
     id: 4, code: "WP-2026-021", name: "远航仓储设备收货", customer: "远航物流有限公司",
     contact: "徐工 · 136 0000 8871", owner: "陈佳", templates: ["receiving"],
+    folder: "D:\\项目资料\\远航仓储设备收货", importedFiles: 3,
     note: "仓储机器人到货验收",
     events: [
       { id: 401, type:"receiving", name:"仓储机器人收货", date:"2026-09-22", owner:"陈佳",
@@ -331,7 +356,8 @@ function renderProject() {
       infoItem("项目编号", project.code) + infoItem("项目负责人", project.owner) +
       infoItem("客户名称", project.customer) + infoItem("客户联系人", project.contact || "未填写") +
       '<div class="info-item"><small>默认适用模板</small><div class="template-tags">' + project.templates.map(typeTag).join("") + '</div></div>' +
-      infoItem("项目备注", project.note || "无") + '</div></div></section>';
+      infoItem("项目备注", project.note || "无") + infoItem("项目文件夹", project.folder || "未选择") +
+      infoItem("已导入模板文件", (project.importedFiles || 0) + " 份") + '</div></div></section>';
   }
   viewNode.innerHTML =
     heading(project.code, project.name, project.note || "暂无项目备注",
@@ -384,19 +410,39 @@ function renderTemplates() {
   const cards = Object.keys(templateMap).map(function (type) {
     const template = templateMap[type];
     const iconClass = type === "receiving" ? "receiving" : type === "training" ? "training" : "";
-    const list = template.files.slice(0, 3).map(function (file) { return "· " + file[0]; }).join("<br>");
+    const assetList = template.assets.map(function (asset, index) {
+      return '<div class="template-file"><span class="file-type">' + fileExtension(asset.name) +
+        '</span><span class="template-file-name"><strong>' + asset.name + '</strong><small>' +
+        asset.size + (asset.source === "upload" ? " · 已上传" : " · 演示文件") +
+        '</small></span><button class="button text small" data-export-asset="' + type + '" data-asset-index="' +
+        index + '">导出</button></div>';
+    }).join("");
     return '<article class="template-card"><span class="event-icon ' + iconClass + '">' + template.icon +
       '</span><h2>' + template.name + '</h2><p>' + template.description + '</p><div class="mini-list">' +
-      list + (template.files.length > 3 ? '<br>· 以及其他 ' + (template.files.length - 3) + ' 项' : "") +
-      '</div><footer><span>' + template.files.length + ' 份文件</span><button class="button small" data-template="' +
-      type + '">查看模板</button></footer></article>';
+      assetList + '</div><footer><span>' + template.assets.length + ' 个模板文件</span><span class="template-actions">' +
+      '<label class="button small upload-inline">＋ 上传<input type="file" multiple data-template-upload="' + type + '"></label>' +
+      '<button class="button small" data-export-template="' + type + '">全部导出</button></span></footer>' +
+      '<button class="button text small template-rule-link" data-template="' + type + '">查看文件要求</button></article>';
   }).join("");
-  viewNode.innerHTML = heading("文件模板", "业务文件模板", "模板决定创建业务事项时自动生成哪些文件及完成要求。") +
+  viewNode.innerHTML = heading("文件模板", "模板文件库", "把常用的 Word、Excel 等空白模板放在这里，需要时可导出或复制到项目文件夹。") +
+    '<div class="template-tip"><span>i</span><div><strong>模板文件只保存一份</strong><p>新建项目时选择所需模板，系统会复制一份到项目文件夹，原始模板保持不变。</p></div></div>' +
     '<section class="template-grid">' + cards + '</section>';
+}
+
+function fileExtension(name) {
+  const parts = name.split(".");
+  return parts.length > 1 ? parts.pop().toUpperCase() : "FILE";
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + " KB";
+  return (bytes / 1024 / 1024).toFixed(1) + " MB";
 }
 
 function openProjectModal(project) {
   const isEdit = Boolean(project);
+  selectedDirectoryHandle = null;
   const templateChecks = Object.keys(templateMap).map(function (type) {
     const checked = project ? project.templates.includes(type) : type === "shipping";
     return '<label class="check-option"><input type="checkbox" name="templates" value="' + type + '" ' +
@@ -405,16 +451,21 @@ function openProjectModal(project) {
   modalNode.innerHTML =
     '<div class="modal-backdrop"><form class="modal" id="projectForm" data-edit-id="' + (project ? project.id : "") + '">' +
     '<header class="modal-head"><div><h2>' + (isEdit ? "编辑项目" : "新建项目") +
-    '</h2><p>填写客户和负责人信息，并选择项目适用模板。</p></div><button type="button" class="modal-close" data-close-modal>×</button></header>' +
+    '</h2><p>填写项目信息，选择需要导入的模板文件和保存位置。</p></div><button type="button" class="modal-close" data-close-modal>×</button></header>' +
     '<div class="modal-body"><div class="field-grid">' +
-      fieldInput("项目名称", "name", "例如：华南工厂设备交付", project ? project.name : "", true, "full") +
+      '<div class="field full"><label>项目名称</label><input id="projectNameInput" name="name" placeholder="例如：华南工厂设备交付" value="' +
+      (project ? project.name : "") + '" required></div>' +
       fieldInput("客户名称", "customer", "客户公司名称", project ? project.customer : "", true, "") +
       '<div class="field"><label>项目负责人</label>' + ownerSelect(project ? project.owner : "陈佳") + '</div>' +
       fieldInput("客户联系人", "contact", "姓名、电话等", project ? project.contact : "", false, "full") +
-      '<div class="field full"><span>默认适用模板</span><div class="check-row">' + templateChecks +
-      '</div><p class="form-help">以后在项目内创建业务事项时，将优先显示这些模板。</p></div>' +
+      '<div class="field full"><span>导入项目的模板文件</span><div class="check-row">' + templateChecks +
+      '</div><p class="form-help">创建项目时，会将所选模板组中的文件复制到项目文件夹；以后创建业务事项时也会优先显示这些模板。</p></div>' +
       '<div class="field full"><label>项目备注</label><textarea name="note" placeholder="简要说明项目内容">' +
       (project ? project.note : "") + '</textarea></div>' +
+      '<div class="field full"><span>项目文件夹</span><div class="folder-picker"><button type="button" class="button" data-action="select-folder">▣　选择上级文件夹</button>' +
+      '<div class="folder-preview" id="folderPreview"><strong>' + (project && project.folder ? project.folder : "尚未选择保存位置") +
+      '</strong><small>' + (project && project.folder ? "更换位置后，会使用项目名称创建新文件夹" : "选择后将自动创建“上级文件夹、项目名称”目录") +
+      '</small></div></div><p class="form-help">浏览器会在你选择的位置下创建与项目名称相同的文件夹，并按发货、收货或培训分类复制模板文件。</p></div>' +
     '</div></div><footer class="modal-footer"><button type="button" class="button" data-close-modal>取消</button><button type="submit" class="button primary">' +
     (isEdit ? "保存修改" : "创建项目") + '</button></footer></form></div>';
 }
@@ -428,6 +479,83 @@ function ownerSelect(owner) {
   return '<select name="owner">' + ["陈佳","林晓","周远"].map(function (name) {
     return '<option ' + (name === owner ? "selected" : "") + '>' + name + '</option>';
   }).join("") + '</select>';
+}
+
+function safeFolderName(name) {
+  return (name || "未命名项目").replace(/[\\/:*?"<>|]/g, "_").trim();
+}
+
+function updateFolderPreview() {
+  const preview = document.querySelector("#folderPreview");
+  if (!preview || !selectedDirectoryHandle) return;
+  const projectName = safeFolderName(document.querySelector("#projectNameInput").value);
+  preview.innerHTML = '<strong>' + selectedDirectoryHandle.name + '\\' + projectName +
+    '</strong><small>将创建项目文件夹，并导入当前勾选的模板文件</small>';
+}
+
+async function chooseProjectFolder() {
+  try {
+    if (window.showDirectoryPicker) {
+      selectedDirectoryHandle = await window.showDirectoryPicker({ mode:"readwrite" });
+    } else {
+      selectedDirectoryHandle = { name:"项目资料（模拟位置）", mock:true };
+      toast("当前浏览器使用模拟文件夹选择");
+    }
+    updateFolderPreview();
+  } catch (error) {
+    if (error.name !== "AbortError") toast("未能选择文件夹，请重试");
+  }
+}
+
+async function createProjectFolder(projectName, selectedTemplates) {
+  const folderName = safeFolderName(projectName);
+  const result = {
+    path:selectedDirectoryHandle.name + "\\" + folderName,
+    importedFiles:selectedTemplates.reduce(function (sum,type) { return sum + templateMap[type].assets.length; }, 0)
+  };
+  if (selectedDirectoryHandle.mock || !selectedDirectoryHandle.getDirectoryHandle) return result;
+  const projectDirectory = await selectedDirectoryHandle.getDirectoryHandle(folderName, { create:true });
+  for (const type of selectedTemplates) {
+    const template = templateMap[type];
+    const typeDirectory = await projectDirectory.getDirectoryHandle(template.label + "资料", { create:true });
+    for (const asset of template.assets) {
+      const storedFile = asset.fileKey ? uploadedTemplateFiles.get(asset.fileKey) : null;
+      const outputName = storedFile ? asset.name : asset.name + "_演示说明.txt";
+      const outputFile = await typeDirectory.getFileHandle(outputName, { create:true });
+      const writable = await outputFile.createWritable();
+      const content = storedFile || new Blob([
+        "这是 WorkPack 前端 Demo 的演示模板占位文件。\n",
+        "正式产品中，此处会复制模板库内上传的原始文件：", asset.name
+      ], { type:"text/plain;charset=utf-8" });
+      await writable.write(content);
+      await writable.close();
+    }
+  }
+  return result;
+}
+
+function downloadTemplateAsset(type, index) {
+  const asset = templateMap[type].assets[Number(index)];
+  if (!asset) return;
+  const storedFile = asset.fileKey ? uploadedTemplateFiles.get(asset.fileKey) : null;
+  const blob = storedFile || new Blob([
+    "这是 WorkPack 前端 Demo 的演示模板说明。\n",
+    "正式产品将导出模板库内的原始文件：", asset.name
+  ], { type:"text/plain;charset=utf-8" });
+  const fileName = storedFile ? asset.name : asset.name + "_演示说明.txt";
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+
+function exportTemplateGroup(type) {
+  templateMap[type].assets.forEach(function (asset, index) {
+    window.setTimeout(function () { downloadTemplateAsset(type, index); }, index * 120);
+  });
+  toast("已开始导出 " + templateMap[type].assets.length + " 个模板文件");
 }
 
 function openEventModal(projectId) {
@@ -506,7 +634,7 @@ function openTemplate(type) {
     '</ul></div><footer class="modal-footer"><button type="button" class="button primary" data-close-modal>我知道了</button></footer></div></div>';
 }
 
-document.addEventListener("click", function (event) {
+document.addEventListener("click", async function (event) {
   const button = event.target.closest("button");
   if (!button) return;
   if (button.dataset.view) {
@@ -530,6 +658,7 @@ document.addEventListener("click", function (event) {
       openEventModal(Number(button.dataset.project) || null);
     }
   }
+  if (button.dataset.action === "select-folder") await chooseProjectFolder();
   if (button.dataset.closeModal !== undefined) modalNode.innerHTML = "";
   if (button.dataset.openProject) {
     appState.selectedProjectId = Number(button.dataset.openProject);
@@ -551,6 +680,8 @@ document.addEventListener("click", function (event) {
   }
   if (button.dataset.openEvent) openEventDetail(button.dataset.project, button.dataset.openEvent);
   if (button.dataset.template) openTemplate(button.dataset.template);
+  if (button.dataset.exportAsset) downloadTemplateAsset(button.dataset.exportAsset, button.dataset.assetIndex);
+  if (button.dataset.exportTemplate) exportTemplateGroup(button.dataset.exportTemplate);
   if (button.dataset.saveEvent !== undefined) {
     modalNode.innerHTML = "";
     render();
@@ -558,7 +689,7 @@ document.addEventListener("click", function (event) {
   }
 });
 
-document.addEventListener("submit", function (event) {
+document.addEventListener("submit", async function (event) {
   event.preventDefault();
   const data = new FormData(event.target);
   if (event.target.id === "projectForm") {
@@ -568,11 +699,26 @@ document.addEventListener("submit", function (event) {
       return;
     }
     const editId = Number(event.target.dataset.editId);
+    if (!editId && !selectedDirectoryHandle) {
+      toast("请先选择项目文件夹");
+      return;
+    }
+    let folderResult = null;
+    if (selectedDirectoryHandle) {
+      try {
+        folderResult = await createProjectFolder(data.get("name"), selectedTemplates);
+      } catch (error) {
+        toast("项目文件夹创建失败，请检查文件夹权限");
+        return;
+      }
+    }
     if (editId) {
       const project = appState.projects.find(function (item) { return item.id === editId; });
       Object.assign(project, {
         name:data.get("name"), customer:data.get("customer"), contact:data.get("contact"),
-        owner:data.get("owner"), templates:selectedTemplates, note:data.get("note")
+        owner:data.get("owner"), templates:selectedTemplates, note:data.get("note"),
+        folder:folderResult ? folderResult.path : project.folder,
+        importedFiles:folderResult ? folderResult.importedFiles : project.importedFiles
       });
       toast("项目信息已保存");
     } else {
@@ -580,7 +726,8 @@ document.addEventListener("submit", function (event) {
       appState.projects.unshift({
         id:id, code:"WP-2026-" + String(id + 21).padStart(3, "0"),
         name:data.get("name"), customer:data.get("customer"), contact:data.get("contact"),
-        owner:data.get("owner"), templates:selectedTemplates, note:data.get("note"), events:[]
+        owner:data.get("owner"), templates:selectedTemplates, note:data.get("note"),
+        folder:folderResult.path, importedFiles:folderResult.importedFiles, events:[]
       });
       appState.selectedProjectId = id;
       appState.view = "project";
@@ -607,6 +754,20 @@ document.addEventListener("submit", function (event) {
 });
 
 document.addEventListener("change", function (event) {
+  if (event.target.id === "projectNameInput") updateFolderPreview();
+  if (event.target.matches("[data-template-upload]")) {
+    const type = event.target.dataset.templateUpload;
+    Array.from(event.target.files).forEach(function (file) {
+      const fileKey = type + "-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+      uploadedTemplateFiles.set(fileKey, file);
+      templateMap[type].assets.push({
+        name:file.name, size:formatFileSize(file.size), source:"upload", fileKey:fileKey
+      });
+    });
+    const count = event.target.files.length;
+    renderTemplates();
+    toast("已加入 " + count + " 个模板文件");
+  }
   if (event.target.id === "eventType") {
     const template = templateMap[event.target.value];
     document.querySelector("#templatePreviewName").value = template.name;
@@ -642,11 +803,20 @@ document.querySelector("#globalSearch").addEventListener("keydown", function (ev
   }
 });
 
+document.addEventListener("input", function (event) {
+  if (event.target.id === "projectNameInput") updateFolderPreview();
+});
+
 document.querySelector("#resetDemo").addEventListener("click", function () {
   appState = {
     view:"home", projects:structuredClone(seedProjects), selectedProjectId:null,
     projectTab:"events", projectFilter:"all", pendingFilter:"all", search:""
   };
+  Object.keys(templateMap).forEach(function (type) {
+    templateMap[type].assets = structuredClone(initialTemplateAssets[type]);
+  });
+  uploadedTemplateFiles.clear();
+  selectedDirectoryHandle = null;
   document.querySelector("#globalSearch").value = "";
   render();
   toast("演示数据已恢复");

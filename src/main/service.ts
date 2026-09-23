@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { types, steps, typeLabels, type Snapshot, type Project, type Template, type Item, type Asset, type BusinessEvent } from '../shared/model'
+import { businessTypeLabel, types, steps, typeLabels, type Snapshot, type Project, type Template, type Item, type Asset, type BusinessEvent } from '../shared/model'
 
 const name = z.string().trim().min(1, '名称不能为空').max(100)
 const text = z.string().max(4000)
@@ -11,7 +11,7 @@ const id = z.string().uuid()
 const required = z.array(z.enum(steps)).max(4).refine(a => new Set(a).size === a.length)
 const rule = z.object({ id, name, note: text, required, assetId: id.optional() })
 const projectSchema = z.object({ id: id.optional(), name, customer: name, contact: text, owner: name, note: text, templateIds: z.array(id).max(100) })
-const templateSchema = z.object({ id: id.optional(), name, type: z.enum(types), rules: z.array(rule).max(200).refine(a => new Set(a.map(r => r.id)).size === a.length) })
+const templateSchema = z.object({ id: id.optional(), name, type: z.string().trim().min(1, '事项类型不能为空').max(50), rules: z.array(rule).max(200).refine(a => new Set(a.map(r => r.id)).size === a.length) })
 const eventSchema = z.object({ projectId: id, templateId: id, name, date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s => { const d = new Date(s); return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s }, '日期无效'), owner: name })
 const eventUpdateSchema = eventSchema.extend({ id })
 const itemSchema = z.object({ id: id.optional(), eventId: id, name, note: text, required })
@@ -170,17 +170,17 @@ export class WorkPackService {
     return { projects, templates, dataDirectory: this.dataDirectory }
   }
   saveTemplate(input: unknown) {
-    const data = templateSchema.parse(input)
+    const data = templateSchema.parse(input), type = safeName(data.type)
     if (data.id) {
       const previous = this.get('templates', data.id)
-      if (previous.type !== data.type) throw new Error('已有模板不能修改业务类型，请新建模板')
+      if (previous.type !== type) throw new Error('已有流程不能修改事项类型，请新建流程')
       this.db.prepare('UPDATE templates SET name=?, rules=? WHERE id=?').run(data.name, JSON.stringify(data.rules), data.id)
-    } else this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(randomUUID(), data.name, data.type, JSON.stringify(data.rules))
+    } else this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(randomUUID(), data.name, type, JSON.stringify(data.rules))
   }
   deleteTemplate(value: string) {
     this.get('templates', value)
-    if (this.all('projects').some(p => JSON.parse(p.template_ids).includes(value))) throw new Error('模板仍被项目设为默认模板，请先调整项目设置')
-    if (this.db.prepare('SELECT 1 FROM events WHERE template_id=? LIMIT 1').get(value)) throw new Error('模板已被业务事项使用，不能删除')
+    if (this.all('projects').some(p => JSON.parse(p.template_ids).includes(value))) throw new Error('流程仍被项目使用，请先调整项目设置')
+    if (this.db.prepare('SELECT 1 FROM events WHERE template_id=? LIMIT 1').get(value)) throw new Error('流程已被事项使用，不能删除')
     this.db.prepare('DELETE FROM templates WHERE id=?').run(value)
   }
   importTemplates(value: string, sources: string[]) {
@@ -208,7 +208,7 @@ export class WorkPackService {
       const assets = this.db.prepare('SELECT * FROM assets WHERE template_id=?').all(templateId) as Row[]
       for (const asset of assets) {
         if (this.db.prepare('SELECT 1 FROM project_copies WHERE project_id=? AND asset_id=?').get(projectId, asset.id)) continue
-        const target = this.mkdir(root, path.join('模板文件', typeLabels[template.type as keyof typeof typeLabels]), dirs)
+        const target = this.mkdir(root, path.join('模板文件', businessTypeLabel(template.type)), dirs)
         this.copy(inside(this.templateRoot, asset.path), target, files)
         this.db.prepare('INSERT INTO project_copies VALUES (?, ?)').run(projectId, asset.id)
       }
@@ -287,7 +287,7 @@ export class WorkPackService {
         if (asset) {
           const source = inside(this.templateRoot, asset.path)
           if (present(source)) {
-            const target = this.mkdir(root, path.join(typeLabels[template.type as keyof typeof typeLabels], `${data.date}_${eventId}`, itemId), dirs)
+            const target = this.mkdir(root, path.join(businessTypeLabel(template.type), `${data.date}_${eventId}`, itemId), dirs)
             const copied = this.copy(source, target, files)
             this.db.prepare('INSERT INTO attachments VALUES (?, ?, ?, ?, ?)').run(randomUUID(), itemId, path.basename(copied), path.relative(root, copied), new Date().toISOString())
             usedAssets.add(asset.id)
@@ -305,8 +305,8 @@ export class WorkPackService {
     const data = eventUpdateSchema.parse(input), event = this.get('events', data.id)
     if (event.project_id !== data.projectId || event.template_id !== data.templateId) throw new Error('事项所属项目或模板不能修改')
     const project = this.get('projects', data.projectId), root = this.root(project)
-    const oldDir = inside(root, path.join(typeLabels[event.type as keyof typeof typeLabels], `${event.date}_${event.id}`))
-    const newDir = inside(root, path.join(typeLabels[event.type as keyof typeof typeLabels], `${data.date}_${event.id}`))
+    const oldDir = inside(root, path.join(businessTypeLabel(event.type), `${event.date}_${event.id}`))
+    const newDir = inside(root, path.join(businessTypeLabel(event.type), `${data.date}_${event.id}`))
     let renamed = false
     try {
       if (oldDir !== newDir && fs.existsSync(oldDir)) {
@@ -383,7 +383,7 @@ export class WorkPackService {
   importAttachments(value: string, sources: string[]) {
     const { item, event, project } = this.projectForItem(value), root = this.root(project)
     this.atomic((files, dirs) => {
-      const target = this.mkdir(root, path.join(typeLabels[event.type as keyof typeof typeLabels], `${event.date}_${event.id}`, item.id), dirs)
+      const target = this.mkdir(root, path.join(businessTypeLabel(event.type), `${event.date}_${event.id}`, item.id), dirs)
       for (const source of sources) {
         const copied = this.copy(source, target, files)
         this.db.prepare('INSERT INTO attachments VALUES (?, ?, ?, ?, ?)').run(randomUUID(), value, path.basename(source), path.relative(root, copied), new Date().toISOString())
@@ -403,7 +403,7 @@ export class WorkPackService {
   relocateAttachment(value: string, source: string) {
     const a = this.get('attachments', value), { item, event, project } = this.projectForItem(a.item_id), root = this.root(project)
     this.atomic((files, dirs) => {
-      const target = this.mkdir(root, path.join(typeLabels[event.type as keyof typeof typeLabels], `${event.date}_${event.id}`, item.id), dirs)
+      const target = this.mkdir(root, path.join(businessTypeLabel(event.type), `${event.date}_${event.id}`, item.id), dirs)
       const copied = this.copy(source, target, files)
       this.db.prepare('UPDATE attachments SET name=?, path=? WHERE id=?').run(path.basename(source), path.relative(root, copied), value)
     })

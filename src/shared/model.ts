@@ -1,6 +1,7 @@
 export const types = ['shipping', 'receiving', 'training'] as const
-export type BusinessType = typeof types[number]
-export const typeLabels: Record<BusinessType, string> = { shipping: '发货', receiving: '收货', training: '培训' }
+export type BusinessType = string
+export const typeLabels: Record<string, string> = { shipping: '发货', receiving: '收货', training: '培训' }
+export function businessTypeLabel(type: BusinessType) { return typeLabels[type] ?? type }
 export const steps = ['prepared', 'filled', 'signed', 'archived'] as const
 export type Step = typeof steps[number]
 export type Status = 'pending' | 'done' | 'na'

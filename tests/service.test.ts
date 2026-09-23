@@ -56,6 +56,30 @@ describe('WorkPackService', () => {
     } finally { service.close() }
   })
 
+  it('supports user-defined workflow types and stores files under that type', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const base = service.snapshot().templates[0]
+      const customName = '售后流程'
+      service.saveTemplate({ name: customName, type: '售后', rules: [{ ...base.rules[0], name: '维修记录' }] })
+      const custom = service.snapshot().templates.find(template => template.name === customName)!
+      expect(custom.type).toBe('售后')
+      const source = path.join(root, '维修记录模板.docx')
+      fs.writeFileSync(source, 'template')
+      service.importTemplates(custom.id, [source])
+
+      const parent = path.join(root, 'projects')
+      fs.mkdirSync(parent)
+      service.saveProject(inputForProject(custom.id), parent)
+      const project = service.snapshot().projects[0]
+      service.createEvent({ projectId: project.id, templateId: custom.id, name: '售后事项', date: '2026-09-23', owner: '测试负责人' })
+
+      expect(service.snapshot().projects[0].events[0].type).toBe('售后')
+      expect(fs.existsSync(path.join(project.folder, '售后', '2026-09-23_' + service.snapshot().projects[0].events[0].id))).toBe(true)
+    } finally { service.close() }
+  })
+
   it('marks prepared files done on import and returns them to pending after removal', () => {
     const root = tempDirectory()
     const service = new WorkPackService(path.join(root, 'data'))

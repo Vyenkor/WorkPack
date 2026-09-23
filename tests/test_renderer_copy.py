@@ -15,6 +15,10 @@ class RendererCopyTest(unittest.TestCase):
         self.assertIn("编辑流程", APP)
         self.assertNotIn("<h1>模板</h1>", APP)
 
+    def test_workflow_type_can_be_named_by_the_user(self):
+        self.assertIn('v-model="templateTypeInput"', APP)
+        self.assertNotIn('<label>事项类型<select', APP)
+
     def test_removes_redundant_page_and_card_copy(self):
         redundant = [
             "按项目查看事项与文件状态。",

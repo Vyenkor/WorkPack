@@ -249,6 +249,20 @@ export class WorkPackService {
       }
     }
   }
+  deleteProject(value: string) {
+    const project = this.get('projects', value)
+    this.db.transaction(() => {
+      const events = this.db.prepare('SELECT id FROM events WHERE project_id=?').all(project.id) as Array<{ id: string }>
+      for (const event of events) {
+        const items = this.db.prepare('SELECT id FROM items WHERE event_id=?').all(event.id) as Array<{ id: string }>
+        for (const item of items) this.db.prepare('DELETE FROM attachments WHERE item_id=?').run(item.id)
+        this.db.prepare('DELETE FROM items WHERE event_id=?').run(event.id)
+      }
+      this.db.prepare('DELETE FROM events WHERE project_id=?').run(project.id)
+      this.db.prepare('DELETE FROM project_copies WHERE project_id=?').run(project.id)
+      this.db.prepare('DELETE FROM projects WHERE id=?').run(project.id)
+    })()
+  }
   relocateProject(value: string, destination: string) {
     const project = this.get('projects', value), folder = directory(destination)
     const marker = inside(folder, '.workpack-project.json')

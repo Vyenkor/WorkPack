@@ -22,6 +22,7 @@ export interface WorkPackAPI {
   snapshot(): Promise<Snapshot>
   chooseDirectory(): Promise<{ token: string; path: string } | null>
   saveProject(input: ProjectInput): Promise<void>
+  deleteProject(id: string): Promise<void>
   relocateProject(id: string): Promise<boolean>
   openProject(id: string): Promise<void>
   saveTemplate(input: TemplateInput): Promise<void>

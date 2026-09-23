@@ -10,6 +10,7 @@ const api: WorkPackAPI = {
   snapshot: () => call('snapshot'),
   chooseDirectory: () => call('chooseDirectory'),
   saveProject: input => call('saveProject', input),
+  deleteProject: id => call('deleteProject', id),
   relocateProject: id => call('relocateProject', id),
   openProject: id => call('openProject', id),
   saveTemplate: input => call('saveTemplate', input),

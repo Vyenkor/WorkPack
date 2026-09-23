@@ -157,4 +157,25 @@ describe('WorkPackService', () => {
       expect(service.snapshot().projects[0].events).toHaveLength(0)
     } finally { service.close() }
   })
+
+  it('deletes project records while preserving the project folder and files', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const template = service.snapshot().templates[0]
+      const parent = path.join(root, 'projects')
+      fs.mkdirSync(parent)
+      service.saveProject(inputForProject(template.id), parent)
+      const project = service.snapshot().projects[0]
+      const marker = path.join(project.folder, '现场资料.txt')
+      fs.writeFileSync(marker, 'keep')
+      service.createEvent({ projectId: project.id, templateId: template.id, name: '待删除事项', date: '2026-09-23', owner: '测试负责人' })
+
+      service.deleteProject(project.id)
+
+      expect(service.snapshot().projects).toHaveLength(0)
+      expect(fs.existsSync(project.folder)).toBe(true)
+      expect(fs.readFileSync(marker, 'utf8')).toBe('keep')
+    } finally { service.close() }
+  })
 })

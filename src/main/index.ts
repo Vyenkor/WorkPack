@@ -52,6 +52,7 @@ function registerIPC() {
     service.saveProject(input, grant.directoryToken ? directoryGrants.get(grant.directoryToken) : undefined)
     if (grant.directoryToken) directoryGrants.delete(grant.directoryToken)
   })
+  handle('deleteProject', value => { stringId.parse(value); service.deleteProject(value) })
   handle('relocateProject', async value => { stringId.parse(value); const folder = await selectFolder(); if (!folder) return false; service.relocateProject(value, folder); return true })
   handle('openProject', value => open(service.projectPath(stringId.parse(value))))
   handle('saveTemplate', value => service.saveTemplate(value))

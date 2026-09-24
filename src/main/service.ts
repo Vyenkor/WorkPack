@@ -165,7 +165,7 @@ export class WorkPackService {
       })) as BusinessEvent[]
     }}) as Project[]
     for (const project of projects) for (const event of project.events) for (const item of event.items) {
-      if (item.attachments.length && !item.attachments.some(a => a.exists) && item.states.prepared === 'done') item.states.prepared = 'pending'
+      if (!item.attachments.some(a => a.exists) && item.states.prepared === 'done') item.states.prepared = 'pending'
     }
     return { projects, templates, dataDirectory: this.dataDirectory }
   }
@@ -343,13 +343,16 @@ export class WorkPackService {
       this.db.prepare('DELETE FROM events WHERE id=?').run(event.id)
     })()
   }
+  private hasFile(itemId: string, root: string) {
+    const attachments = this.db.prepare('SELECT path FROM attachments WHERE item_id=?').all(itemId) as Row[]
+    return attachments.some(attachment => {
+      try { return present(inside(root, attachment.path)) } catch { return false }
+    })
+  }
   private completeItems(items: Row[], root: string) {
     for (const item of items) {
       const states = JSON.parse(item.states) as Record<string, string>
-      const attachments = this.db.prepare('SELECT path FROM attachments WHERE item_id=?').all(item.id) as Row[]
-      const hasFile = attachments.some(attachment => {
-        try { return present(inside(root, attachment.path)) } catch { return false }
-      })
+      const hasFile = this.hasFile(item.id, root)
       for (const step of steps) if (states[step] === 'pending' && (step !== 'prepared' || hasFile)) states[step] = 'done'
       this.db.prepare('UPDATE items SET states=?, required=? WHERE id=?').run(JSON.stringify(states), JSON.stringify(steps.filter(step => states[step] !== 'na')), item.id)
     }
@@ -378,6 +381,10 @@ export class WorkPackService {
   deleteItem(value: string) { this.get('items', value); this.db.prepare('DELETE FROM items WHERE id=?').run(value) }
   setStatus(input: unknown) {
     const data = statusSchema.parse(input), item = this.get('items', data.id)
+    if (data.step === 'prepared' && data.status === 'done') {
+      const { project } = this.projectForItem(data.id)
+      if (!this.hasFile(data.id, this.root(project))) throw new Error('请先上传文件，再标记为已准备')
+    }
     const states = JSON.parse(item.states); states[data.step] = data.status
     const applicable = steps.filter(s => states[s] !== 'na')
     this.db.prepare('UPDATE items SET states=?, required=? WHERE id=?').run(JSON.stringify(states), JSON.stringify(applicable), data.id)

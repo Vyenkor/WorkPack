@@ -118,4 +118,4 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 
 ## 协作约定
 
-见 [AGENT.md](AGENT.md)：每次改动后都要提交对应的 git commit，并编写或更新测试，确保所有测试通过后再交付。
+见 [AGENT.md](AGENT.md)：每次改动后都要提交对应的 git commit，并编写或更新测试，确保所有测试通过后再交付。涉及界面、样式或交互的修改，要先阅读并遵循 [DESIGN.md](DESIGN.md)。

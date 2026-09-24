@@ -214,7 +214,7 @@ export class WorkPackService {
       }
     }
   }
-  saveProject(input: unknown, parent?: string) {
+  saveProject(input: unknown, parent?: string): string {
     const data = projectSchema.parse(input), projectName = safeName(data.name)
     for (const value of data.templateIds) this.get('templates', value)
     if (!data.id) {
@@ -227,6 +227,7 @@ export class WorkPackService {
         this.db.prepare('INSERT INTO projects VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(projectId, projectName, data.customer, data.contact, data.owner, data.note, root, JSON.stringify(data.templateIds))
         this.copyTemplates(projectId, root, data.templateIds, files, dirs)
       })
+      return projectId
     } else {
       const previous = this.get('projects', data.id), oldRoot = this.root(previous)
       const newRoot = path.join(path.dirname(oldRoot), projectName)
@@ -247,6 +248,7 @@ export class WorkPackService {
         }
         throw error
       }
+      return data.id
     }
   }
   deleteProject(value: string) {

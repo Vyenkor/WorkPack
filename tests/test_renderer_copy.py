@@ -19,6 +19,10 @@ class RendererCopyTest(unittest.TestCase):
         self.assertIn('v-model="templateTypeInput"', APP)
         self.assertNotIn('<label>事项类型<select', APP)
 
+    def test_saved_project_is_opened_by_id(self):
+        self.assertIn("projects.find(item => item.id === saved)", APP)
+        self.assertNotIn("projects.find(item => item.name === name)", APP)
+
     def test_removes_redundant_page_and_card_copy(self):
         redundant = [
             "按项目查看事项与文件状态。",

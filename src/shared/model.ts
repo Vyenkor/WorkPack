@@ -22,7 +22,7 @@ export interface ItemInput { id?: string; eventId: string; name: string; note: s
 export interface WorkPackAPI {
   snapshot(): Promise<Snapshot>
   chooseDirectory(): Promise<{ token: string; path: string } | null>
-  saveProject(input: ProjectInput): Promise<void>
+  saveProject(input: ProjectInput): Promise<string>
   deleteProject(id: string): Promise<void>
   relocateProject(id: string): Promise<boolean>
   openProject(id: string): Promise<void>

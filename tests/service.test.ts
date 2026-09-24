@@ -152,6 +152,28 @@ describe('WorkPackService', () => {
     } finally { service.close() }
   })
 
+  it('returns the saved project id so same-name projects stay distinguishable', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const template = service.snapshot().templates[0]
+      const firstParent = path.join(root, 'first'), secondParent = path.join(root, 'second')
+      fs.mkdirSync(firstParent)
+      fs.mkdirSync(secondParent)
+      const firstId = service.saveProject(inputForProject(template.id), firstParent)
+      const secondId = service.saveProject(inputForProject(template.id), secondParent)
+
+      expect(firstId).not.toBe(secondId)
+      const projects = service.snapshot().projects
+      expect(projects.find(project => project.id === firstId)!.folder).toBe(path.join(firstParent, '测试项目'))
+      expect(projects.find(project => project.id === secondId)!.folder).toBe(path.join(secondParent, '测试项目'))
+
+      const edited = service.saveProject({ ...inputForProject(template.id), id: secondId, name: '重命名项目' })
+      expect(edited).toBe(secondId)
+      expect(service.snapshot().projects.find(project => project.id === secondId)!.folder).toBe(path.join(secondParent, '重命名项目'))
+    } finally { service.close() }
+  })
+
   it('updates event details and moves generated work copies with the date', () => {
     const root = tempDirectory()
     const service = new WorkPackService(path.join(root, 'data'))

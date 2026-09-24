@@ -1,0 +1,476 @@
+---
+version: alpha
+name: WorkPack
+description: "A calm, light, information-dense Windows desktop tool for tracking project paperwork. Warm off-white canvas (#f5f7f5), white panels separated by hairline borders rather than shadows, near-black green-tinted ink (#17221d), and one restrained brand green (#1f7a55) reserved for primary actions, focus and the active navigation item. Status is the loudest thing on screen: done green, pending orange, not-applicable gray, always paired with a text label. Business types use a separate blue / teal / purple family so they are never confused with status. Chinese-first typography: Microsoft YaHei UI, body at 14px with 1.6 line height, nothing below 12px."
+
+colors:
+  primary: "#1f7a55"
+  primary-hover: "#1a6848"
+  primary-soft: "#e8f5ed"
+  on-primary: "#ffffff"
+  focus-ring: "#3f9a70"
+  canvas: "#f5f7f5"
+  surface: "#ffffff"
+  surface-subtle: "#fafcfb"
+  surface-hover: "#f3f8f5"
+  sidebar: "#fbfcfb"
+  hairline: "#e3e9e4"
+  hairline-strong: "#cfd9d2"
+  control-border: "#859189"
+  ink: "#17221d"
+  ink-secondary: "#4a5850"
+  ink-muted: "#66736b"
+  status-done: "#1d6f4c"
+  status-done-soft: "#e8f5ed"
+  status-pending: "#9a5412"
+  status-pending-soft: "#fff2e5"
+  status-na: "#5f6a64"
+  status-na-soft: "#eef1ef"
+  danger: "#b3261e"
+  danger-soft: "#fdecea"
+  type-shipping: "#2f65a0"
+  type-shipping-soft: "#eaf2fb"
+  type-receiving: "#12707e"
+  type-receiving-soft: "#e3f4f6"
+  type-training: "#6250a6"
+  type-training-soft: "#f0edfb"
+  type-custom: "#4f5b6e"
+  type-custom-soft: "#edf0f5"
+  overlay: "rgba(35, 48, 41, 0.3)"
+
+typography:
+  page-title:
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontSize: 24px
+    fontWeight: 600
+    lineHeight: 1.35
+    letterSpacing: 0
+  section-title:
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontSize: 18px
+    fontWeight: 600
+    lineHeight: 1.4
+    letterSpacing: 0
+  card-title:
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontSize: 15px
+    fontWeight: 600
+    lineHeight: 1.45
+    letterSpacing: 0
+  body:
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontSize: 14px
+    fontWeight: 400
+    lineHeight: 1.6
+    letterSpacing: 0
+  body-sm:
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontSize: 13px
+    fontWeight: 400
+    lineHeight: 1.6
+    letterSpacing: 0
+  label:
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontSize: 13px
+    fontWeight: 500
+    lineHeight: 1.4
+    letterSpacing: 0
+  caption:
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontSize: 12px
+    fontWeight: 400
+    lineHeight: 1.5
+    letterSpacing: 0
+  button:
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontSize: 13px
+    fontWeight: 500
+    lineHeight: 1.2
+    letterSpacing: 0
+  stat-number:
+    fontFamily: "Segoe UI, Microsoft YaHei UI, sans-serif"
+    fontSize: 26px
+    fontWeight: 600
+    lineHeight: 1.1
+    letterSpacing: 0
+  mono:
+    fontFamily: "Cascadia Mono, Consolas, monospace"
+    fontSize: 12px
+    fontWeight: 400
+    lineHeight: 1.5
+    letterSpacing: 0
+
+rounded:
+  sm: 4px
+  md: 6px
+  lg: 8px
+  xl: 12px
+  pill: 9999px
+
+spacing:
+  xxs: 4px
+  xs: 8px
+  sm: 12px
+  md: 16px
+  lg: 24px
+  xl: 32px
+  xxl: 40px
+
+components:
+  app-canvas:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+  divider:
+    backgroundColor: "{colors.hairline}"
+    height: 1px
+  divider-strong:
+    backgroundColor: "{colors.hairline-strong}"
+    height: 1px
+  control-boundary:
+    backgroundColor: "{colors.control-border}"
+    height: 1px
+  focus-indicator:
+    backgroundColor: "{colors.focus-ring}"
+    rounded: "{rounded.md}"
+    height: 3px
+  modal-overlay:
+    backgroundColor: "{colors.overlay}"
+  button-disabled:
+    backgroundColor: "{colors.surface-subtle}"
+    textColor: "{colors.ink-muted}"
+    typography: "{typography.button}"
+    rounded: "{rounded.md}"
+    height: 36px
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.button}"
+    rounded: "{rounded.md}"
+    padding: 0 16px
+    height: 36px
+  button-primary-hover:
+    backgroundColor: "{colors.primary-hover}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.button}"
+    rounded: "{rounded.md}"
+  button-secondary:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink-secondary}"
+    typography: "{typography.button}"
+    rounded: "{rounded.md}"
+    padding: 0 16px
+    height: 36px
+  button-small:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink-secondary}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.md}"
+    padding: 0 10px
+    height: 28px
+  button-danger-text:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.danger}"
+    typography: "{typography.button}"
+    rounded: "{rounded.md}"
+  text-input:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.md}"
+    padding: 8px 10px
+    height: 36px
+  text-input-focused:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.md}"
+  nav-item:
+    backgroundColor: "{colors.sidebar}"
+    textColor: "{colors.ink-secondary}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.lg}"
+    padding: 10px 12px
+  nav-item-active:
+    backgroundColor: "{colors.primary-soft}"
+    textColor: "{colors.primary}"
+    typography: "{typography.label}"
+    rounded: "{rounded.lg}"
+    padding: 10px 12px
+  panel:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.xl}"
+    padding: 20px
+  table-header:
+    backgroundColor: "{colors.surface-subtle}"
+    textColor: "{colors.ink-muted}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.sm}"
+    padding: 10px 12px
+  table-row:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.sm}"
+    padding: 12px
+  table-row-hover:
+    backgroundColor: "{colors.surface-hover}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.sm}"
+  status-done:
+    backgroundColor: "{colors.status-done-soft}"
+    textColor: "{colors.status-done}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.pill}"
+    padding: 2px 10px
+  status-pending:
+    backgroundColor: "{colors.status-pending-soft}"
+    textColor: "{colors.status-pending}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.pill}"
+    padding: 2px 10px
+  status-na:
+    backgroundColor: "{colors.status-na-soft}"
+    textColor: "{colors.status-na}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.pill}"
+    padding: 2px 10px
+  type-badge-shipping:
+    backgroundColor: "{colors.type-shipping-soft}"
+    textColor: "{colors.type-shipping}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.md}"
+    padding: 2px 8px
+  type-badge-receiving:
+    backgroundColor: "{colors.type-receiving-soft}"
+    textColor: "{colors.type-receiving}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.md}"
+    padding: 2px 8px
+  type-badge-training:
+    backgroundColor: "{colors.type-training-soft}"
+    textColor: "{colors.type-training}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.md}"
+    padding: 2px 8px
+  type-badge-custom:
+    backgroundColor: "{colors.type-custom-soft}"
+    textColor: "{colors.type-custom}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.md}"
+    padding: 2px 8px
+  progress-fill:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    rounded: "{rounded.pill}"
+    height: 6px
+  modal:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.xl}"
+    padding: 24px
+  toast-success:
+    backgroundColor: "{colors.status-done-soft}"
+    textColor: "{colors.status-done}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.lg}"
+    padding: 12px 16px
+  toast-error:
+    backgroundColor: "{colors.danger-soft}"
+    textColor: "{colors.danger}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.lg}"
+    padding: 12px 16px
+  banner-warning:
+    backgroundColor: "{colors.status-pending-soft}"
+    textColor: "{colors.status-pending}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.lg}"
+    padding: 12px 16px
+---
+
+# WorkPack 设计规范
+
+本文件是 WorkPack 界面的设计依据，供开发者和 AI agent 修改界面时参照。文件头部的 token 是唯一的取值来源，正文说明这些值的用途和交互规则。格式遵循 [Google Stitch DESIGN.md](https://stitch.withgoogle.com/docs/design-md/specification/)。
+
+## Overview
+
+WorkPack 是给项目交付、物流和培训岗位的办公人员使用的 Windows 桌面工具，用户每天要在大量文件清单里找出“还缺什么”。界面的目标是**安静、清楚、密度适中**：
+
+- 浅色、低饱和的背景，让状态颜色成为页面上最醒目的信息。
+- 面板之间用细线分隔，不靠阴影和大色块制造层次。
+- 品牌绿只用在主要按钮、焦点和当前导航项上，不做装饰。
+- 用户大多不是技术人员：文案直白，操作结果立即可见，删除这类不可逆操作之前一定要确认。
+
+风格参考 Notion 的温和极简和 Linear 的克制原则，但 WorkPack 使用浅色主题，并以中文排版为准。
+
+## Colors
+
+### 品牌与界面
+
+- `primary` 用于主要按钮、当前导航项、焦点、链接和进度条，每个视图里的主要按钮不超过一个。
+- `canvas` 是窗口背景，`surface` 是面板和卡片，`surface-subtle` 用于表头和面板底栏，`surface-hover` 用于可点击行的悬停状态。
+- 文字分三级：`ink` 用于标题和正文，`ink-secondary` 用于次要正文和按钮，`ink-muted` 用于说明、表头和时间等辅助信息，也是最浅的文字色。禁用状态通过 `surface-subtle` 背景和去掉悬停效果来表达，不通过调低文字颜色或透明度，保证禁用按钮上的文字仍然看得清。
+
+### 状态色（最重要）
+
+| 状态 | 文字 | 背景 | 含义 |
+| --- | --- | --- | --- |
+| 已完成 | `status-done` | `status-done-soft` | 步骤完成，附件有效 |
+| 待处理 | `status-pending` | `status-pending-soft` | 待准备、待填写、待签字、待归档、未上传 |
+| 不适用 | `status-na` | `status-na-soft` | 不参与完成率计算 |
+| 错误 | `danger` | `danger-soft` | 附件失效、目录失效、操作失败、删除 |
+
+状态色只能表示状态。状态必须同时用文字表达（如“待签字”），不能只靠颜色区分。
+
+### 事项类型色
+
+发货用 `type-shipping`（蓝），收货用 `type-receiving`（青），培训用 `type-training`（紫），用户自定义类型统一用 `type-custom`（石板灰）。类型标签的背景色也不能和状态标签的背景色相同。类型色只用于类型图标和类型标签，**不能使用橙色或绿色**，避免和状态混淆。
+
+### 对比度要求
+
+- 文字和背景的组合对比度不低于 4.5（WCAG AA）。
+- 焦点框 `focus-ring` 和控件边框 `control-border` 在所有背景色（`surface`、`canvas`、`surface-subtle`、`surface-hover`、`sidebar`）上的对比度不低于 3（WCAG 1.4.11 非文本对比度）。
+- `hairline`、`hairline-strong` 只用于装饰性分隔，不能作为识别控件的唯一边界。
+
+新增颜色时也必须满足这些要求。
+
+## Typography
+
+- 字体栈：`"Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif`。英文和数字跟随系统字体，不单独引入网络字体。
+- 正文用 `body`（14px / 1.6），表格和表单用 `body-sm`（13px），说明文字用 `caption`（12px）。**任何需要阅读的文字不小于 12px。**
+- 中文不使用负字间距，也不全大写。标题通过字重（600）和字号区分，不使用斜体。
+- 统计数字、进度百分比和日期使用 `font-variant-numeric: tabular-nums`，保证数字对齐。
+- 文件路径使用 `mono`，过长时从中间截断，并在悬停提示中显示完整路径。
+
+## Layout
+
+- 窗口最小宽度 1050px。左侧导航固定 240px，内容区最大宽度 1400px，左右内边距 `spacing.xl`。
+- 间距统一使用 4 的倍数（`spacing` token）。同组元素间距 `xs`–`sm`，面板内边距 `md`–`lg`，区块之间 `lg`–`xl`。
+- 页面结构固定为：顶栏（面包屑、全局搜索）→ 页面标题和主要操作 → 筛选栏 → 内容。
+- 列表类信息优先用表格或紧凑行，卡片只用于项目和事项这类需要概览的对象。
+
+## Elevation & Depth
+
+- 默认层级：`app-canvas` 上放 `surface` 面板，面板用 1px `hairline` 边框分隔，**不加阴影**。行与行、区块与区块之间用 `divider`，需要更明显的分隔时用 `divider-strong`。
+- 阴影只用于浮在内容之上的元素：弹窗、抽屉、下拉菜单和提示条，统一使用 `0 12px 32px rgba(35, 48, 41, .16)`。
+- 可点击卡片悬停时，边框改为 `hairline-strong`，可以加一层很浅的阴影，但不要位移或放大。
+- 弹窗遮罩使用 `modal-overlay`（`overlay` 已包含 30% 不透明度）。
+
+### 边框
+
+Stitch 的组件 token 不支持边框属性，边框统一按下表设置，宽度都是 1px：
+
+| 组件 | 边框颜色 |
+| --- | --- |
+| `panel`、`modal`、卡片、表格外框 | `hairline` |
+| `button-secondary`、`button-small` | `control-border`（白底按钮放在白色面板上，必须有看得见的轮廓） |
+| `text-input`、下拉框、复选框 | `control-border`，聚焦时改为 `focus-ring` |
+| 可点击卡片悬停 | `hairline-strong` |
+| `status-*`、`type-badge-*` | 无边框 |
+| `toast-success`、`toast-error`、`banner-warning` | 对应文字色的 20% 透明度 |
+- 键盘焦点统一使用 `focus-indicator`：3px 的 `focus-ring` 外框，偏移 2px。鼠标点击不显示焦点框（使用 `:focus-visible`）。
+
+## Shapes
+
+- 标签和小元素用 `rounded.sm`–`md`，按钮和输入框用 `md`，面板、卡片和弹窗用 `xl`，状态标签用 `pill`。
+- 同一层级的元素圆角保持一致，不要混用多种圆角。
+
+## Components
+
+- **按钮**：主要按钮 `button-primary` 每个视图最多一个；其他操作用 `button-secondary`（边框见 Elevation & Depth 中的边框表）；表格和卡片内的操作用 `button-small` 或文字链接；删除用 `button-danger-text`，放在操作组的最后。不可用的按钮用 `button-disabled`，并通过悬停提示说明原因。按钮文案用动词，不超过 4 个字，如“新建项目”“上传”“完成”。
+- **输入框**：`text-input` 边框为 `control-border`；获得焦点时（`text-input-focused`）边框改为 `focus-ring`，并加一圈 3px 的 `primary-soft` 光晕。标签放在输入框上方。必填项在提交时校验，错误信息用 `danger` 显示在字段下方。
+- **侧边导航**：`nav-item` 和 `nav-item-active`，待处理数量用 `status-pending` 的圆角数字徽标显示。
+- **表格**：表头用 `table-header`，行用 `table-row`，可点击行悬停时用 `table-row-hover`。操作列固定在右侧。数字列右对齐，状态列居中。
+- **状态标签**：`status-done`、`status-pending`、`status-na`，文字格式固定为“已准备”“待签字”“不适用”。
+- **类型标签**：`type-badge-shipping`、`type-badge-receiving`、`type-badge-training`、`type-badge-custom`。
+- **进度条**：6px 高，轨道为 `status-na-soft`，填充为 `progress-fill`，旁边同时显示百分比数字。
+- **弹窗**：`modal` 宽 640px，编辑流程和清单项时可以加宽到 820px。标题在左上，关闭按钮在右上，操作按钮在右下，取消在前、确认在后。
+- **提示条**：`toast-success` 3 秒后自动消失（已实现）。`toast-error` 应一直显示，并带关闭按钮，直到用户关闭或进行下一次操作（规划）；当前实现中错误提示和成功提示一样，约 3 秒后自动消失，也没有关闭按钮。
+- **横幅**：`banner-warning` 用于项目目录失效这类需要用户处理的问题，横幅内必须提供修复操作按钮（如“重新定位”）。
+- **空状态**：图标、一句话说明、一个主要操作按钮，不写营销式文案。
+
+## Interaction Patterns
+
+标注“已实现”的是当前代码的行为，标注“规划”的是后续改造方向。新功能应遵循这里的规则。
+
+- **即时反馈**（已实现）：保存后在当前位置显示“已保存”，全局操作结果用提示条告知。操作进行中，相关按钮禁用并显示“保存中…”。
+- **弹窗键盘操作**（已实现）：打开弹窗时焦点移入弹窗，`Tab` 在弹窗内循环，`Esc` 关闭；有未保存修改时，关闭前需要确认。
+- **弹窗初始焦点**（规划）：打开弹窗时焦点直接落在第一个输入框上。当前实现会先聚焦右上角的关闭按钮。
+- **卡片键盘操作**（已实现）：项目和事项卡片可以用 `Tab` 聚焦，按 `Enter` 或空格打开。
+- **不可逆操作确认**（已实现）：删除前的确认文字要说清楚会删除什么、保留什么，例如“项目文件夹和实际文件会保留”。删除流程的确认目前只有“删除流程 X？”，还没有说明保留的内容。
+- **错误提示持久显示**（规划）：见 Components 中的提示条。
+- **状态点击切换**（规划）：清单中的四个步骤改为可点击的状态标签，点一下在“待完成”和“已完成”之间切换，“不适用”放进更多菜单。“准备”步骤没有可用附件时不可点击，悬停时提示“请先上传文件”。
+- **侧边抽屉**（规划）：从项目页打开事项时，改为从右侧滑出抽屉（宽 720px），不离开项目页。
+- **拖拽上传**（规划）：把文件拖到清单行上即可上传到该清单项；拖拽悬停时该行显示 `primary` 虚线边框。
+- **全局搜索**（规划）：`Ctrl+K` 打开搜索面板，可以搜索项目、事项和文件，用方向键选择，按 `Enter` 跳转。
+- **待处理分组**（规划）：待处理页支持按项目或负责人分组，并记住上次使用的筛选条件。
+
+## Content & Copy
+
+- 使用简体中文，语气直接。用“项目”“事项”“流程”“文件项”“附件”这几个固定名词，不要混用“模板配置”“任务”等说法。
+- 标题说明“是什么”，按钮说明“做什么”，错误信息说明“怎么办”，例如“项目文件夹已失效，请先重新定位项目目录”。
+- 不写欢迎语、口号或重复标题的说明文字，空状态不超过一句话。
+- 日期格式：列表中写“9月23日”，详情中写“2026/9/23”。
+
+## Do's and Don'ts
+
+### Do
+
+- 用 token 取值，不要在组件中硬编码颜色和字号。
+- 状态同时用颜色和文字表达。
+- 保持高信息密度，但每行只放一类信息。
+- 失效、缺失这类问题要就地提示，并附上修复入口。
+
+### Don't
+
+- 不要使用小于 12px 的文字，也不要使用比 `ink-muted` 更浅的文字色；禁用状态不要靠调低透明度表达。
+- 不要让类型色使用橙色或绿色，也不要用状态色做装饰。
+- 不要给普通面板加阴影，也不要在悬停时移动或放大元素。
+- 不要使用 Element Plus 默认的蓝色主题色 `#409eff`；使用 Element Plus 组件时，要覆盖成本文件的 token。
+- 不要使用暗色主题、渐变背景或大面积品牌色块。
+
+## Responsive Behavior
+
+WorkPack 只运行在桌面端，需要适配的是窗口宽度，不是移动设备：
+
+- 1180px 及以上：导航 240px，流程卡片三列，事项卡片两列。
+- 1050–1180px：导航收窄到 216px，流程卡片两列，内容区左右内边距改为 `spacing.lg`。
+- 表格超出宽度时横向滚动，第一列（文件名）和操作列保持可见。
+- 可点击区域至少 28×28px，主要按钮高度 36px。
+
+## Agent Prompt Guide
+
+- 主色 `#1f7a55`，背景 `#f5f7f5`，面板 `#ffffff`，边框 `#e3e9e4`，正文 `#17221d`，辅助文字 `#66736b`。
+- 状态：完成 `#1d6f4c` / `#e8f5ed`，待处理 `#9a5412` / `#fff2e5`，不适用 `#5f6a64` / `#eef1ef`，错误 `#b3261e` / `#fdecea`。
+- 示例提示词：“按照 DESIGN.md 把事项详情中的清单状态下拉框改为 `status-done` / `status-pending` 样式的可点击状态标签，遵循 Interaction Patterns 中的状态点击切换规则。”
+
+## Iteration Guide
+
+1. 每次只改一个组件，并用 `components` 里的 token 名称指代它。
+2. 修改后运行 `npx @google/design.md lint DESIGN.md` 检查格式。
+3. 新增组件变体时，单独添加一个 token，不要修改已有 token 的含义。
+4. 规划中的交互实现后，把 Interaction Patterns 里对应的“规划”改为“已实现”。
+
+## Known Gaps
+
+当前 `src/renderer/src/style.css` 与本规范还有以下差异，改造时按本规范处理：
+
+- 大量说明文字是 10–11px，辅助文字 `#9ba59e`、`#78857d` 在白底上的对比度分别只有 2.5 和 3.9，没有达到 AA 标准。
+- “收货”类型使用了橙色，和“待处理”状态颜色冲突。
+- 普通卡片和面板都带有阴影，卡片悬停时会上移。
+- 颜色和字号大多直接写在选择器里，还没有整理成与本文件 token 对应的 CSS 变量。
+- 清单状态仍是每行四个下拉框，尚未改成状态点击切换。
+- 错误提示约 3 秒后自动消失，没有关闭按钮。
+- 打开弹窗时焦点落在关闭按钮上，而不是第一个输入框。
+- 焦点框 `#78b396` 和输入框边框 `#dfe8e1` 在白底上的对比度都不到 3，没有达到非文本对比度要求。
+- 删除流程的确认文案没有说明保留哪些内容。
+
+以下内容受 Stitch 格式限制，只写在正文里，接入 CSS 变量时需要从正文取值：
+
+- 边框颜色（见 Elevation & Depth 中的边框表）。
+- 浮层阴影 `0 12px 32px rgba(35, 48, 41, .16)`。

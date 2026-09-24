@@ -70,6 +70,7 @@ src/
 tests/                    # Vitest 服务测试与 Python 检查
 demo/                     # 早期静态网页原型，可直接用浏览器打开，数据不持久化
 scripts/test.cjs          # 用 Electron 自带的 Node 运行 Vitest（匹配 better-sqlite3 原生模块）
+DESIGN.md                 # 界面设计规范（设计 token 与交互规则），修改界面前先阅读
 产品设计文档_MVP.md
 技术方案_MVP.md
 ```
@@ -98,11 +99,16 @@ npm run dist        # 生成 NSIS 安装包 WorkPack-<版本>-Setup.exe
 ## 测试
 
 ```bash
-npm test                                            # Vitest 服务层测试
-python3 -m unittest discover -s tests -p 'test_*.py' # 文档、Demo 与界面文案检查
+npm test
 ```
 
-服务层测试使用临时目录和临时数据库，不会触碰真实数据。
+`npm test` 会依次运行 Vitest 服务层测试和 `tests/test_*.py` 中的 Python 检查（文档、Demo、界面文案和 `DESIGN.md`），因此需要安装 Python 3。只运行 Python 检查可以用：
+
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py'
+```
+
+服务层测试使用临时目录和临时数据库，不会触碰真实数据。修改 `DESIGN.md` 后，还可以运行 `npx @google/design.md lint DESIGN.md` 检查格式。
 
 `package.json` 中有 `test:e2e`（Playwright）脚本，但仓库目前还没有 Playwright 配置和端到端用例。
 

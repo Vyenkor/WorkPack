@@ -98,6 +98,12 @@ class DesignMdTest(unittest.TestCase):
                 with self.subTest(component=component):
                     self.assertGreaterEqual(contrast(resolve(properties["textColor"]), resolve(properties["backgroundColor"])), 4.5)
 
+    def test_focus_and_control_boundaries_meet_non_text_contrast(self):
+        for indicator in ("focus-ring", "control-border"):
+            for background in ("surface", "canvas", "surface-subtle", "surface-hover", "sidebar"):
+                with self.subTest(indicator=indicator, background=background):
+                    self.assertGreaterEqual(contrast(COLORS[indicator], COLORS[background]), 3)
+
     def test_type_colors_do_not_reuse_status_hues(self):
         status_hues = [hue_and_saturation(COLORS[name])[0] for name in ("status-done", "status-pending")]
         for name in ("type-shipping", "type-receiving", "type-training", "type-custom"):

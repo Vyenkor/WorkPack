@@ -8,7 +8,7 @@ colors:
   primary-hover: "#1a6848"
   primary-soft: "#e8f5ed"
   on-primary: "#ffffff"
-  focus-ring: "#8ec6a5"
+  focus-ring: "#3f9a70"
   canvas: "#f5f7f5"
   surface: "#ffffff"
   surface-subtle: "#fafcfb"
@@ -16,6 +16,7 @@ colors:
   sidebar: "#fbfcfb"
   hairline: "#e3e9e4"
   hairline-strong: "#cfd9d2"
+  control-border: "#859189"
   ink: "#17221d"
   ink-secondary: "#4a5850"
   ink-muted: "#66736b"
@@ -125,6 +126,9 @@ components:
     height: 1px
   divider-strong:
     backgroundColor: "{colors.hairline-strong}"
+    height: 1px
+  control-boundary:
+    backgroundColor: "{colors.control-border}"
     height: 1px
   focus-indicator:
     backgroundColor: "{colors.focus-ring}"
@@ -327,7 +331,13 @@ WorkPack 是给项目交付、物流和培训岗位的办公人员使用的 Wind
 
 发货用 `type-shipping`（蓝），收货用 `type-receiving`（青），培训用 `type-training`（紫），用户自定义类型统一用 `type-custom`（石板灰）。类型标签的背景色也不能和状态标签的背景色相同。类型色只用于类型图标和类型标签，**不能使用橙色或绿色**，避免和状态混淆。
 
-所有文字和背景的组合都已满足 WCAG AA（对比度不低于 4.5）。新增颜色时也必须满足这个要求。
+### 对比度要求
+
+- 文字和背景的组合对比度不低于 4.5（WCAG AA）。
+- 焦点框 `focus-ring` 和控件边框 `control-border` 在所有背景色（`surface`、`canvas`、`surface-subtle`、`surface-hover`、`sidebar`）上的对比度不低于 3（WCAG 1.4.11 非文本对比度）。
+- `hairline`、`hairline-strong` 只用于装饰性分隔，不能作为识别控件的唯一边界。
+
+新增颜色时也必须满足这些要求。
 
 ## Typography
 
@@ -358,8 +368,9 @@ Stitch 的组件 token 不支持边框属性，边框统一按下表设置，宽
 | 组件 | 边框颜色 |
 | --- | --- |
 | `panel`、`modal`、卡片、表格外框 | `hairline` |
-| `button-secondary`、`button-small` | `hairline-strong`（白底按钮放在白色面板上，必须有看得见的轮廓） |
-| `text-input` | `hairline`，聚焦时改为 `focus-ring` |
+| `button-secondary`、`button-small` | `control-border`（白底按钮放在白色面板上，必须有看得见的轮廓） |
+| `text-input`、下拉框、复选框 | `control-border`，聚焦时改为 `focus-ring` |
+| 可点击卡片悬停 | `hairline-strong` |
 | `status-*`、`type-badge-*` | 无边框 |
 | `toast-success`、`toast-error`、`banner-warning` | 对应文字色的 20% 透明度 |
 - 键盘焦点统一使用 `focus-indicator`：3px 的 `focus-ring` 外框，偏移 2px。鼠标点击不显示焦点框（使用 `:focus-visible`）。
@@ -372,14 +383,14 @@ Stitch 的组件 token 不支持边框属性，边框统一按下表设置，宽
 ## Components
 
 - **按钮**：主要按钮 `button-primary` 每个视图最多一个；其他操作用 `button-secondary`（边框见 Elevation & Depth 中的边框表）；表格和卡片内的操作用 `button-small` 或文字链接；删除用 `button-danger-text`，放在操作组的最后。不可用的按钮用 `button-disabled`，并通过悬停提示说明原因。按钮文案用动词，不超过 4 个字，如“新建项目”“上传”“完成”。
-- **输入框**：`text-input` 边框为 `hairline`；获得焦点时（`text-input-focused`）边框改为 `focus-ring`，并加一圈 3px 的 `primary-soft` 光晕。标签放在输入框上方。必填项在提交时校验，错误信息用 `danger` 显示在字段下方。
+- **输入框**：`text-input` 边框为 `control-border`；获得焦点时（`text-input-focused`）边框改为 `focus-ring`，并加一圈 3px 的 `primary-soft` 光晕。标签放在输入框上方。必填项在提交时校验，错误信息用 `danger` 显示在字段下方。
 - **侧边导航**：`nav-item` 和 `nav-item-active`，待处理数量用 `status-pending` 的圆角数字徽标显示。
 - **表格**：表头用 `table-header`，行用 `table-row`，可点击行悬停时用 `table-row-hover`。操作列固定在右侧。数字列右对齐，状态列居中。
 - **状态标签**：`status-done`、`status-pending`、`status-na`，文字格式固定为“已准备”“待签字”“不适用”。
 - **类型标签**：`type-badge-shipping`、`type-badge-receiving`、`type-badge-training`、`type-badge-custom`。
 - **进度条**：6px 高，轨道为 `status-na-soft`，填充为 `progress-fill`，旁边同时显示百分比数字。
 - **弹窗**：`modal` 宽 640px，编辑流程和清单项时可以加宽到 820px。标题在左上，关闭按钮在右上，操作按钮在右下，取消在前、确认在后。
-- **提示条**：`toast-success` 3 秒后自动消失；`toast-error` 保持显示，直到用户关闭或进行下一次操作。
+- **提示条**：`toast-success` 3 秒后自动消失（已实现）。`toast-error` 应一直显示，并带关闭按钮，直到用户关闭或进行下一次操作（规划）；当前实现中错误提示和成功提示一样，约 3 秒后自动消失，也没有关闭按钮。
 - **横幅**：`banner-warning` 用于项目目录失效这类需要用户处理的问题，横幅内必须提供修复操作按钮（如“重新定位”）。
 - **空状态**：图标、一句话说明、一个主要操作按钮，不写营销式文案。
 
@@ -388,9 +399,11 @@ Stitch 的组件 token 不支持边框属性，边框统一按下表设置，宽
 标注“已实现”的是当前代码的行为，标注“规划”的是后续改造方向。新功能应遵循这里的规则。
 
 - **即时反馈**（已实现）：保存后在当前位置显示“已保存”，全局操作结果用提示条告知。操作进行中，相关按钮禁用并显示“保存中…”。
-- **弹窗键盘操作**（已实现）：打开弹窗时焦点进入第一个输入框，`Tab` 在弹窗内循环，`Esc` 关闭；有未保存修改时，关闭前需要确认。
+- **弹窗键盘操作**（已实现）：打开弹窗时焦点移入弹窗，`Tab` 在弹窗内循环，`Esc` 关闭；有未保存修改时，关闭前需要确认。
+- **弹窗初始焦点**（规划）：打开弹窗时焦点直接落在第一个输入框上。当前实现会先聚焦右上角的关闭按钮。
 - **卡片键盘操作**（已实现）：项目和事项卡片可以用 `Tab` 聚焦，按 `Enter` 或空格打开。
-- **不可逆操作确认**（已实现）：删除前的确认文字要说清楚会删除什么、保留什么，例如“项目文件夹和实际文件会保留”。
+- **不可逆操作确认**（已实现）：删除前的确认文字要说清楚会删除什么、保留什么，例如“项目文件夹和实际文件会保留”。删除流程的确认目前只有“删除流程 X？”，还没有说明保留的内容。
+- **错误提示持久显示**（规划）：见 Components 中的提示条。
 - **状态点击切换**（规划）：清单中的四个步骤改为可点击的状态标签，点一下在“待完成”和“已完成”之间切换，“不适用”放进更多菜单。“准备”步骤没有可用附件时不可点击，悬停时提示“请先上传文件”。
 - **侧边抽屉**（规划）：从项目页打开事项时，改为从右侧滑出抽屉（宽 720px），不离开项目页。
 - **拖拽上传**（规划）：把文件拖到清单行上即可上传到该清单项；拖拽悬停时该行显示 `primary` 虚线边框。
@@ -452,6 +465,10 @@ WorkPack 只运行在桌面端，需要适配的是窗口宽度，不是移动�
 - 普通卡片和面板都带有阴影，卡片悬停时会上移。
 - 颜色和字号大多直接写在选择器里，还没有整理成与本文件 token 对应的 CSS 变量。
 - 清单状态仍是每行四个下拉框，尚未改成状态点击切换。
+- 错误提示约 3 秒后自动消失，没有关闭按钮。
+- 打开弹窗时焦点落在关闭按钮上，而不是第一个输入框。
+- 焦点框 `#78b396` 和输入框边框 `#dfe8e1` 在白底上的对比度都不到 3，没有达到非文本对比度要求。
+- 删除流程的确认文案没有说明保留哪些内容。
 
 以下内容受 Stitch 格式限制，只写在正文里，接入 CSS 变量时需要从正文取值：
 

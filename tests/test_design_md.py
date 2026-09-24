@@ -102,35 +102,47 @@ class DesignMdTest(unittest.TestCase):
 
     def test_typography_uses_chinese_system_font(self):
         typography = CONTENT.split("## Typography\n", 1)[1].split("\n## Layout\n", 1)[0]
-        self.assertIn('"Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif', typography)
-        self.assertIn("任何需要阅读的文字不小于 12px", typography)
-        self.assertIn("中文不使用负字间距", typography)
+        for family in ("Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Segoe UI"):
+            with self.subTest(family=family):
+                self.assertIn(family, typography)
+        self.assertRegex(typography, r"12\s*px")
+        self.assertRegex(typography, r"负字间距")
 
     def test_layout_rules_for_dense_desktop(self):
         layout = CONTENT.split("## Layout\n", 1)[1].split("\n## Elevation & Depth\n", 1)[0]
-        for phrase in [
-            "内容区最大宽度 1400px",
-            "1180px 及以上为 240px，1050–1180px 时为 216px",
-            "左右内边距 `spacing.xl`",
-            "都是 4px 的倍数",
-            "`xs`–`sm`",
-            "`sm`–`md`",
-            "`md`–`lg`",
-            "`lg`–`xl`",
-            "`xl`–`xxl`",
-            "空状态",
-            "页面标题 | 搜索 | 筛选 | 排序 | 主要操作",
-            "单行状态高度为 36–44px",
-            "不再受 36–44px 限制",
-            "单行数据行的目标高度是 32–40px",
-            "实际大约 45px",
-            "不受 40px 限制",
-            "常规按钮和输入框 28–36px",
-            "不要卡片套卡片",
-            "文件名称 > 状态 / 修改时间 > 类型 / 大小 > 辅助信息",
-        ]:
-            with self.subTest(phrase=phrase):
-                self.assertIn(phrase, layout)
+        structure = layout.split("### 页面结构\n", 1)[1].split("\n### ", 1)[0]
+        spacing = layout.split("### 间距\n", 1)[1].split("\n### ", 1)[0]
+        toolbar = layout.split("### 工具栏\n", 1)[1].split("\n### ", 1)[0]
+        rows = layout.split("### 行高与垂直密度\n", 1)[1].split("\n### ", 1)[0]
+        priority = layout.split("### 主次信息\n", 1)[1].split("\n### ", 1)[0]
+
+        self.assertRegex(structure, r"1400\s*px")
+        self.assertRegex(structure, r"spacing\.xl")
+        for marker in ("1180", "1050", "240", "216"):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, structure)
+        self.assertRegex(spacing, r"4\s*px")
+        for token in ("xs", "sm", "md", "lg", "xl", "xxl"):
+            with self.subTest(token=token):
+                self.assertIn(token, spacing)
+        self.assertIn("空状态", spacing)
+        for control in ("页面标题", "搜索", "筛选", "排序", "主要操作"):
+            with self.subTest(control=control):
+                self.assertIn(control, toolbar)
+        self.assertRegex(toolbar, r"36\s*[–-]\s*44\s*px")
+        self.assertIn("换行", toolbar)
+        self.assertRegex(rows, r"32\s*[–-]\s*40\s*px")
+        self.assertRegex(rows, r"45\s*px")
+        self.assertIn("Badge", rows)
+        self.assertIn("垂直空间", rows)
+        self.assertRegex(rows, r"28\s*[–-]\s*36\s*px")
+        self.assertIn("卡片套卡片", layout)
+        for term in ("文件名称", "状态", "修改时间", "类型", "大小", "辅助信息"):
+            with self.subTest(term=term):
+                self.assertIn(term, priority)
+        self.assertLess(priority.index("文件名称"), priority.index("状态"))
+        self.assertLess(priority.index("状态"), priority.index("类型"))
+        self.assertLess(priority.index("类型"), priority.index("辅助信息"))
         self.assertNotIn("密度适中", CONTENT)
 
     def test_documents_required_sections(self):

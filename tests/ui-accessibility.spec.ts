@@ -76,7 +76,7 @@ test('page components use semantic outline icons', async ({}, testInfo) => {
   await expect(page.locator('.modal-close svg')).toHaveCount(1)
   const templateIcons = page.locator('.template-check .template-icon svg')
   await expect(templateIcons).toHaveCount(3)
-  expect(await templateIcons.evaluateAll(nodes => new Set(nodes.map(node => node.innerHTML)).size)).toBe(3)
+  expect(await templateIcons.evaluateAll(nodes => new Set(nodes.map(node => node.innerHTML)).size)).toBe(1)
   for (const icon of await templateIcons.all()) {
     await expect(icon).toHaveCSS('width', '17px')
     await expect(icon).toHaveAttribute('stroke', 'currentColor')
@@ -104,8 +104,16 @@ test('page components use semantic outline icons', async ({}, testInfo) => {
   await expect(page.locator('.template-card .more-button').first()).toContainText('编辑')
   const flowIcons = page.locator('.template-card .template-icon svg')
   await expect(flowIcons).toHaveCount(3)
-  expect(await flowIcons.evaluateAll(nodes => new Set(nodes.map(node => node.innerHTML)).size)).toBe(3)
+  expect(await flowIcons.evaluateAll(nodes => new Set(nodes.map(node => node.innerHTML)).size)).toBe(1)
   await page.screenshot({ path: testInfo.outputPath('flow-component-icons.png') })
+
+  await page.getByRole('button', { name: '新建流程' }).click()
+  await expect(page.getByRole('heading', { name: '新建流程' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: '流程名称' })).toBeVisible()
+  await expect(page.getByText('事项类型')).toHaveCount(0)
+  await page.getByRole('textbox', { name: '流程名称' }).fill('自定义流程')
+  await page.getByRole('button', { name: '保存' }).click()
+  await expect(page.locator('.template-card').filter({ hasText: '自定义流程' })).toBeVisible()
 })
 
 test('text, focus, and persistent error feedback follow the design rules', async () => {

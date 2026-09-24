@@ -15,9 +15,21 @@ class RendererCopyTest(unittest.TestCase):
         self.assertIn("编辑流程", APP)
         self.assertNotIn("<h1>模板</h1>", APP)
 
-    def test_workflow_type_can_be_named_by_the_user(self):
-        self.assertIn('v-model="templateTypeInput"', APP)
-        self.assertNotIn('<label>事项类型<select', APP)
+    def test_workflow_form_only_asks_for_a_workflow_name(self):
+        self.assertIn('<label class="full-width">流程名称', APP)
+        self.assertNotIn('templateTypeInput', APP)
+        self.assertNotIn('事项类型', APP)
+
+    def test_projects_and_events_show_workflow_names(self):
+        self.assertIn('templateFor(event.templateId)?.name', APP)
+        self.assertIn('templateFor(row.event.templateId)?.name', APP)
+        self.assertNotIn('typeLabel(', APP)
+
+    def test_workflow_categories_do_not_drive_icons_or_filters(self):
+        self.assertIn('<UiIcon name="workflow" />', APP)
+        self.assertNotIn('projectFilter.type', APP)
+        self.assertNotIn('pendingFilter.type', APP)
+        self.assertNotIn('availableTypes', APP)
 
     def test_saved_project_is_opened_by_id(self):
         self.assertIn("projects.find(item => item.id === saved)", APP)

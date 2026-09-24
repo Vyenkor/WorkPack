@@ -31,7 +31,8 @@ describe('WorkPackService', () => {
     const service = new WorkPackService(data)
 
     try {
-      const template = service.snapshot().templates.find(item => item.type === 'shipping')!
+      const template = service.snapshot().templates.find(item => item.name === '发货资料模板')!
+      expect(template).not.toHaveProperty('type')
       const source = path.join(root, '发货清单模板.docx')
       fs.writeFileSync(source, 'template')
       service.importTemplates(template.id, [source])
@@ -45,26 +46,26 @@ describe('WorkPackService', () => {
       service.createEvent({ projectId: project.id, templateId: template.id, name: '首批发货', date: '2026-09-23', owner: '测试负责人' })
       project = service.snapshot().projects[0]
       const event = project.events[0]
+      expect(event).not.toHaveProperty('type')
       expect(event.items.map(item => item.name)).toEqual(template.rules.map(rule => rule.name))
       expect(event.items[0].attachments).toHaveLength(1)
       expect(event.items[0].attachments[0].exists).toBe(true)
       expect(event.items[0].states.prepared).toBe('done')
 
       const changedRules = template.rules.map((rule, index) => index === 0 ? { ...rule, name: '修改后的模板文件' } : rule)
-      service.saveTemplate({ id: template.id, name: template.name, type: template.type, rules: changedRules })
+      service.saveTemplate({ id: template.id, name: template.name, rules: changedRules })
       expect(service.snapshot().projects[0].events[0].items[0].name).not.toBe('修改后的模板文件')
     } finally { service.close() }
   })
 
-  it('supports user-defined workflow types and stores files under that type', () => {
+  it('supports user-defined workflow names and stores files under that workflow', () => {
     const root = tempDirectory()
     const service = new WorkPackService(path.join(root, 'data'))
     try {
       const base = service.snapshot().templates[0]
       const customName = '售后流程'
-      service.saveTemplate({ name: customName, type: '售后', rules: [{ ...base.rules[0], name: '维修记录' }] })
+      service.saveTemplate({ name: customName, rules: [{ ...base.rules[0], name: '维修记录' }] })
       const custom = service.snapshot().templates.find(template => template.name === customName)!
-      expect(custom.type).toBe('售后')
       const source = path.join(root, '维修记录模板.docx')
       fs.writeFileSync(source, 'template')
       service.importTemplates(custom.id, [source])
@@ -75,8 +76,8 @@ describe('WorkPackService', () => {
       const project = service.snapshot().projects[0]
       service.createEvent({ projectId: project.id, templateId: custom.id, name: '售后事项', date: '2026-09-23', owner: '测试负责人' })
 
-      expect(service.snapshot().projects[0].events[0].type).toBe('售后')
-      expect(fs.existsSync(path.join(project.folder, '售后', '2026-09-23_' + service.snapshot().projects[0].events[0].id))).toBe(true)
+      expect(service.snapshot().projects[0].events[0].templateId).toBe(custom.id)
+      expect(fs.existsSync(path.join(project.folder, '售后流程', '2026-09-23_' + service.snapshot().projects[0].events[0].id))).toBe(true)
     } finally { service.close() }
   })
 
@@ -84,7 +85,7 @@ describe('WorkPackService', () => {
     const root = tempDirectory()
     const service = new WorkPackService(path.join(root, 'data'))
     try {
-      const template = service.snapshot().templates.find(item => item.type === 'shipping')!
+      const template = service.snapshot().templates.find(item => item.name === '发货资料模板')!
       const parent = path.join(root, 'projects')
       fs.mkdirSync(parent)
       service.saveProject(inputForProject(template.id), parent)
@@ -112,7 +113,7 @@ describe('WorkPackService', () => {
     const root = tempDirectory()
     const service = new WorkPackService(path.join(root, 'data'))
     try {
-      const template = service.snapshot().templates.find(item => item.type === 'training')!
+      const template = service.snapshot().templates.find(item => item.name === '培训资料模板')!
       const parent = path.join(root, 'projects')
       const movedParent = path.join(root, 'moved')
       fs.mkdirSync(parent)
@@ -207,7 +208,7 @@ describe('WorkPackService', () => {
     const root = tempDirectory()
     const service = new WorkPackService(path.join(root, 'data'))
     try {
-      const template = service.snapshot().templates.find(item => item.type === 'shipping')!
+      const template = service.snapshot().templates.find(item => item.name === '发货资料模板')!
       const source = path.join(root, '客户签收单模板.docx')
       fs.writeFileSync(source, 'template')
       service.importTemplates(template.id, [source])

@@ -1,23 +1,19 @@
-export const types = ['shipping', 'receiving', 'training'] as const
-export type BusinessType = string
-export const typeLabels: Record<string, string> = { shipping: '发货', receiving: '收货', training: '培训' }
-export function businessTypeLabel(type: BusinessType) { return typeLabels[type] ?? type }
 export const steps = ['prepared', 'filled', 'signed', 'archived'] as const
 export type Step = typeof steps[number]
 export type Status = 'pending' | 'done' | 'na'
 export const stepLabels: Record<Step, string> = { prepared: '准备', filled: '填写', signed: '签字', archived: '归档' }
 export interface Rule { id: string; name: string; note: string; required: Step[]; assetId?: string }
 export interface Asset { id: string; name: string; path: string; exists: boolean }
-export interface Template { id: string; name: string; type: BusinessType; rules: Rule[]; assets: Asset[] }
+export interface Template { id: string; name: string; rules: Rule[]; assets: Asset[] }
 export interface Attachment extends Asset { itemId: string; createdAt: string }
 export interface Item extends Rule { eventId: string; states: Record<Step, Status>; attachments: Attachment[] }
-export interface BusinessEvent { id: string; projectId: string; templateId: string; type: BusinessType; name: string; date: string; owner: string; items: Item[] }
+export interface BusinessEvent { id: string; projectId: string; templateId: string; name: string; date: string; owner: string; items: Item[] }
 export interface Project { id: string; name: string; customer: string; contact: string; owner: string; note: string; folder: string; templateIds: string[]; folderExists: boolean; events: BusinessEvent[] }
 export interface Snapshot { projects: Project[]; templates: Template[]; dataDirectory: string }
 export interface ProjectInput { id?: string; name: string; customer: string; contact: string; owner: string; note: string; templateIds: string[]; directoryToken?: string }
 export interface EventInput { projectId: string; templateId: string; name: string; date: string; owner: string }
 export interface EventUpdateInput extends EventInput { id: string }
-export interface TemplateInput { id?: string; name: string; type: BusinessType; rules: Rule[] }
+export interface TemplateInput { id?: string; name: string; rules: Rule[] }
 export interface ItemInput { id?: string; eventId: string; name: string; note: string; required: Step[] }
 export interface WorkPackAPI {
   snapshot(): Promise<Snapshot>

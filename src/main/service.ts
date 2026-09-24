@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { businessTypeLabel, types, steps, typeLabels, type Snapshot, type Project, type Template, type Item, type Asset, type BusinessEvent } from '../shared/model'
+import { steps, type Snapshot, type Project, type Template, type Item, type Asset, type BusinessEvent } from '../shared/model'
 
 const name = z.string().trim().min(1, '名称不能为空').max(100)
 const text = z.string().max(4000)
@@ -11,7 +11,7 @@ const id = z.string().uuid()
 const required = z.array(z.enum(steps)).max(4).refine(a => new Set(a).size === a.length)
 const rule = z.object({ id, name, note: text, required, assetId: id.optional() })
 const projectSchema = z.object({ id: id.optional(), name, customer: name, contact: text, owner: name, note: text, templateIds: z.array(id).max(100) })
-const templateSchema = z.object({ id: id.optional(), name, type: z.string().trim().min(1, '事项类型不能为空').max(50), rules: z.array(rule).max(200).refine(a => new Set(a.map(r => r.id)).size === a.length) })
+const templateSchema = z.object({ id: id.optional(), name, rules: z.array(rule).max(200).refine(a => new Set(a.map(r => r.id)).size === a.length) })
 const eventSchema = z.object({ projectId: id, templateId: id, name, date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(s => { const d = new Date(s); return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s }, '日期无效'), owner: name })
 const eventUpdateSchema = eventSchema.extend({ id })
 const itemSchema = z.object({ id: id.optional(), eventId: id, name, note: text, required })
@@ -46,6 +46,8 @@ function assetMatchesRule(assetName: string, ruleName: string) {
   const asset = compactFileName(assetName), rule = compactFileName(ruleName)
   return Boolean(asset && rule && (asset === rule || asset.includes(rule) || rule.includes(asset)))
 }
+const legacyWorkflowFolders: Record<string, string> = { shipping: '发货', receiving: '收货', training: '培训' }
+function workflowFolder(value: string) { return legacyWorkflowFolders[value] ?? value }
 
 /** All disk access is in the main process. Rollbacks only remove paths created by this operation. */
 export class WorkPackService {
@@ -79,7 +81,7 @@ export class WorkPackService {
         receiving: [['收货登记表', [...steps]], ['到货验收单', [...steps]], ['异常情况记录', ['prepared', 'filled', 'archived']]],
         training: [['培训计划', ['prepared', 'filled', 'archived']], ['培训签到表', [...steps]], ['培训记录', [...steps]], ['现场照片', ['prepared', 'archived']]]
       }
-      for (const type of types) this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(randomUUID(), `${typeLabels[type]}资料模板`, type, JSON.stringify(seeds[type].map(([name, required]) => ({ id: randomUUID(), name, note: '', required }))))
+      for (const type of Object.keys(seeds)) this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(randomUUID(), `${legacyWorkflowFolders[type]}资料模板`, type, JSON.stringify(seeds[type].map(([name, required]) => ({ id: randomUUID(), name, note: '', required }))))
     })()
   }
   close() { this.db.close() }
@@ -153,7 +155,7 @@ export class WorkPackService {
       return {
       id: p.id, name: p.name, customer: p.customer, contact: p.contact, owner: p.owner, note: p.note, folder: p.folder, templateIds: JSON.parse(p.template_ids), folderExists,
       events: allEvents.filter(e => e.project_id === p.id).map(e => ({
-        id: e.id, projectId: p.id, templateId: e.template_id, type: e.type, name: e.name, date: e.date, owner: e.owner,
+        id: e.id, projectId: p.id, templateId: e.template_id, name: e.name, date: e.date, owner: e.owner,
         items: allItems.filter(i => i.event_id === e.id).map(i => ({
           id: i.id, eventId: e.id, name: i.name, note: i.note, required: JSON.parse(i.required), states: JSON.parse(i.states),
           attachments: attachments.filter(a => a.item_id === i.id).map(a => {
@@ -167,15 +169,16 @@ export class WorkPackService {
     for (const project of projects) for (const event of project.events) for (const item of event.items) {
       if (!item.attachments.some(a => a.exists) && item.states.prepared === 'done') item.states.prepared = 'pending'
     }
-    return { projects, templates, dataDirectory: this.dataDirectory }
+    return { projects, templates: templates.map(template => ({ id: template.id, name: template.name, rules: template.rules, assets: template.assets })), dataDirectory: this.dataDirectory }
   }
   saveTemplate(input: unknown) {
-    const data = templateSchema.parse(input), type = safeName(data.type)
+    const data = templateSchema.parse(input)
     if (data.id) {
-      const previous = this.get('templates', data.id)
-      if (previous.type !== type) throw new Error('已有流程不能修改事项类型，请新建流程')
       this.db.prepare('UPDATE templates SET name=?, rules=? WHERE id=?').run(data.name, JSON.stringify(data.rules), data.id)
-    } else this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(randomUUID(), data.name, type, JSON.stringify(data.rules))
+    } else {
+      const templateId = randomUUID()
+      this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(templateId, data.name, safeName(data.name), JSON.stringify(data.rules))
+    }
   }
   deleteTemplate(value: string) {
     this.get('templates', value)
@@ -208,7 +211,7 @@ export class WorkPackService {
       const assets = this.db.prepare('SELECT * FROM assets WHERE template_id=?').all(templateId) as Row[]
       for (const asset of assets) {
         if (this.db.prepare('SELECT 1 FROM project_copies WHERE project_id=? AND asset_id=?').get(projectId, asset.id)) continue
-        const target = this.mkdir(root, path.join('模板文件', businessTypeLabel(template.type)), dirs)
+        const target = this.mkdir(root, path.join('模板文件', workflowFolder(template.type)), dirs)
         this.copy(inside(this.templateRoot, asset.path), target, files)
         this.db.prepare('INSERT INTO project_copies VALUES (?, ?)').run(projectId, asset.id)
       }
@@ -289,7 +292,7 @@ export class WorkPackService {
         if (asset) {
           const source = inside(this.templateRoot, asset.path)
           if (present(source)) {
-            const target = this.mkdir(root, path.join(businessTypeLabel(template.type), `${data.date}_${eventId}`, itemId), dirs)
+            const target = this.mkdir(root, path.join(workflowFolder(template.type), `${data.date}_${eventId}`, itemId), dirs)
             const copied = this.copy(source, target, files)
             this.db.prepare('INSERT INTO attachments VALUES (?, ?, ?, ?, ?)').run(randomUUID(), itemId, path.basename(copied), path.relative(root, copied), new Date().toISOString())
             usedAssets.add(asset.id)
@@ -307,8 +310,8 @@ export class WorkPackService {
     const data = eventUpdateSchema.parse(input), event = this.get('events', data.id)
     if (event.project_id !== data.projectId || event.template_id !== data.templateId) throw new Error('事项所属项目或模板不能修改')
     const project = this.get('projects', data.projectId), root = this.root(project)
-    const oldDir = inside(root, path.join(businessTypeLabel(event.type), `${event.date}_${event.id}`))
-    const newDir = inside(root, path.join(businessTypeLabel(event.type), `${data.date}_${event.id}`))
+    const oldDir = inside(root, path.join(workflowFolder(event.type), `${event.date}_${event.id}`))
+    const newDir = inside(root, path.join(workflowFolder(event.type), `${data.date}_${event.id}`))
     let renamed = false
     try {
       if (oldDir !== newDir && fs.existsSync(oldDir)) {
@@ -392,7 +395,7 @@ export class WorkPackService {
   importAttachments(value: string, sources: string[]) {
     const { item, event, project } = this.projectForItem(value), root = this.root(project)
     this.atomic((files, dirs) => {
-      const target = this.mkdir(root, path.join(businessTypeLabel(event.type), `${event.date}_${event.id}`, item.id), dirs)
+      const target = this.mkdir(root, path.join(workflowFolder(event.type), `${event.date}_${event.id}`, item.id), dirs)
       for (const source of sources) {
         const copied = this.copy(source, target, files)
         this.db.prepare('INSERT INTO attachments VALUES (?, ?, ?, ?, ?)').run(randomUUID(), value, path.basename(source), path.relative(root, copied), new Date().toISOString())
@@ -412,7 +415,7 @@ export class WorkPackService {
   relocateAttachment(value: string, source: string) {
     const a = this.get('attachments', value), { item, event, project } = this.projectForItem(a.item_id), root = this.root(project)
     this.atomic((files, dirs) => {
-      const target = this.mkdir(root, path.join(businessTypeLabel(event.type), `${event.date}_${event.id}`, item.id), dirs)
+      const target = this.mkdir(root, path.join(workflowFolder(event.type), `${event.date}_${event.id}`, item.id), dirs)
       const copied = this.copy(source, target, files)
       this.db.prepare('UPDATE attachments SET name=?, path=? WHERE id=?').run(path.basename(source), path.relative(root, copied), value)
     })

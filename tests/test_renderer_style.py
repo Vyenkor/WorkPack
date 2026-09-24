@@ -25,7 +25,7 @@ class RendererStyleTest(unittest.TestCase):
     def test_focus_and_status_styles_use_readable_design_colors(self):
         self.assertIn("outline: 3px solid var(--color-focus-ring)", STYLE)
         self.assertIn("border-color: var(--color-control-border)", STYLE)
-        self.assertRegex(STYLE, r"\.template-icon\.receiving, \.event-type-icon\.receiving\s*\{[^}]*--color-type-receiving")
+        self.assertRegex(STYLE, r"\.template-icon, \.event-type-icon\s*\{[^}]*--color-primary")
         for status in ("done", "pending", "na"):
             with self.subTest(status=status):
                 self.assertRegex(STYLE, rf"\.status-toggle\.{status}\s*\{{[^}}]*--color-status-{status}[^}}]*--color-status-{status}-soft")

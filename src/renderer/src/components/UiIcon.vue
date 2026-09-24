@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ name: 'project' | 'clock' | 'event' | 'workflow' | 'check' | 'plus' | 'search' | 'file' | 'info' | 'warning' | 'shipping' | 'receiving' | 'training' | 'custom' | 'error' | 'close' }>()
+defineProps<{ name: 'project' | 'clock' | 'event' | 'workflow' | 'check' | 'plus' | 'search' | 'file' | 'info' | 'warning' | 'error' | 'close' }>()
 </script>
 
 <template>
@@ -41,20 +41,6 @@ defineProps<{ name: 'project' | 'clock' | 'event' | 'workflow' | 'check' | 'plus
     </template>
     <template v-else-if="name === 'warning'">
       <path d="M10.4 4.6a1.8 1.8 0 0 1 3.2 0l7 13.1a1.7 1.7 0 0 1-1.5 2.5H4.9a1.7 1.7 0 0 1-1.5-2.5zM12 9v5M12 17h.01" />
-    </template>
-    <template v-else-if="name === 'shipping'">
-      <rect x="3.5" y="8" width="11" height="11" rx="1.5" />
-      <path d="M7 12h4M9 8v11M15.5 4h5v5M20.5 4l-7 7" />
-    </template>
-    <template v-else-if="name === 'receiving'">
-      <rect x="9.5" y="8" width="11" height="11" rx="1.5" />
-      <path d="M13 12h4M15 8v11M3.5 4v5h5M3.5 4l7 7" />
-    </template>
-    <template v-else-if="name === 'training'">
-      <path d="M4.5 5.5c2.7-1.1 5.3-.8 7.5.5 2.2-1.3 4.8-1.6 7.5-.5v13c-2.7-1.1-5.3-.8-7.5.5-2.2-1.3-4.8-1.6-7.5-.5zM12 6v13" />
-    </template>
-    <template v-else-if="name === 'custom'">
-      <path d="m12 3 8.5 5-8.5 5-8.5-5zM3.5 12l8.5 5 8.5-5M3.5 16l8.5 5 8.5-5" />
     </template>
     <template v-else-if="name === 'close'">
       <path d="M5 5l14 14M19 5 5 19" />

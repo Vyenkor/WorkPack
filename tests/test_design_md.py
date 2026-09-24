@@ -1,5 +1,4 @@
 from pathlib import Path
-import colorsys
 import importlib.util
 import re
 import unittest
@@ -65,12 +64,6 @@ def contrast(first, second):
     return (light + 0.05) / (dark + 0.05)
 
 
-def hue_and_saturation(hex_color):
-    r, g, b = (int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5))
-    hue, _, saturation = colorsys.rgb_to_hls(r, g, b)
-    return hue * 360, saturation
-
-
 class DesignMdTest(unittest.TestCase):
     def test_colors_are_hex_values(self):
         for name, value in COLORS.items():
@@ -104,21 +97,8 @@ class DesignMdTest(unittest.TestCase):
                 with self.subTest(indicator=indicator, background=background):
                     self.assertGreaterEqual(contrast(COLORS[indicator], COLORS[background]), 3)
 
-    def test_type_colors_do_not_reuse_status_hues(self):
-        status_hues = [hue_and_saturation(COLORS[name])[0] for name in ("status-done", "status-pending")]
-        for name in ("type-shipping", "type-receiving", "type-training", "type-custom"):
-            hue, saturation = hue_and_saturation(COLORS[name])
-            if saturation < 0.25:
-                continue
-            for status_hue in status_hues:
-                with self.subTest(type=name, status_hue=status_hue):
-                    self.assertGreater(min(abs(hue - status_hue), 360 - abs(hue - status_hue)), 25)
-
-    def test_type_badges_do_not_share_status_backgrounds(self):
-        status_backgrounds = {COLORS[f"status-{name}-soft"] for name in ("done", "pending", "na")} | {COLORS["danger-soft"]}
-        for name in ("shipping", "receiving", "training", "custom"):
-            with self.subTest(type=name):
-                self.assertNotIn(COLORS[f"type-{name}-soft"], status_backgrounds)
+    def test_workflow_identity_uses_one_shared_visual_treatment(self):
+        self.assertIn("流程统一使用同一图标和主色", CONTENT)
 
     def test_documents_required_sections(self):
         for section in ["Overview", "Colors", "Typography", "Layout", "Elevation & Depth", "Shapes", "Components", "Interaction Patterns", "Content & Copy", "Do's and Don'ts", "Responsive Behavior", "Agent Prompt Guide", "Iteration Guide", "Known Gaps"]:

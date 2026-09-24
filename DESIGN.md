@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: WorkPack
-description: "A calm, light, information-dense Windows desktop tool for tracking project paperwork. Warm off-white canvas (#f5f7f5), white panels separated by hairline borders rather than shadows, near-black green-tinted ink (#17221d), and one restrained brand green (#1f7a55) reserved for primary actions, focus and the active navigation item. Status is the loudest thing on screen: done green, pending orange, not-applicable gray, always paired with a text label. Business types use a separate blue / teal / purple family so they are never confused with status. Chinese-first typography: Microsoft YaHei UI, body at 14px with 1.6 line height, nothing below 12px."
+description: "A calm, light, information-dense Windows desktop tool for tracking project paperwork. Warm off-white canvas (#f5f7f5), white panels separated by hairline borders rather than shadows, near-black green-tinted ink (#17221d), and one restrained brand green (#1f7a55) reserved for primary actions, focus and the active navigation item. Status is the loudest thing on screen: done green, pending orange, not-applicable gray, always paired with a text label. Chinese-first typography: Microsoft YaHei UI, body at 14px with 1.6 line height, nothing below 12px."
 
 colors:
   primary: "#1f7a55"
@@ -28,14 +28,6 @@ colors:
   status-na-soft: "#eef1ef"
   danger: "#b3261e"
   danger-soft: "#fdecea"
-  type-shipping: "#2f65a0"
-  type-shipping-soft: "#eaf2fb"
-  type-receiving: "#12707e"
-  type-receiving-soft: "#e3f4f6"
-  type-training: "#6250a6"
-  type-training-soft: "#f0edfb"
-  type-custom: "#4f5b6e"
-  type-custom-soft: "#edf0f5"
   overlay: "rgba(35, 48, 41, 0.3)"
 
 typography:
@@ -238,30 +230,6 @@ components:
     typography: "{typography.caption}"
     rounded: "{rounded.pill}"
     padding: 2px 10px
-  type-badge-shipping:
-    backgroundColor: "{colors.type-shipping-soft}"
-    textColor: "{colors.type-shipping}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.md}"
-    padding: 2px 8px
-  type-badge-receiving:
-    backgroundColor: "{colors.type-receiving-soft}"
-    textColor: "{colors.type-receiving}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.md}"
-    padding: 2px 8px
-  type-badge-training:
-    backgroundColor: "{colors.type-training-soft}"
-    textColor: "{colors.type-training}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.md}"
-    padding: 2px 8px
-  type-badge-custom:
-    backgroundColor: "{colors.type-custom-soft}"
-    textColor: "{colors.type-custom}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.md}"
-    padding: 2px 8px
   progress-fill:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
@@ -327,10 +295,6 @@ WorkPack 是给项目交付、物流和培训岗位的办公人员使用的 Wind
 
 状态色只能表示状态。状态必须同时用文字表达（如“待签字”），不能只靠颜色区分。
 
-### 事项类型色
-
-发货用 `type-shipping`（蓝），收货用 `type-receiving`（青），培训用 `type-training`（紫），用户自定义类型统一用 `type-custom`（石板灰）。类型标签的背景色也不能和状态标签的背景色相同。类型色只用于类型图标和类型标签，**不能使用橙色或绿色**，避免和状态混淆。
-
 ### 对比度要求
 
 - 文字和背景的组合对比度不低于 4.5（WCAG AA）。
@@ -371,7 +335,7 @@ Stitch 的组件 token 不支持边框属性，边框统一按下表设置，宽
 | `button-secondary`、`button-small` | `control-border`（白底按钮放在白色面板上，必须有看得见的轮廓） |
 | `text-input`、下拉框、复选框 | `control-border`，聚焦时改为 `focus-ring` |
 | 可点击卡片悬停 | `hairline-strong` |
-| `status-*`、`type-badge-*` | 无边框 |
+| `status-*` | 无边框 |
 | `toast-success`、`toast-error`、`banner-warning` | 对应文字色的 20% 透明度 |
 - 键盘焦点统一使用 `focus-indicator`：3px 的 `focus-ring` 外框，偏移 2px。鼠标点击不显示焦点框（使用 `:focus-visible`）。
 
@@ -387,7 +351,7 @@ Stitch 的组件 token 不支持边框属性，边框统一按下表设置，宽
 - **侧边导航**：`nav-item` 和 `nav-item-active`，待处理数量用 `status-pending` 的圆角数字徽标显示。
 - **表格**：表头用 `table-header`，行用 `table-row`，可点击行悬停时用 `table-row-hover`。操作列固定在右侧。数字列右对齐，状态列居中。
 - **状态标签**：`status-done`、`status-pending`、`status-na`，文字格式固定为“已准备”“待签字”“不适用”。
-- **类型标签**：`type-badge-shipping`、`type-badge-receiving`、`type-badge-training`、`type-badge-custom`。
+- **流程标识**：流程统一使用同一图标和主色，不按流程名称区分颜色。
 - **进度条**：6px 高，轨道为 `status-na-soft`，填充为 `progress-fill`，旁边同时显示百分比数字。
 - **弹窗**：`modal` 宽 640px，编辑流程和清单项时可以加宽到 820px。标题在左上，关闭按钮在右上，操作按钮在右下，取消在前、确认在后。
 - **提示条**：`toast-success` 3 秒后自动消失；`toast-error` 一直显示，并带关闭按钮，直到用户关闭或进行下一次操作（已实现）。

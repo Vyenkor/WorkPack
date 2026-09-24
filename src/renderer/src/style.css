@@ -24,14 +24,6 @@
   --color-status-na-soft: #eef1ef;
   --color-danger: #b3261e;
   --color-danger-soft: #fdecea;
-  --color-type-shipping: #2f65a0;
-  --color-type-shipping-soft: #eaf2fb;
-  --color-type-receiving: #12707e;
-  --color-type-receiving-soft: #e3f4f6;
-  --color-type-training: #6250a6;
-  --color-type-training-soft: #f0edfb;
-  --color-type-custom: #4f5b6e;
-  --color-type-custom-soft: #edf0f5;
   --color-overlay: rgba(35, 48, 41, 0.3);
   --font-page-title: 24px;
   --font-section-title: 18px;
@@ -569,8 +561,8 @@ button:disabled {
 }
 
 .stat-icon.violet {
-  color: var(--color-type-training);
-  background: var(--color-type-training-soft);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
 }
 
 .stat-icon.orange {
@@ -579,8 +571,8 @@ button:disabled {
 }
 
 .stat-icon.blue {
-  color: var(--color-type-shipping);
-  background: var(--color-type-shipping-soft);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
 }
 
 .stat-icon.green {
@@ -1165,19 +1157,9 @@ button:disabled {
   height: 17px;
 }
 
-.template-icon.shipping, .event-type-icon.shipping {
-  color: var(--color-type-shipping);
-  background: var(--color-type-shipping-soft);
-}
-
-.template-icon.receiving, .event-type-icon.receiving {
-  color: var(--color-type-receiving);
-  background: var(--color-type-receiving-soft);
-}
-
-.template-icon.training, .event-type-icon.training {
-  color: var(--color-type-training);
-  background: var(--color-type-training-soft);
+.template-icon, .event-type-icon {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
 }
 
 .template-card-head > div {
@@ -1185,7 +1167,7 @@ button:disabled {
   flex: 1;
 }
 
-.type-label {
+.event-meta {
   display: block;
   margin-bottom: 5px;
   color: var(--color-ink-muted);
@@ -2341,12 +2323,6 @@ html, body, #app {
   color: var(--color-ink-secondary);
   border-color: var(--color-hairline);
   background: var(--color-surface-subtle);
-}
-
-.template-icon:not(.shipping):not(.receiving):not(.training),
-.event-type-icon:not(.shipping):not(.receiving):not(.training) {
-  color: var(--color-type-custom);
-  background: var(--color-type-custom-soft);
 }
 
 .selected-path, .folder-value {

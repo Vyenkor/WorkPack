@@ -102,7 +102,7 @@ npm run dist        # 生成 NSIS 安装包 WorkPack-<版本>-Setup.exe
 npm test
 ```
 
-`npm test` 会依次运行 Vitest 服务层测试和 `tests/test_*.py` 中的 Python 检查（文档、Demo、界面文案和 `DESIGN.md`），因此需要安装 Python 3。只运行 Python 检查可以用：
+`npm test` 会依次运行 Vitest 服务层测试和 `tests/test_*.py` 中的 Python 检查（文档、Demo、界面文案和 `DESIGN.md`），因此需要安装 Python 3.9 或更高版本（脚本会依次尝试 `python3`、`python`、`py -3`，并实际检查版本号，不会误用 Python 2）。只运行 Python 检查可以用：
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_*.py'

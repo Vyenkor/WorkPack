@@ -66,6 +66,48 @@ test('sidebar uses consistent outline icons at normal and minimum widths', async
   for (const icon of await icons.all()) await expect(icon).toHaveCSS('width', '20px')
 })
 
+test('page components use semantic outline icons', async ({}, testInfo) => {
+  await expect(page.locator('.stat-card .stat-icon svg')).toHaveCount(4)
+  await expect(page.locator('.home-grid .empty-icon svg')).toHaveCount(2)
+  await expect(page.locator('.global-search svg.search-icon')).toHaveCount(1)
+  await page.screenshot({ path: testInfo.outputPath('home-component-icons.png') })
+
+  await page.getByRole('button', { name: '新建项目' }).first().click()
+  await expect(page.locator('.modal-close svg')).toHaveCount(1)
+  const templateIcons = page.locator('.template-check .template-icon svg')
+  await expect(templateIcons).toHaveCount(3)
+  expect(await templateIcons.evaluateAll(nodes => new Set(nodes.map(node => node.innerHTML)).size)).toBe(3)
+  for (const icon of await templateIcons.all()) {
+    await expect(icon).toHaveCSS('width', '17px')
+    await expect(icon).toHaveAttribute('stroke', 'currentColor')
+  }
+  await page.screenshot({ path: testInfo.outputPath('project-flow-icons.png') })
+  await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1050, 700))
+  const modalBounds = await page.locator('.modal-card').boundingBox()
+  expect(modalBounds).not.toBeNull()
+  expect(modalBounds!.x).toBeGreaterThanOrEqual(0)
+  expect(modalBounds!.x + modalBounds!.width).toBeLessThanOrEqual(1050)
+  await expect(templateIcons.first()).toHaveCSS('width', '17px')
+  await page.locator('.modal-close').click()
+
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '项目', exact: true }).click()
+  await expect(page.locator('.project-list .empty-icon svg')).toHaveCount(1)
+  await expect(page.locator('.filter-search svg.search-icon')).toHaveCount(1)
+  await page.screenshot({ path: testInfo.outputPath('projects-empty-icon.png') })
+
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '待处理', exact: true }).click()
+  await expect(page.locator('.pending-table .empty-icon svg')).toHaveCount(1)
+
+  await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '流程', exact: true }).click()
+  await expect(page.locator('.notice-icon svg')).toHaveCount(1)
+  await expect(page.locator('.notice-icon')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(page.locator('.template-card .more-button').first()).toContainText('编辑')
+  const flowIcons = page.locator('.template-card .template-icon svg')
+  await expect(flowIcons).toHaveCount(3)
+  expect(await flowIcons.evaluateAll(nodes => new Set(nodes.map(node => node.innerHTML)).size)).toBe(3)
+  await page.screenshot({ path: testInfo.outputPath('flow-component-icons.png') })
+})
+
 test('text, focus, and persistent error feedback follow the design rules', async () => {
   await page.getByRole('button', { name: '新建项目' }).first().click()
   const name = page.getByRole('textbox', { name: '项目名称' })
@@ -76,6 +118,7 @@ test('text, focus, and persistent error feedback follow the design rules', async
   await page.locator('.modal-card button[type="submit"]').click()
   const error = page.getByRole('alert')
   await expect(error).toContainText('请先选择项目上级文件夹')
+  await expect(error.locator('svg')).toHaveCount(2)
   await page.waitForTimeout(3500)
   await expect(error).toBeVisible()
   await error.getByRole('button', { name: '关闭错误提示' }).click()
@@ -104,6 +147,7 @@ test('prepared status needs an attachment and other steps toggle by click', asyn
   await expect(page.locator('.selected-path')).toContainText(parent)
   await page.locator('.modal-card button[type="submit"]').click()
   await expect(page.getByRole('heading', { name: '状态检查' })).toBeVisible()
+  await expect(page.locator('.project-detail .empty-icon svg')).toHaveCount(1)
   await page.getByRole('button', { name: '新建事项' }).first().click()
   await page.getByRole('textbox', { name: '事项名称' }).fill('第一批交付')
   await page.locator('.modal-card button[type="submit"]').click()

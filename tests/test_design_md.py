@@ -100,6 +100,29 @@ class DesignMdTest(unittest.TestCase):
     def test_workflow_identity_uses_one_shared_visual_treatment(self):
         self.assertIn("流程统一使用同一图标和主色", CONTENT)
 
+    def test_layout_rules_for_dense_desktop(self):
+        layout = CONTENT.split("## Layout\n", 1)[1].split("\n## Elevation & Depth\n", 1)[0]
+        for phrase in [
+            "内容区最大宽度 1400px",
+            "左右内边距 `spacing.xl`",
+            "都是 4px 的倍数",
+            "`xs`–`sm`",
+            "`sm`–`md`",
+            "`md`–`lg`",
+            "`lg`–`xl`",
+            "`xl`–`xxl`",
+            "页面标题 | 搜索 | 筛选 | 排序 | 主要操作",
+            "普通数据行 32–40px",
+            "工具栏 36–44px",
+            "常规按钮和输入框 28–36px",
+            "不要卡片套卡片",
+            "文件名称 > 状态 / 修改时间 > 类型 / 大小 > 辅助信息",
+        ]:
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, layout)
+        self.assertIn("Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif", CONTENT)
+        self.assertNotIn("密度适中", CONTENT)
+
     def test_documents_required_sections(self):
         for section in ["Overview", "Colors", "Typography", "Layout", "Elevation & Depth", "Shapes", "Components", "Interaction Patterns", "Content & Copy", "Do's and Don'ts", "Responsive Behavior", "Agent Prompt Guide", "Iteration Guide", "Known Gaps"]:
             with self.subTest(section=section):

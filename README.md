@@ -110,7 +110,7 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 
 服务层测试使用临时目录和临时数据库，不会触碰真实数据。修改 `DESIGN.md` 后，还可以运行 `npx @google/design.md lint DESIGN.md` 检查格式。
 
-`package.json` 中有 `test:e2e`（Playwright）脚本，但仓库目前还没有 Playwright 配置和端到端用例。
+`npm run test:e2e` 会先构建，再用 Playwright 运行 `tests` 下的 `*.spec.ts`。配置在 `playwright.config.ts`，不会加载 Vitest 的 `*.test.ts`。
 
 ## 首版范围
 

@@ -33,67 +33,67 @@ colors:
   type-receiving-soft: "#e3f4f6"
   type-training: "#6250a6"
   type-training-soft: "#f0edfb"
-  type-custom: "#56615b"
-  type-custom-soft: "#eef1ef"
-  overlay: "#233029"
+  type-custom: "#4f5b6e"
+  type-custom-soft: "#edf0f5"
+  overlay: "rgba(35, 48, 41, 0.3)"
 
 typography:
   page-title:
-    fontFamily: Microsoft YaHei UI
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
     fontSize: 24px
     fontWeight: 600
     lineHeight: 1.35
     letterSpacing: 0
   section-title:
-    fontFamily: Microsoft YaHei UI
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
     fontSize: 18px
     fontWeight: 600
     lineHeight: 1.4
     letterSpacing: 0
   card-title:
-    fontFamily: Microsoft YaHei UI
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
     fontSize: 15px
     fontWeight: 600
     lineHeight: 1.45
     letterSpacing: 0
   body:
-    fontFamily: Microsoft YaHei UI
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
     fontSize: 14px
     fontWeight: 400
     lineHeight: 1.6
     letterSpacing: 0
   body-sm:
-    fontFamily: Microsoft YaHei UI
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
     fontSize: 13px
     fontWeight: 400
     lineHeight: 1.6
     letterSpacing: 0
   label:
-    fontFamily: Microsoft YaHei UI
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
     fontSize: 13px
     fontWeight: 500
     lineHeight: 1.4
     letterSpacing: 0
   caption:
-    fontFamily: Microsoft YaHei UI
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
     fontSize: 12px
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: 0
   button:
-    fontFamily: Microsoft YaHei UI
+    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
     fontSize: 13px
     fontWeight: 500
     lineHeight: 1.2
     letterSpacing: 0
   stat-number:
-    fontFamily: Segoe UI
+    fontFamily: "Segoe UI, Microsoft YaHei UI, sans-serif"
     fontSize: 26px
     fontWeight: 600
     lineHeight: 1.1
     letterSpacing: 0
   mono:
-    fontFamily: Cascadia Mono
+    fontFamily: "Cascadia Mono, Consolas, monospace"
     fontSize: 12px
     fontWeight: 400
     lineHeight: 1.5
@@ -132,7 +132,6 @@ components:
     height: 3px
   modal-overlay:
     backgroundColor: "{colors.overlay}"
-    textColor: "{colors.on-primary}"
   button-disabled:
     backgroundColor: "{colors.surface-subtle}"
     textColor: "{colors.ink-muted}"
@@ -326,7 +325,7 @@ WorkPack 是给项目交付、物流和培训岗位的办公人员使用的 Wind
 
 ### 事项类型色
 
-发货用 `type-shipping`（蓝），收货用 `type-receiving`（青），培训用 `type-training`（紫），用户自定义类型统一用 `type-custom`（灰绿）。类型色只用于类型图标和类型标签，**不能使用橙色或绿色**，避免和状态混淆。
+发货用 `type-shipping`（蓝），收货用 `type-receiving`（青），培训用 `type-training`（紫），用户自定义类型统一用 `type-custom`（石板灰）。类型标签的背景色也不能和状态标签的背景色相同。类型色只用于类型图标和类型标签，**不能使用橙色或绿色**，避免和状态混淆。
 
 所有文字和背景的组合都已满足 WCAG AA（对比度不低于 4.5）。新增颜色时也必须满足这个要求。
 
@@ -350,7 +349,19 @@ WorkPack 是给项目交付、物流和培训岗位的办公人员使用的 Wind
 - 默认层级：`app-canvas` 上放 `surface` 面板，面板用 1px `hairline` 边框分隔，**不加阴影**。行与行、区块与区块之间用 `divider`，需要更明显的分隔时用 `divider-strong`。
 - 阴影只用于浮在内容之上的元素：弹窗、抽屉、下拉菜单和提示条，统一使用 `0 12px 32px rgba(35, 48, 41, .16)`。
 - 可点击卡片悬停时，边框改为 `hairline-strong`，可以加一层很浅的阴影，但不要位移或放大。
-- 弹窗遮罩使用 `modal-overlay`，不透明度 30%。
+- 弹窗遮罩使用 `modal-overlay`（`overlay` 已包含 30% 不透明度）。
+
+### 边框
+
+Stitch 的组件 token 不支持边框属性，边框统一按下表设置，宽度都是 1px：
+
+| 组件 | 边框颜色 |
+| --- | --- |
+| `panel`、`modal`、卡片、表格外框 | `hairline` |
+| `button-secondary`、`button-small` | `hairline-strong`（白底按钮放在白色面板上，必须有看得见的轮廓） |
+| `text-input` | `hairline`，聚焦时改为 `focus-ring` |
+| `status-*`、`type-badge-*` | 无边框 |
+| `toast-success`、`toast-error`、`banner-warning` | 对应文字色的 20% 透明度 |
 - 键盘焦点统一使用 `focus-indicator`：3px 的 `focus-ring` 外框，偏移 2px。鼠标点击不显示焦点框（使用 `:focus-visible`）。
 
 ## Shapes
@@ -360,7 +371,7 @@ WorkPack 是给项目交付、物流和培训岗位的办公人员使用的 Wind
 
 ## Components
 
-- **按钮**：主要按钮 `button-primary` 每个视图最多一个；其他操作用 `button-secondary`；表格和卡片内的操作用 `button-small` 或文字链接；删除用 `button-danger-text`，放在操作组的最后。不可用的按钮用 `button-disabled`，并通过悬停提示说明原因。按钮文案用动词，不超过 4 个字，如“新建项目”“上传”“完成”。
+- **按钮**：主要按钮 `button-primary` 每个视图最多一个；其他操作用 `button-secondary`（边框见 Elevation & Depth 中的边框表）；表格和卡片内的操作用 `button-small` 或文字链接；删除用 `button-danger-text`，放在操作组的最后。不可用的按钮用 `button-disabled`，并通过悬停提示说明原因。按钮文案用动词，不超过 4 个字，如“新建项目”“上传”“完成”。
 - **输入框**：`text-input` 边框为 `hairline`；获得焦点时（`text-input-focused`）边框改为 `focus-ring`，并加一圈 3px 的 `primary-soft` 光晕。标签放在输入框上方。必填项在提交时校验，错误信息用 `danger` 显示在字段下方。
 - **侧边导航**：`nav-item` 和 `nav-item-active`，待处理数量用 `status-pending` 的圆角数字徽标显示。
 - **表格**：表头用 `table-header`，行用 `table-row`，可点击行悬停时用 `table-row-hover`。操作列固定在右侧。数字列右对齐，状态列居中。
@@ -441,3 +452,8 @@ WorkPack 只运行在桌面端，需要适配的是窗口宽度，不是移动�
 - 普通卡片和面板都带有阴影，卡片悬停时会上移。
 - 颜色和字号大多直接写在选择器里，还没有整理成与本文件 token 对应的 CSS 变量。
 - 清单状态仍是每行四个下拉框，尚未改成状态点击切换。
+
+以下内容受 Stitch 格式限制，只写在正文里，接入 CSS 变量时需要从正文取值：
+
+- 边框颜色（见 Elevation & Depth 中的边框表）。
+- 浮层阴影 `0 12px 32px rgba(35, 48, 41, .16)`。

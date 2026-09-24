@@ -108,7 +108,12 @@ function handleModalKeydown(event: KeyboardEvent) {
   if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
 }
-function focusModal() { nextTick(() => focusableModalElements()[0]?.focus()) }
+function focusModal() {
+  nextTick(() => {
+    const firstField = modalCard.value?.querySelector<HTMLElement>('form input:not([disabled]), form textarea:not([disabled]), form select:not([disabled])')
+    ;(firstField ?? focusableModalElements()[0])?.focus()
+  })
+}
 function handleModalClick(event: MouseEvent) {
   if (!modal.value) return
   const target = event.target as HTMLElement
@@ -127,7 +132,7 @@ function showInlineFeedback(eventId: string, itemId = '') {
 function showToast(message: string, tone: 'success' | 'error' = 'success') {
   if (toastTimer) clearTimeout(toastTimer)
   toast.value = { visible: true, message, tone }
-  toastTimer = setTimeout(() => { toast.value.visible = false }, 3200)
+  if (tone === 'success') toastTimer = setTimeout(() => { toast.value.visible = false }, 3000)
 }
 function formatDate(date: string) {
   const value = new Date(`${date}T00:00:00`)
@@ -166,6 +171,7 @@ async function refresh(showLoading: boolean | Event = true) {
   }
 }
 async function run<T>(action: () => Promise<T>, success?: string): Promise<T | boolean> {
+  toast.value.visible = false
   busy.value = true
   try {
     const result = await action()
@@ -246,7 +252,7 @@ async function saveTemplate() {
   if (saved) modal.value = null
 }
 async function deleteTemplate(template: Template) {
-  if (!window.confirm(`删除流程“${template.name}”？`)) return
+  if (!window.confirm(`删除流程“${template.name}”？流程和模板文件记录会删除，已创建事项及磁盘上的实际文件会保留。`)) return
   await run(() => window.workpack.deleteTemplate(template.id), '已删除')
 }
 async function deleteProject(project: Project) {
@@ -323,6 +329,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleModalClick, true)
   if (inlineFeedbackTimer) clearTimeout(inlineFeedbackTimer)
+  if (toastTimer) clearTimeout(toastTimer)
 })
 </script>
 
@@ -366,7 +373,7 @@ onBeforeUnmount(() => {
     </section>
 
     <div v-if="modal" class="modal-backdrop" @click.self="requestCloseModal"><section ref="modalCard" class="modal-card" :class="{ 'modal-wide': modal === 'template' || modal === 'item' }" role="dialog" aria-modal="true" tabindex="-1" @keydown="handleModalKeydown">
-      <template v-if="modal === 'project'"><div class="modal-heading"><div><span class="eyebrow">PROJECT</span><h2>{{ projectForm.id ? '编辑项目' : '新建项目' }}</h2></div><button class="modal-close" @click="modal = null">×</button></div><form class="form-grid" @submit.prevent="saveProject"><label>项目名称<input v-model="projectForm.name" required maxlength="100" placeholder="例如：华东智造产线升级项目"></label><label>客户名称<input v-model="projectForm.customer" required maxlength="100" placeholder="客户公司或单位"></label><label>负责人<input v-model="projectForm.owner" required maxlength="100" placeholder="项目负责人"></label><label>联系方式<input v-model="projectForm.contact" maxlength="4000" placeholder="电话、邮箱或其他联系方式"></label><label class="full-width">项目备注<textarea v-model="projectForm.note" rows="3" maxlength="4000" placeholder="项目背景或交付范围"></textarea></label><div class="full-width folder-picker"><div><span class="form-label">项目文件夹</span><p v-if="projectForm.id" class="form-help">目录不可用时重新定位。</p><p v-else class="form-help">选择上级文件夹，系统会创建同名目录。</p><span v-if="projectForm.directoryPath" class="selected-path">{{ projectForm.directoryPath }}</span></div><button v-if="!projectForm.id" type="button" class="button secondary" @click="chooseProjectFolder">选择文件夹</button></div><fieldset class="full-width"><legend>适用流程</legend><p class="form-help">仅可用于项目内新事项。</p><div class="template-checks"><label v-for="template in snapshot.templates" :key="template.id" class="template-check"><input v-model="projectForm.templateIds" type="checkbox" :value="template.id"><span class="template-icon tiny" :class="template.type">{{ typeIcon(template.type) }}</span><span><strong>{{ template.name }}</strong><small>{{ typeLabel(template.type) }} · {{ template.rules.length }} 个文件项</small></span></label><span v-if="!snapshot.templates.length" class="form-help">请先新建流程。</span></div></fieldset><div class="modal-actions"><button type="button" class="button secondary" @click="modal = null">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></form></template>
+      <template v-if="modal === 'project'"><div class="modal-heading"><div><span class="eyebrow">PROJECT</span><h2>{{ projectForm.id ? '编辑项目' : '新建项目' }}</h2></div><button class="modal-close" @click="modal = null">×</button></div><form class="form-grid" @submit.prevent="saveProject"><label>项目名称<input v-model="projectForm.name" required maxlength="100" placeholder="例如：华东智造产线升级项目"></label><label>客户名称<input v-model="projectForm.customer" required maxlength="100" placeholder="客户公司或单位"></label><label>负责人<input v-model="projectForm.owner" required maxlength="100" placeholder="项目负责人"></label><label>联系方式<input v-model="projectForm.contact" maxlength="4000" placeholder="电话、邮箱或其他联系方式"></label><label class="full-width">项目备注<textarea v-model="projectForm.note" rows="3" maxlength="4000" placeholder="项目背景或交付范围"></textarea></label><div class="full-width folder-picker"><div><span class="form-label">项目文件夹</span><p v-if="projectForm.id" class="form-help">目录不可用时重新定位。</p><p v-else class="form-help">选择上级文件夹，系统会创建同名目录。</p><span v-if="projectForm.directoryPath" class="selected-path" :title="projectForm.directoryPath">{{ projectForm.directoryPath }}</span></div><button v-if="!projectForm.id" type="button" class="button secondary" @click="chooseProjectFolder">选择文件夹</button></div><fieldset class="full-width"><legend>适用流程</legend><p class="form-help">仅可用于项目内新事项。</p><div class="template-checks"><label v-for="template in snapshot.templates" :key="template.id" class="template-check"><input v-model="projectForm.templateIds" type="checkbox" :value="template.id"><span class="template-icon tiny" :class="template.type">{{ typeIcon(template.type) }}</span><span><strong>{{ template.name }}</strong><small>{{ typeLabel(template.type) }} · {{ template.rules.length }} 个文件项</small></span></label><span v-if="!snapshot.templates.length" class="form-help">请先新建流程。</span></div></fieldset><div class="modal-actions"><button type="button" class="button secondary" @click="modal = null">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></form></template>
 
       <template v-else-if="modal === 'event'"><div class="modal-heading"><div><span class="eyebrow">BUSINESS EVENT</span><h2>{{ eventForm.id ? '编辑业务事项' : '新建业务事项' }}</h2></div><button class="modal-close" @click="modal = null">×</button></div><form class="form-grid" @submit.prevent="saveEvent"><label class="full-width">事项名称<input v-model="eventForm.name" required maxlength="100" placeholder="例如：第一批控制柜发货"></label><label>流程<select v-model="eventForm.templateId" :disabled="Boolean(eventForm.id)" required><option value="" disabled>请选择流程</option><option v-for="template in activeProject?.templateIds.map(templateFor).filter(Boolean)" :key="template!.id" :value="template!.id">{{ typeLabel(template!.type) }} · {{ template!.name }}</option></select></label><label>日期<input v-model="eventForm.date" required type="date"></label><label>经办人<input v-model="eventForm.owner" required maxlength="100"></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="modal = null">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : eventForm.id ? '保存' : '创建' }}</button></div></form></template>
 
@@ -374,6 +381,6 @@ onBeforeUnmount(() => {
 
       <template v-else-if="modal === 'item'"><div class="modal-heading"><div><span class="eyebrow">CHECKLIST ITEM</span><h2>{{ itemForm.id ? '编辑清单项' : '添加文件项' }}</h2><p>不适用不计入完成率。</p></div><button class="modal-close" @click="modal = null">×</button></div><form class="form-grid" @submit.prevent="saveItem"><label class="full-width">文件名称<input v-model="itemForm.name" required maxlength="100" placeholder="例如：客户签收单"></label><label class="full-width">文件说明<textarea v-model="itemForm.note" rows="3" maxlength="4000" placeholder="用途或填写要求"></textarea></label><fieldset class="full-width"><legend>需要完成的步骤</legend><div class="step-checks"><label v-for="step in steps" :key="step"><input v-model="itemForm.required" type="checkbox" :value="step"><span>{{ stepLabels[step] }}</span></label></div></fieldset><div class="modal-actions"><button type="button" class="button secondary" @click="modal = null">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></form></template>
     </section></div>
-    <div v-if="toast.visible" class="toast" :class="toast.tone"><span>{{ toast.tone === 'success' ? '✓' : '!' }}</span>{{ toast.message }}</div>
+    <div v-if="toast.visible" class="toast" :class="toast.tone" :role="toast.tone === 'error' ? 'alert' : 'status'"><span>{{ toast.tone === 'success' ? '✓' : '!' }}</span>{{ toast.message }}<button v-if="toast.tone === 'error'" class="toast-close" aria-label="关闭错误提示" @click="toast.visible = false">×</button></div>
   </div>
 </template>

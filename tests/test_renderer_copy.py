@@ -24,7 +24,10 @@ class RendererCopyTest(unittest.TestCase):
         self.assertNotIn("projects.find(item => item.name === name)", APP)
 
     def test_prepared_done_requires_available_attachment(self):
-        self.assertIn(":disabled=\"step === 'prepared' && !item.attachments.some(file => file.exists)\"", CHECKLIST)
+        self.assertIn('class="status-toggle"', CHECKLIST)
+        self.assertIn("step === 'prepared' && item.states[step] !== 'done' && !item.attachments.some(file => file.exists)", CHECKLIST)
+        self.assertIn("'请先上传文件'", CHECKLIST)
+        self.assertIn('<option value="na">不适用</option>', CHECKLIST)
 
     def test_removes_redundant_page_and_card_copy(self):
         redundant = [

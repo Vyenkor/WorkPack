@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import ItemChecklist from './components/ItemChecklist.vue'
+import NavIcon from './components/NavIcon.vue'
 import RulesEditor from './components/RulesEditor.vue'
 import {
   gaps,
@@ -339,10 +340,10 @@ onBeforeUnmount(() => {
       <div class="brand"><div class="brand-mark"><span></span><span></span><span></span></div><strong>WorkPack</strong></div>
       <div class="workspace-switch"><span class="workspace-avatar">W</span><span>我的工作空间</span><b>⌄</b></div>
       <nav class="nav" aria-label="主导航">
-        <button type="button" :class="{ active: view === 'home' }" @click="go('home')"><span class="nav-icon">▦</span>工作台</button>
-        <button type="button" :class="{ active: view === 'projects' }" @click="go('projects')"><span class="nav-icon">▤</span>项目</button>
-        <button type="button" :class="{ active: view === 'pending' }" @click="go('pending')"><span class="nav-icon">◷</span>待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
-        <button type="button" :class="{ active: view === 'templates' }" @click="go('templates')"><span class="nav-icon">▧</span>流程</button>
+        <button type="button" :class="{ active: view === 'home' }" @click="go('home')"><NavIcon class="nav-icon" name="home" />工作台</button>
+        <button type="button" :class="{ active: view === 'projects' }" @click="go('projects')"><NavIcon class="nav-icon" name="projects" />项目</button>
+        <button type="button" :class="{ active: view === 'pending' }" @click="go('pending')"><NavIcon class="nav-icon" name="pending" />待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
+        <button type="button" :class="{ active: view === 'templates' }" @click="go('templates')"><NavIcon class="nav-icon" name="templates" />流程</button>
       </nav>
       <div class="sidebar-bottom"><div class="sidebar-user"><span class="user-avatar">陈</span><span><strong>本机用户</strong><small>项目负责人</small></span></div></div>
     </aside>

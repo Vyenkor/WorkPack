@@ -43,6 +43,29 @@ test.afterEach(async () => {
   }
 })
 
+test('sidebar uses consistent outline icons at normal and minimum widths', async ({}, testInfo) => {
+  const icons = page.locator('.nav button svg.nav-icon')
+  await expect(icons).toHaveCount(4)
+  expect(await icons.evaluateAll(nodes => new Set(nodes.map(node => node.innerHTML)).size)).toBe(4)
+  for (const icon of await icons.all()) {
+    await expect(icon).toHaveAttribute('aria-hidden', 'true')
+    await expect(icon).toHaveAttribute('stroke', 'currentColor')
+    await expect(icon).toHaveCSS('width', '20px')
+    await expect(icon).toHaveCSS('height', '20px')
+  }
+  const active = page.locator('.nav button.active')
+  const activeColors = await active.evaluate(button => ({ text: getComputedStyle(button).color, icon: getComputedStyle(button.querySelector('svg')!).color }))
+  expect(activeColors.icon).toBe(activeColors.text)
+  await page.screenshot({ path: testInfo.outputPath('sidebar-icons.png') })
+  for (const label of ['项目', '待处理', '流程', '工作台']) {
+    const button = page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: label, exact: true })
+    await button.locator('svg').click()
+    await expect(button).toHaveClass(/active/)
+  }
+  await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1050, 700))
+  for (const icon of await icons.all()) await expect(icon).toHaveCSS('width', '20px')
+})
+
 test('text, focus, and persistent error feedback follow the design rules', async () => {
   await page.getByRole('button', { name: '新建项目' }).first().click()
   const name = page.getByRole('textbox', { name: '项目名称' })

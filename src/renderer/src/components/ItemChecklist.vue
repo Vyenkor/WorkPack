@@ -12,7 +12,12 @@ const emit = defineEmits<{
   detach: [id: string]
 }>()
 function statusText(status: Status, step: Step) { return status === 'done' ? `已${stepLabels[step]}` : status === 'na' ? '不适用' : `待${stepLabels[step]}` }
+function canToggle(item: Item, step: Step) {
+  if (props.busy || item.states[step] === 'na') return false
+  return step !== 'prepared' || item.states[step] === 'done' || item.attachments.some(file => file.exists)
+}
 function toggle(item: Item, step: Step) {
+  if (!canToggle(item, step)) return
   emit('status', item.id, step, item.states[step] === 'done' ? 'pending' : 'done')
 }
 function moreState(event: Event, item: Item, step: Step) {
@@ -32,7 +37,7 @@ function moreState(event: Event, item: Item, step: Step) {
           <ul class="attachment-list"><li v-for="file in item.attachments" :key="file.id"><div><button class="link" :disabled="!file.exists || busy" :title="file.path" @click="emit('open', file.id)">{{ file.name }}</button><span v-if="!file.exists" class="file-warning">文件失效</span></div><div class="inline-actions"><button class="link secondary" :disabled="busy" @click="emit('relocate', file.id)">重新定位</button><button class="link danger" :disabled="busy" @click="emit('detach', file.id)">移除记录</button></div></li></ul>
           <button class="button small" :disabled="busy" @click="emit('upload', item.id)">上传</button>
         </td>
-        <td v-for="step in steps" :key="step" class="status-cell"><div class="status-actions"><span :title="step === 'prepared' && item.states[step] !== 'done' && !item.attachments.some(file => file.exists) ? '请先上传文件' : ''"><button class="status-toggle" :class="item.states[step]" type="button" :aria-label="`${item.name}的${stepLabels[step]}状态：${statusText(item.states[step], step)}。点击切换`" :disabled="busy || (step === 'prepared' && item.states[step] !== 'done' && !item.attachments.some(file => file.exists))" @click="toggle(item, step)">{{ statusText(item.states[step], step) }}</button></span><select class="status-more" value="" :aria-label="`${item.name}的${stepLabels[step]}更多状态`" :disabled="busy" @change="moreState($event, item, step)"><option value="">···</option><option value="pending">待{{ stepLabels[step] }}</option><option value="na">不适用</option></select></div></td>
+        <td v-for="step in steps" :key="step" class="status-cell"><div class="status-actions"><span :title="step === 'prepared' && item.states[step] !== 'done' && !item.attachments.some(file => file.exists) ? '请先上传文件' : item.states[step] === 'na' ? '请用更多菜单改回待完成后再切换' : ''"><button class="status-toggle" :class="item.states[step]" type="button" :aria-label="`${item.name}的${stepLabels[step]}状态：${statusText(item.states[step], step)}${canToggle(item, step) ? '。点击切换' : ''}`" :disabled="!canToggle(item, step)" @click="toggle(item, step)">{{ statusText(item.states[step], step) }}</button></span><select class="status-more" value="" :aria-label="`${item.name}的${stepLabels[step]}更多状态`" :disabled="busy" @change="moreState($event, item, step)"><option value="">···</option><option value="pending">待{{ stepLabels[step] }}</option><option value="na">不适用</option></select></div></td>
         <td><div class="stack-actions"><button class="link" :disabled="busy || !gaps(item).length" @click="emit('complete', item.id)">完成</button><button class="link" :disabled="busy" @click="emit('edit', item)">编辑</button><button class="link danger" :disabled="busy" @click="emit('remove', item)">删除</button></div></td>
       </tr></tbody>
     </table>

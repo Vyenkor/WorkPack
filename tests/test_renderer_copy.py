@@ -25,9 +25,22 @@ class RendererCopyTest(unittest.TestCase):
 
     def test_prepared_done_requires_available_attachment(self):
         self.assertIn('class="status-toggle"', CHECKLIST)
-        self.assertIn("step === 'prepared' && item.states[step] !== 'done' && !item.attachments.some(file => file.exists)", CHECKLIST)
+        self.assertIn("function canToggle", CHECKLIST)
+        self.assertIn("item.states[step] === 'na'", CHECKLIST)
+        self.assertIn("step !== 'prepared' || item.states[step] === 'done' || item.attachments.some(file => file.exists)", CHECKLIST)
         self.assertIn("'请先上传文件'", CHECKLIST)
         self.assertIn('<option value="na">不适用</option>', CHECKLIST)
+
+    def test_not_applicable_status_does_not_toggle_to_done(self):
+        self.assertIn("if (!canToggle(item, step)) return", CHECKLIST)
+        self.assertIn("item.states[step] === 'done' ? 'pending' : 'done'", CHECKLIST)
+
+    def test_error_toast_clears_on_the_next_action(self):
+        self.assertIn("function clearToast()", APP)
+        self.assertIn("clearToast()\n  view.value = next", APP)
+        self.assertIn('@click="requestCloseModal"', APP)
+        self.assertNotIn('@click="modal = null"', APP)
+        self.assertIn("@click=\"clearToast\"", APP)
 
     def test_removes_redundant_page_and_card_copy(self):
         redundant = [

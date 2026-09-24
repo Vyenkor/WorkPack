@@ -34,6 +34,11 @@ class RendererStyleTest(unittest.TestCase):
         self.assertNotRegex(STYLE, r"\.panel\s*\{[^}]*box-shadow")
         self.assertNotRegex(STYLE, r"\.(?:project-card|event-card):hover\s*\{[^}]*transform")
 
+    def test_top_level_selectors_are_not_overridden_later(self):
+        selectors = re.findall(r"(?m)^([.#@][^{/][^{]*)\{", REST)
+        duplicates = sorted({name.strip() for name in selectors if selectors.count(name) > 1})
+        self.assertEqual(duplicates, [])
+
 
 if __name__ == "__main__":
     unittest.main()

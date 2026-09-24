@@ -73,6 +73,7 @@ body {
   margin: 0;
   min-width: 1050px;
   background: var(--color-canvas);
+  overflow: hidden;
 }
 
 button, input, textarea, select {
@@ -105,7 +106,11 @@ button:disabled {
 
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  min-height: 0;
+  width: 100%;
+  height: 100vh;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -116,6 +121,10 @@ button:disabled {
   padding: 27px 16px 18px;
   background: var(--color-sidebar);
   border-right: 1px solid var(--color-hairline);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .brand, .workspace-switch, .sidebar-user, .topbar-actions, .page-heading, .heading-actions, .panel-heading, .project-card-main, .project-card-footer, .detail-title-row, .event-card-head, .event-card-meta, .event-detail-heading, .section-heading, .template-card-head, .asset-heading, .template-actions, .modal-heading, .modal-actions, .folder-picker, .breadcrumb, .global-search, .pending-table-head, .pending-row, .attention-row, .project-mini {
@@ -315,6 +324,9 @@ button:disabled {
 .content-shell {
   min-width: 0;
   flex: 1;
+  height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .topbar {
@@ -322,9 +334,12 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 42px;
+  padding: 0 var(--spacing-xl);
   border-bottom: 1px solid var(--color-hairline);
   background: var(--color-surface);
+  position: sticky;
+  top: 0;
+  z-index: 8;
 }
 
 .breadcrumb {
@@ -398,13 +413,14 @@ button:disabled {
   width: 31px;
   height: 31px;
   border-radius: 50%;
-  background: var(--color-status-pending-soft);
+  background: var(--color-surface-subtle);
+  color: var(--color-ink-secondary);
 }
 
 .view {
-  max-width: 1410px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 38px 42px 70px;
+  padding: 38px var(--spacing-xl) 70px;
 }
 
 .page-section {
@@ -427,7 +443,7 @@ button:disabled {
 }
 
 .eyebrow {
-  display: block;
+  display: none;
   margin-bottom: 8px;
   color: var(--color-ink-muted);
   font-size: var(--font-caption);
@@ -645,7 +661,7 @@ button:disabled {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--color-status-pending-soft);
+  background: var(--color-status-pending);
 }
 
 .attention-main {
@@ -750,7 +766,7 @@ button:disabled {
 
 .mini-progress {
   width: 72px;
-  height: 5px;
+  height: 6px;
   border-radius: 4px;
   background: var(--color-status-na-soft);
 }
@@ -813,6 +829,8 @@ button:disabled {
   border: 1px solid var(--color-hairline);
   border-radius: 10px;
   background: var(--color-surface);
+  cursor: pointer;
+  transition: border-color .15s ease;
 }
 
 .project-card-main {
@@ -992,7 +1010,7 @@ button:disabled {
 
 .pending-table-head, .pending-row {
   display: grid;
-  grid-template-columns: 1.25fr 1.4fr 1.5fr .7fr 25px;
+  grid-template-columns: 1.25fr 1.4fr 1.5fr .7fr;
   gap: 15px;
   align-items: center;
   padding: 13px 20px;
@@ -1446,7 +1464,7 @@ button:disabled {
 }
 
 .event-card:hover {
-  border-color: var(--color-hairline);
+  border-color: var(--color-hairline-strong);
 }
 
 .event-card-head {
@@ -1638,13 +1656,17 @@ button:disabled {
   overflow: auto;
   border: 1px solid var(--color-hairline);
   border-radius: 8px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .checklist {
   width: 100%;
-  min-width: 850px;
+  min-width: 930px;
   border-collapse: collapse;
-  font-size: var(--font-caption);
+  font-size: var(--font-body-sm);
 }
 
 .checklist th {
@@ -1673,7 +1695,7 @@ button:disabled {
 }
 
 .document-cell {
-  width: 43%;
+  width: 38%;
 }
 
 .document-cell strong {
@@ -1831,7 +1853,8 @@ button:disabled {
 }
 
 .form-grid input:focus, .form-grid textarea:focus, .form-grid select:focus {
-  border-color: var(--color-control-border);
+  border-color: var(--color-focus-ring);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
 .form-grid textarea {
@@ -2071,7 +2094,8 @@ button:disabled {
   border-radius: 8px;
   background: var(--color-status-done-soft);
   box-shadow: var(--floating-shadow);
-  font-size: var(--font-caption);
+  font-size: var(--font-body-sm);
+  border-color: color-mix(in srgb, var(--color-status-done) 20%, transparent);
 }
 
 .toast span {
@@ -2082,7 +2106,7 @@ button:disabled {
   height: 18px;
   color: var(--color-on-primary);
   border-radius: 50%;
-  background: var(--color-status-done-soft);
+  background: var(--color-status-done);
   font-size: var(--font-caption);
 }
 
@@ -2093,12 +2117,12 @@ button:disabled {
 
 .toast.error {
   color: var(--color-danger);
-  border-color: var(--color-hairline);
+  border-color: color-mix(in srgb, var(--color-danger) 20%, transparent);
   background: var(--color-danger-soft);
 }
 
 .toast.error span {
-  background: var(--color-danger-soft);
+  background: var(--color-danger);
 }
 
 .loading-state, .error-state {
@@ -2143,24 +2167,35 @@ button:disabled {
     width: 216px;
     flex-basis: 216px;
   }
+
   .view {
     padding-right: 27px;
     padding-left: 27px;
   }
+
   .topbar {
     padding: 0 27px;
   }
+
   .project-card-main {
     gap: 10px;
   }
+
   .project-owner {
     width: 75px;
   }
+
   .project-progress {
     width: 140px;
   }
+
   .template-grid {
     grid-template-columns: repeat(2, minmax(270px, 1fr));
+  }
+
+  .view, .topbar {
+    padding-right: var(--spacing-lg);
+    padding-left: var(--spacing-lg);
   }
 }
 
@@ -2173,23 +2208,6 @@ button:disabled {
 
 .event-actions .back-button {
   margin-bottom: 0;
-}
-
-.checklist {
-  min-width: 760px;
-  font-size: var(--font-caption);
-}
-
-.checklist th {
-  font-size: var(--font-caption);
-}
-
-.document-cell {
-  width: 38%;
-}
-
-.help {
-  font-size: var(--font-caption);
 }
 
 .asset-select {
@@ -2216,48 +2234,9 @@ html, body, #app {
   overflow-x: hidden;
 }
 
-body {
-  overflow: hidden;
-}
-
-.app-shell {
-  width: 100%;
-  height: 100vh;
-  min-height: 0;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.sidebar {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-}
-
-.content-shell {
-  height: 100vh;
-  min-width: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 8;
-}
-
 .view, .page-section, .event-detail, .panel {
   min-width: 0;
   max-width: 100%;
-}
-
-.table-wrap {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
 }
 
 .checklist th:last-child, .checklist td:last-child {
@@ -2298,13 +2277,8 @@ body {
   justify-content: flex-end;
 }
 
-.project-card {
-  cursor: pointer;
-  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
-}
-
 .project-card:hover {
-  border-color: var(--color-hairline);
+  border-color: var(--color-hairline-strong);
 }
 
 .project-card:focus-visible, .event-card:focus-visible, .attention-row:focus-visible, .project-mini:focus-visible, .pending-row:focus-visible {
@@ -2321,25 +2295,7 @@ body {
   margin-left: 0;
 }
 
-.pending-table-head, .pending-row {
-  grid-template-columns: 1.25fr 1.4fr 1.5fr .7fr;
-}
-
-.eyebrow {
-  display: none;
-}
-
-/* Design tokens for controls, statuses, and narrow desktop windows. */
-.view {
-  max-width: 1400px;
-  padding-right: var(--spacing-xl);
-  padding-left: var(--spacing-xl);
-}
-
-.topbar {
-  padding-right: var(--spacing-xl);
-  padding-left: var(--spacing-xl);
-}
+/* Control borders, status toggles, sticky checklist columns. */
 
 .global-search, .filter-search, .filter-bar select,
 .form-grid input, .form-grid textarea, .form-grid select,
@@ -2357,11 +2313,6 @@ body {
 .rule-title input, .rule-editor > input, .asset-select select,
 .filter-bar select, .global-search input, .filter-search input {
   font-size: var(--font-body-sm);
-}
-
-.form-grid input:focus, .form-grid textarea:focus, .form-grid select:focus {
-  border-color: var(--color-focus-ring);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
 .global-search input::placeholder, .filter-search input::placeholder,
@@ -2382,15 +2333,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.mini-progress {
-  height: 6px;
-}
-
-.top-avatar {
-  color: var(--color-ink-secondary);
-  background: var(--color-surface-subtle);
-}
-
 .flow-card strong, .rule-preview .more-rules {
   color: var(--color-ink-secondary);
 }
@@ -2401,48 +2343,15 @@ body {
   background: var(--color-surface-subtle);
 }
 
-.attention-dot {
-  background: var(--color-status-pending);
-}
-
 .template-icon:not(.shipping):not(.receiving):not(.training),
 .event-type-icon:not(.shipping):not(.receiving):not(.training) {
   color: var(--color-type-custom);
   background: var(--color-type-custom-soft);
 }
 
-.template-icon.receiving, .event-type-icon.receiving {
-  color: var(--color-type-receiving);
-  background: var(--color-type-receiving-soft);
-}
-
-.event-card:hover, .project-card:hover {
-  border-color: var(--color-hairline-strong);
-}
-
-.project-card {
-  transition: border-color .15s ease;
-}
-
-.project-card:focus-visible, .event-card:focus-visible,
-.attention-row:focus-visible, .project-mini:focus-visible,
-.pending-row:focus-visible {
-  outline: 3px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
 .selected-path, .folder-value {
   font-family: "Cascadia Mono", Consolas, monospace;
   font-size: var(--font-mono);
-}
-
-.checklist {
-  min-width: 930px;
-  font-size: var(--font-body-sm);
-}
-
-.checklist th {
-  font-size: var(--font-caption);
 }
 
 .checklist th:first-child, .checklist td:first-child {
@@ -2497,8 +2406,6 @@ body {
 }
 
 .status-toggle:disabled {
-  color: var(--color-status-pending);
-  background: var(--color-status-pending-soft);
   pointer-events: none;
 }
 
@@ -2515,27 +2422,6 @@ body {
   background: var(--color-surface);
   font-size: var(--font-caption);
   cursor: pointer;
-}
-
-.toast {
-  color: var(--color-status-done);
-  border-color: color-mix(in srgb, var(--color-status-done) 20%, transparent);
-  background: var(--color-status-done-soft);
-  font-size: var(--font-body-sm);
-}
-
-.toast.error {
-  color: var(--color-danger);
-  border-color: color-mix(in srgb, var(--color-danger) 20%, transparent);
-  background: var(--color-danger-soft);
-}
-
-.toast span {
-  background: var(--color-status-done);
-}
-
-.toast.error span {
-  background: var(--color-danger);
 }
 
 .button.primary:disabled, .button.secondary:disabled,
@@ -2569,11 +2455,4 @@ input:disabled, textarea:disabled, select:disabled {
 
 .toast-close:hover {
   background: var(--color-surface);
-}
-
-@media (max-width: 1180px) {
-  .view, .topbar {
-    padding-right: var(--spacing-lg);
-    padding-left: var(--spacing-lg);
-  }
 }

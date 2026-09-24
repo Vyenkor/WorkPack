@@ -94,8 +94,13 @@ function currentModalData() {
   return null
 }
 function markModalClean() { modalBaseline.value = JSON.stringify(currentModalData()) }
+function clearToast() {
+  if (toastTimer) clearTimeout(toastTimer)
+  toast.value.visible = false
+}
 function requestCloseModal() {
   if (modalDirty.value && !window.confirm('有未保存修改，关闭？')) return
+  clearToast()
   modal.value = null
 }
 function focusableModalElements() {
@@ -173,7 +178,7 @@ async function refresh(showLoading: boolean | Event = true) {
   }
 }
 async function run<T>(action: () => Promise<T>, success?: string): Promise<T | boolean> {
-  toast.value.visible = false
+  clearToast()
   busy.value = true
   try {
     const result = await action()
@@ -187,18 +192,21 @@ async function run<T>(action: () => Promise<T>, success?: string): Promise<T | b
   } finally { busy.value = false }
 }
 function go(next: MainView) {
+  clearToast()
   view.value = next
   if (next !== 'project') { activeProjectId.value = null; activeEventId.value = null; activeEventOnly.value = false }
 }
 function openProject(project: Project, eventId?: string) {
+  clearToast()
   activeProjectId.value = project.id
   activeEventId.value = eventId ?? null
   activeEventOnly.value = Boolean(eventId)
   view.value = 'project'
 }
 function openEvent(project: Project, event: BusinessEvent) { openProject(project, event.id) }
-function closeEventDetail() { activeEventId.value = null; activeEventOnly.value = false }
+function closeEventDetail() { clearToast(); activeEventId.value = null; activeEventOnly.value = false }
 function runGlobalSearch() {
+  clearToast()
   const keyword = search.value.trim().toLowerCase()
   if (!keyword) { go('projects'); return }
   const project = snapshot.value.projects.find(item => [item.name, item.customer, item.owner].some(value => value.toLowerCase().includes(keyword)))
@@ -211,8 +219,9 @@ function runGlobalSearch() {
 function resetProjectForm(project?: Project) {
   Object.assign(projectForm, project ? { id: project.id, name: project.name, customer: project.customer, contact: project.contact, owner: project.owner, note: project.note, templateIds: [...project.templateIds], directoryToken: '', directoryPath: project.folder } : { id: '', name: '', customer: '', contact: '', owner: '', note: '', templateIds: [], directoryToken: '', directoryPath: '' })
 }
-function openProjectModal(project?: Project) { resetProjectForm(project); modal.value = 'project'; markModalClean() }
+function openProjectModal(project?: Project) { clearToast(); resetProjectForm(project); modal.value = 'project'; markModalClean() }
 async function chooseProjectFolder() {
+  clearToast()
   try {
     const result = await window.workpack.chooseDirectory()
     if (result) { projectForm.directoryToken = result.token; projectForm.directoryPath = result.path }
@@ -230,7 +239,7 @@ async function saveProject() {
 }
 
 function resetEventForm(project: Project, event?: BusinessEvent) { Object.assign(eventForm, event ? { id: event.id, projectId: project.id, templateId: event.templateId, name: event.name, date: event.date, owner: event.owner } : { id: '', projectId: project.id, templateId: project.templateIds[0] ?? '', name: '', date: new Date().toISOString().slice(0, 10), owner: project.owner }) }
-function openEventModal(project = activeProject.value, event?: BusinessEvent) { if (!project) return; resetEventForm(project, event); modal.value = 'event'; markModalClean() }
+function openEventModal(project = activeProject.value, event?: BusinessEvent) { if (!project) return; clearToast(); resetEventForm(project, event); modal.value = 'event'; markModalClean() }
 async function saveEvent() {
   if (!eventForm.name.trim() || !eventForm.templateId || !eventForm.owner.trim()) { showToast('请填写事项名称、模板和经办人', 'error'); return }
   const input = { id: eventForm.id, projectId: eventForm.projectId, templateId: eventForm.templateId, name: eventForm.name, date: eventForm.date, owner: eventForm.owner }
@@ -247,7 +256,7 @@ async function saveEvent() {
 function resetTemplateForm(template?: Template) {
   Object.assign(templateForm, template ? { id: template.id, name: template.name, type: template.type, rules: clone(template.rules) } : { id: '', name: '', type: '', rules: [] })
 }
-function openTemplateModal(template?: Template) { resetTemplateForm(template); modal.value = 'template'; markModalClean() }
+function openTemplateModal(template?: Template) { clearToast(); resetTemplateForm(template); modal.value = 'template'; markModalClean() }
 async function saveTemplate() {
   if (!templateForm.name.trim() || !templateForm.type.trim() || !templateForm.rules.every(rule => rule.name.trim())) { showToast('请填写流程名称、事项类型及文件项名称', 'error'); return }
   const saved = await run(() => window.workpack.saveTemplate({ id: templateForm.id || undefined, name: templateForm.name, type: templateForm.type, rules: clone(templateForm.rules) }), '已保存')
@@ -284,7 +293,7 @@ async function exportTemplate(template: Template) {
 }
 
 function resetItemForm(event: BusinessEvent, item?: Item) { Object.assign(itemForm, item ? { id: item.id, eventId: event.id, name: item.name, note: item.note, required: [...item.required] } : { id: '', eventId: event.id, name: '', note: '', required: [...steps] }) }
-function openItemModal(event: BusinessEvent, item?: Item) { resetItemForm(event, item); modal.value = 'item'; markModalClean() }
+function openItemModal(event: BusinessEvent, item?: Item) { clearToast(); resetItemForm(event, item); modal.value = 'item'; markModalClean() }
 async function saveItem() {
   if (!itemForm.name.trim() || !itemForm.required.length) { showToast('请填写文件名称，并至少选择一个完成步骤', 'error'); return }
   const saved = await run(() => window.workpack.saveItem({ id: itemForm.id || undefined, eventId: itemForm.eventId, name: itemForm.name, note: itemForm.note, required: [...itemForm.required] }), '已保存')
@@ -375,14 +384,14 @@ onBeforeUnmount(() => {
     </section>
 
     <div v-if="modal" class="modal-backdrop" @click.self="requestCloseModal"><section ref="modalCard" class="modal-card" :class="{ 'modal-wide': modal === 'template' || modal === 'item' }" role="dialog" aria-modal="true" tabindex="-1" @keydown="handleModalKeydown">
-      <template v-if="modal === 'project'"><div class="modal-heading"><div><span class="eyebrow">PROJECT</span><h2>{{ projectForm.id ? '编辑项目' : '新建项目' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="modal = null"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveProject"><label>项目名称<input v-model="projectForm.name" required maxlength="100" placeholder="例如：华东智造产线升级项目"></label><label>客户名称<input v-model="projectForm.customer" required maxlength="100" placeholder="客户公司或单位"></label><label>负责人<input v-model="projectForm.owner" required maxlength="100" placeholder="项目负责人"></label><label>联系方式<input v-model="projectForm.contact" maxlength="4000" placeholder="电话、邮箱或其他联系方式"></label><label class="full-width">项目备注<textarea v-model="projectForm.note" rows="3" maxlength="4000" placeholder="项目背景或交付范围"></textarea></label><div class="full-width folder-picker"><div><span class="form-label">项目文件夹</span><p v-if="projectForm.id" class="form-help">目录不可用时重新定位。</p><p v-else class="form-help">选择上级文件夹，系统会创建同名目录。</p><span v-if="projectForm.directoryPath" class="selected-path" :title="projectForm.directoryPath">{{ projectForm.directoryPath }}</span></div><button v-if="!projectForm.id" type="button" class="button secondary" @click="chooseProjectFolder">选择文件夹</button></div><fieldset class="full-width"><legend>适用流程</legend><p class="form-help">仅可用于项目内新事项。</p><div class="template-checks"><label v-for="template in snapshot.templates" :key="template.id" class="template-check"><input v-model="projectForm.templateIds" type="checkbox" :value="template.id"><span class="template-icon tiny" :class="template.type"><UiIcon :name="typeIcon(template.type)" /></span><span><strong>{{ template.name }}</strong><small>{{ typeLabel(template.type) }} · {{ template.rules.length }} 个文件项</small></span></label><span v-if="!snapshot.templates.length" class="form-help">请先新建流程。</span></div></fieldset><div class="modal-actions"><button type="button" class="button secondary" @click="modal = null">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></form></template>
+      <template v-if="modal === 'project'"><div class="modal-heading"><div><span class="eyebrow">PROJECT</span><h2>{{ projectForm.id ? '编辑项目' : '新建项目' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveProject"><label>项目名称<input v-model="projectForm.name" required maxlength="100" placeholder="例如：华东智造产线升级项目"></label><label>客户名称<input v-model="projectForm.customer" required maxlength="100" placeholder="客户公司或单位"></label><label>负责人<input v-model="projectForm.owner" required maxlength="100" placeholder="项目负责人"></label><label>联系方式<input v-model="projectForm.contact" maxlength="4000" placeholder="电话、邮箱或其他联系方式"></label><label class="full-width">项目备注<textarea v-model="projectForm.note" rows="3" maxlength="4000" placeholder="项目背景或交付范围"></textarea></label><div class="full-width folder-picker"><div><span class="form-label">项目文件夹</span><p v-if="projectForm.id" class="form-help">目录不可用时重新定位。</p><p v-else class="form-help">选择上级文件夹，系统会创建同名目录。</p><span v-if="projectForm.directoryPath" class="selected-path" :title="projectForm.directoryPath">{{ projectForm.directoryPath }}</span></div><button v-if="!projectForm.id" type="button" class="button secondary" @click="chooseProjectFolder">选择文件夹</button></div><fieldset class="full-width"><legend>适用流程</legend><p class="form-help">仅可用于项目内新事项。</p><div class="template-checks"><label v-for="template in snapshot.templates" :key="template.id" class="template-check"><input v-model="projectForm.templateIds" type="checkbox" :value="template.id"><span class="template-icon tiny" :class="template.type"><UiIcon :name="typeIcon(template.type)" /></span><span><strong>{{ template.name }}</strong><small>{{ typeLabel(template.type) }} · {{ template.rules.length }} 个文件项</small></span></label><span v-if="!snapshot.templates.length" class="form-help">请先新建流程。</span></div></fieldset><div class="modal-actions"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></form></template>
 
-      <template v-else-if="modal === 'event'"><div class="modal-heading"><div><span class="eyebrow">BUSINESS EVENT</span><h2>{{ eventForm.id ? '编辑业务事项' : '新建业务事项' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="modal = null"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveEvent"><label class="full-width">事项名称<input v-model="eventForm.name" required maxlength="100" placeholder="例如：第一批控制柜发货"></label><label>流程<select v-model="eventForm.templateId" :disabled="Boolean(eventForm.id)" required><option value="" disabled>请选择流程</option><option v-for="template in activeProject?.templateIds.map(templateFor).filter(Boolean)" :key="template!.id" :value="template!.id">{{ typeLabel(template!.type) }} · {{ template!.name }}</option></select></label><label>日期<input v-model="eventForm.date" required type="date"></label><label>经办人<input v-model="eventForm.owner" required maxlength="100"></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="modal = null">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : eventForm.id ? '保存' : '创建' }}</button></div></form></template>
+      <template v-else-if="modal === 'event'"><div class="modal-heading"><div><span class="eyebrow">BUSINESS EVENT</span><h2>{{ eventForm.id ? '编辑业务事项' : '新建业务事项' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveEvent"><label class="full-width">事项名称<input v-model="eventForm.name" required maxlength="100" placeholder="例如：第一批控制柜发货"></label><label>流程<select v-model="eventForm.templateId" :disabled="Boolean(eventForm.id)" required><option value="" disabled>请选择流程</option><option v-for="template in activeProject?.templateIds.map(templateFor).filter(Boolean)" :key="template!.id" :value="template!.id">{{ typeLabel(template!.type) }} · {{ template!.name }}</option></select></label><label>日期<input v-model="eventForm.date" required type="date"></label><label>经办人<input v-model="eventForm.owner" required maxlength="100"></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : eventForm.id ? '保存' : '创建' }}</button></div></form></template>
 
-      <template v-else-if="modal === 'template'"><div class="modal-heading"><div><span class="eyebrow">TEMPLATE RULES</span><h2>{{ templateForm.id ? '编辑流程' : '新建流程' }}</h2><p>规则仅作用于新事项。</p></div><button class="modal-close" aria-label="关闭弹窗" @click="modal = null"><UiIcon name="close" /></button></div><form @submit.prevent="saveTemplate"><div class="form-grid"><label>流程名称<input v-model="templateForm.name" required maxlength="100" placeholder="例如：发货流程"></label><label>事项类型<input v-model="templateTypeInput" required maxlength="50" :disabled="Boolean(templateForm.id)" placeholder="例如：售后"></label></div><RulesEditor v-model="templateForm.rules" :assets="templateFormAssets" /><div class="modal-actions"><button type="button" class="button secondary" @click="modal = null">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></form></template>
+      <template v-else-if="modal === 'template'"><div class="modal-heading"><div><span class="eyebrow">TEMPLATE RULES</span><h2>{{ templateForm.id ? '编辑流程' : '新建流程' }}</h2><p>规则仅作用于新事项。</p></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form @submit.prevent="saveTemplate"><div class="form-grid"><label>流程名称<input v-model="templateForm.name" required maxlength="100" placeholder="例如：发货流程"></label><label>事项类型<input v-model="templateTypeInput" required maxlength="50" :disabled="Boolean(templateForm.id)" placeholder="例如：售后"></label></div><RulesEditor v-model="templateForm.rules" :assets="templateFormAssets" /><div class="modal-actions"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></form></template>
 
-      <template v-else-if="modal === 'item'"><div class="modal-heading"><div><span class="eyebrow">CHECKLIST ITEM</span><h2>{{ itemForm.id ? '编辑清单项' : '添加文件项' }}</h2><p>不适用不计入完成率。</p></div><button class="modal-close" aria-label="关闭弹窗" @click="modal = null"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveItem"><label class="full-width">文件名称<input v-model="itemForm.name" required maxlength="100" placeholder="例如：客户签收单"></label><label class="full-width">文件说明<textarea v-model="itemForm.note" rows="3" maxlength="4000" placeholder="用途或填写要求"></textarea></label><fieldset class="full-width"><legend>需要完成的步骤</legend><div class="step-checks"><label v-for="step in steps" :key="step"><input v-model="itemForm.required" type="checkbox" :value="step"><span>{{ stepLabels[step] }}</span></label></div></fieldset><div class="modal-actions"><button type="button" class="button secondary" @click="modal = null">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></form></template>
+      <template v-else-if="modal === 'item'"><div class="modal-heading"><div><span class="eyebrow">CHECKLIST ITEM</span><h2>{{ itemForm.id ? '编辑清单项' : '添加文件项' }}</h2><p>不适用不计入完成率。</p></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveItem"><label class="full-width">文件名称<input v-model="itemForm.name" required maxlength="100" placeholder="例如：客户签收单"></label><label class="full-width">文件说明<textarea v-model="itemForm.note" rows="3" maxlength="4000" placeholder="用途或填写要求"></textarea></label><fieldset class="full-width"><legend>需要完成的步骤</legend><div class="step-checks"><label v-for="step in steps" :key="step"><input v-model="itemForm.required" type="checkbox" :value="step"><span>{{ stepLabels[step] }}</span></label></div></fieldset><div class="modal-actions"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></form></template>
     </section></div>
-    <div v-if="toast.visible" class="toast" :class="toast.tone" :role="toast.tone === 'error' ? 'alert' : 'status'"><span><UiIcon :name="toast.tone === 'success' ? 'check' : 'error'" /></span>{{ toast.message }}<button v-if="toast.tone === 'error'" class="toast-close" aria-label="关闭错误提示" @click="toast.visible = false"><UiIcon name="close" /></button></div>
+    <div v-if="toast.visible" class="toast" :class="toast.tone" :role="toast.tone === 'error' ? 'alert' : 'status'"><span><UiIcon :name="toast.tone === 'success' ? 'check' : 'error'" /></span>{{ toast.message }}<button v-if="toast.tone === 'error'" class="toast-close" aria-label="关闭错误提示" @click="clearToast"><UiIcon name="close" /></button></div>
   </div>
 </template>

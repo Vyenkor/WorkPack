@@ -100,10 +100,17 @@ class DesignMdTest(unittest.TestCase):
     def test_workflow_identity_uses_one_shared_visual_treatment(self):
         self.assertIn("流程统一使用同一图标和主色", CONTENT)
 
+    def test_typography_uses_chinese_system_font(self):
+        typography = CONTENT.split("## Typography\n", 1)[1].split("\n## Layout\n", 1)[0]
+        self.assertIn('"Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif', typography)
+        self.assertIn("任何需要阅读的文字不小于 12px", typography)
+        self.assertIn("中文不使用负字间距", typography)
+
     def test_layout_rules_for_dense_desktop(self):
         layout = CONTENT.split("## Layout\n", 1)[1].split("\n## Elevation & Depth\n", 1)[0]
         for phrase in [
             "内容区最大宽度 1400px",
+            "1180px 及以上为 240px，1050–1180px 时为 216px",
             "左右内边距 `spacing.xl`",
             "都是 4px 的倍数",
             "`xs`–`sm`",
@@ -111,16 +118,19 @@ class DesignMdTest(unittest.TestCase):
             "`md`–`lg`",
             "`lg`–`xl`",
             "`xl`–`xxl`",
+            "空状态",
             "页面标题 | 搜索 | 筛选 | 排序 | 主要操作",
-            "普通数据行 32–40px",
-            "工具栏 36–44px",
+            "单行状态高度为 36–44px",
+            "不再受 36–44px 限制",
+            "单行数据行的目标高度是 32–40px",
+            "实际大约 45px",
+            "不受 40px 限制",
             "常规按钮和输入框 28–36px",
             "不要卡片套卡片",
             "文件名称 > 状态 / 修改时间 > 类型 / 大小 > 辅助信息",
         ]:
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, layout)
-        self.assertIn("Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif", CONTENT)
         self.assertNotIn("密度适中", CONTENT)
 
     def test_documents_required_sections(self):

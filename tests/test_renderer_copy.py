@@ -31,6 +31,11 @@ class RendererCopyTest(unittest.TestCase):
         self.assertNotIn('pendingFilter.type', APP)
         self.assertNotIn('availableTypes', APP)
 
+    def test_back_buttons_use_the_shared_linear_icon(self):
+        self.assertIn('<UiIcon name="back" class="back-icon" />', APP)
+        self.assertNotIn('>← 项目</button>', APP)
+        self.assertNotIn('>← 返回事项</button>', APP)
+
     def test_saved_project_is_opened_by_id(self):
         self.assertIn("projects.find(item => item.id === saved)", APP)
         self.assertNotIn("projects.find(item => item.name === name)", APP)

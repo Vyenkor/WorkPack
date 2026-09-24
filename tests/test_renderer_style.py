@@ -34,6 +34,10 @@ class RendererStyleTest(unittest.TestCase):
         self.assertNotRegex(STYLE, r"\.panel\s*\{[^}]*box-shadow")
         self.assertNotRegex(STYLE, r"\.(?:project-card|event-card):hover\s*\{[^}]*transform")
 
+    def test_back_button_has_a_compact_hover_target(self):
+        self.assertRegex(STYLE, r"\.back-button\s*\{[^}]*min-height: 28px[^}]*border: 1px solid transparent")
+        self.assertIn(".back-button .back-icon", STYLE)
+
     def test_top_level_selectors_are_not_overridden_later(self):
         selectors = re.findall(r"(?m)^([.#@][^{/][^{]*)\{", REST)
         duplicates = sorted({name.strip() for name in selectors if selectors.count(name) > 1})

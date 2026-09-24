@@ -1326,16 +1326,35 @@ button:disabled {
 }
 
 .back-button {
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 8px 4px 4px;
   margin-bottom: 17px;
   color: var(--color-ink-muted);
-  border: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
   background: transparent;
   font-size: var(--font-caption);
+  transition: color .15s, border-color .15s, background-color .15s;
 }
 
 .back-button:hover {
   color: var(--color-primary);
+  border-color: var(--color-hairline);
+  background: var(--color-surface-hover);
+}
+
+.back-button .back-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  transition: transform .15s;
+}
+
+.back-button:hover .back-icon {
+  transform: translateX(-1px);
 }
 
 .detail-title-row {

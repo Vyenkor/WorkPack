@@ -169,6 +169,8 @@ test('prepared status needs an attachment and other steps toggle by click', asyn
   await page.getByRole('textbox', { name: '事项名称' }).fill('第一批交付')
   await page.locator('.modal-card button[type="submit"]').click()
   await expect(page.getByRole('heading', { name: '第一批交付' })).toBeVisible()
+  await expect(page.locator('.back-button .back-icon')).toHaveCount(2)
+  expect((await page.locator('.back-button').allTextContents()).join('')).not.toContain('←')
   const firstItem = page.locator('.checklist tbody tr').first()
   await expect(firstItem).toBeVisible()
   const prepared = firstItem.getByRole('button', { name: /准备状态/ })

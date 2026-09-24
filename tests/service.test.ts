@@ -152,6 +152,57 @@ describe('WorkPackService', () => {
     } finally { service.close() }
   })
 
+  it('returns the saved project id so same-name projects stay distinguishable', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const template = service.snapshot().templates[0]
+      const firstParent = path.join(root, 'first'), secondParent = path.join(root, 'second')
+      fs.mkdirSync(firstParent)
+      fs.mkdirSync(secondParent)
+      const firstId = service.saveProject(inputForProject(template.id), firstParent)
+      const secondId = service.saveProject(inputForProject(template.id), secondParent)
+
+      expect(firstId).not.toBe(secondId)
+      const projects = service.snapshot().projects
+      expect(projects.find(project => project.id === firstId)!.folder).toBe(path.join(firstParent, '测试项目'))
+      expect(projects.find(project => project.id === secondId)!.folder).toBe(path.join(secondParent, '测试项目'))
+
+      const edited = service.saveProject({ ...inputForProject(template.id), id: secondId, name: '重命名项目' })
+      expect(edited).toBe(secondId)
+      expect(service.snapshot().projects.find(project => project.id === secondId)!.folder).toBe(path.join(secondParent, '重命名项目'))
+    } finally { service.close() }
+  })
+
+  it('rejects marking a file prepared until it has an available attachment', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const template = service.snapshot().templates[0]
+      const parent = path.join(root, 'projects')
+      fs.mkdirSync(parent)
+      service.saveProject(inputForProject(template.id), parent)
+      const project = service.snapshot().projects[0]
+      service.createEvent({ projectId: project.id, templateId: template.id, name: '准备状态测试', date: '2026-09-23', owner: '测试负责人' })
+      const item = service.snapshot().projects[0].events[0].items[0]
+
+      expect(() => service.setStatus({ id: item.id, step: 'prepared', status: 'done' })).toThrow('请先上传文件')
+      expect(service.snapshot().projects[0].events[0].items[0].states.prepared).toBe('pending')
+
+      const attachment = path.join(root, '发货清单.pdf')
+      fs.writeFileSync(attachment, 'attachment')
+      service.importAttachments(item.id, [attachment])
+      const uploaded = service.snapshot().projects[0].events[0].items[0]
+      service.setStatus({ id: item.id, step: 'prepared', status: 'pending' })
+      service.setStatus({ id: item.id, step: 'prepared', status: 'done' })
+      expect(service.snapshot().projects[0].events[0].items[0].states.prepared).toBe('done')
+
+      fs.unlinkSync(path.join(project.folder, uploaded.attachments[0].path))
+      expect(service.snapshot().projects[0].events[0].items[0].states.prepared).toBe('pending')
+      expect(() => service.setStatus({ id: item.id, step: 'prepared', status: 'done' })).toThrow('请先上传文件')
+    } finally { service.close() }
+  })
+
   it('updates event details and moves generated work copies with the date', () => {
     const root = tempDirectory()
     const service = new WorkPackService(path.join(root, 'data'))

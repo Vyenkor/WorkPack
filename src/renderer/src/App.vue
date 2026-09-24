@@ -215,10 +215,9 @@ async function saveProject() {
   if (!projectForm.id && !projectForm.directoryToken) { showToast('请先选择项目上级文件夹', 'error'); return }
   const input = { id: projectForm.id || undefined, name: projectForm.name, customer: projectForm.customer, contact: projectForm.contact, owner: projectForm.owner, note: projectForm.note, templateIds: [...projectForm.templateIds], directoryToken: projectForm.directoryToken || undefined }
   const saved = await run(() => window.workpack.saveProject(input), '已保存')
-  if (!saved) return
-  const name = projectForm.name
+  if (typeof saved !== 'string') return
   modal.value = null
-  const project = snapshot.value.projects.find(item => item.name === name)
+  const project = snapshot.value.projects.find(item => item.id === saved)
   if (project) openProject(project)
 }
 

@@ -199,6 +199,11 @@ function formatDate(value) {
   return Number(parts[1]) + "月" + Number(parts[2]) + "日";
 }
 
+function escapeHtml(value) {
+  const entities = { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" };
+  return (value === null || value === undefined ? "" : String(value)).replace(/[&<>"']/g, function (char) { return entities[char]; });
+}
+
 function progressBar(percent) {
   return '<div class="progress-track"><div class="progress-fill" style="width:' + percent + '%"></div></div>';
 }
@@ -209,18 +214,18 @@ function typeTag(type) {
 }
 
 function heading(eyebrow, title, subtitle, actions) {
-  return '<div class="page-heading"><div><p class="eyebrow">' + eyebrow + '</p><h1>' + title +
-    '</h1><p>' + subtitle + '</p></div><div class="heading-actions">' + (actions || "") + '</div></div>';
+  return '<div class="page-heading"><div><p class="eyebrow">' + escapeHtml(eyebrow) + '</p><h1>' + escapeHtml(title) +
+    '</h1><p>' + escapeHtml(subtitle) + '</p></div><div class="heading-actions">' + (actions || "") + '</div></div>';
 }
 
 function setBreadcrumb(parts) {
   breadcrumbNode.innerHTML = parts.map(function (part, index) {
-    return index === parts.length - 1 ? "<strong>" + part + "</strong>" : "<span>" + part + "</span>";
+    return index === parts.length - 1 ? "<strong>" + escapeHtml(part) + "</strong>" : "<span>" + escapeHtml(part) + "</span>";
   }).join("　›　");
 }
 
 function toast(message) {
-  toastNode.innerHTML = '<div class="toast">' + message + '</div>';
+  toastNode.innerHTML = '<div class="toast">' + escapeHtml(message) + '</div>';
   window.setTimeout(function () { toastNode.innerHTML = ""; }, 2200);
 }
 
@@ -246,8 +251,8 @@ function renderHome() {
   const openEvents = events.filter(function (pair) { return eventProgress(pair.event).percent < 100; });
   let notices = pending.slice(0, 5).map(function (item) {
     return '<li class="notice-item"><span class="notice-icon ' + (item.file.attachment ? "" : "missing") + '">' +
-      (item.file.attachment ? "✎" : "▱") + '</span><span class="notice-text"><strong>' + item.file.name +
-      '</strong><span>' + item.project.name + ' · ' + item.event.name + '</span></span><span class="tag ' +
+      (item.file.attachment ? "✎" : "▱") + '</span><span class="notice-text"><strong>' + escapeHtml(item.file.name) +
+      '</strong><span>' + escapeHtml(item.project.name) + ' · ' + escapeHtml(item.event.name) + '</span></span><span class="tag ' +
       (item.gaps.includes("待签字") ? "orange" : "gray") + '">' + item.gaps[0] +
       '</span><button aria-label="查看事项" data-open-event="' + item.event.id + '" data-project="' + item.project.id + '">›</button></li>';
   }).join("");
@@ -255,15 +260,15 @@ function renderHome() {
     const totals = project.events.reduce(function (sum,event) { return sum + eventProgress(event).total; }, 0);
     const done = project.events.reduce(function (sum,event) { return sum + eventProgress(event).done; }, 0);
     const percent = totals ? Math.round(done / totals * 100) : 0;
-    return '<div class="progress-row"><div class="progress-label"><strong>' + project.name + '</strong><span>' + percent +
+    return '<div class="progress-row"><div class="progress-label"><strong>' + escapeHtml(project.name) + '</strong><span>' + percent +
       '%</span></div>' + progressBar(percent) + '<div class="progress-meta">' + project.events.length +
-      ' 个业务事项 · 负责人 ' + project.owner + '</div></div>';
+      ' 个业务事项 · 负责人 ' + escapeHtml(project.owner) + '</div></div>';
   }).join("");
   let recentRows = events.slice(0, 4).map(function (pair) {
     const progress = eventProgress(pair.event);
-    return '<tr><td class="name-cell"><strong>' + pair.event.name + '</strong><small>' + pair.event.files.length +
-      ' 份文件</small></td><td>' + pair.project.name + '</td><td>' + typeTag(pair.event.type) + '</td><td>' +
-      pair.event.owner + '</td><td>' + formatDate(pair.event.date) + '</td><td><strong>' + progress.percent +
+    return '<tr><td class="name-cell"><strong>' + escapeHtml(pair.event.name) + '</strong><small>' + pair.event.files.length +
+      ' 份文件</small></td><td>' + escapeHtml(pair.project.name) + '</td><td>' + typeTag(pair.event.type) + '</td><td>' +
+      escapeHtml(pair.event.owner) + '</td><td>' + escapeHtml(formatDate(pair.event.date)) + '</td><td><strong>' + progress.percent +
       '%</strong></td><td><button class="button small" data-open-event="' + pair.event.id + '" data-project="' +
       pair.project.id + '">查看清单</button></td></tr>';
   }).join("");
@@ -310,8 +315,8 @@ function renderProjects() {
     const done = project.events.reduce(function (sum,event) { return sum + eventProgress(event).done; }, 0);
     const percent = total ? Math.round(done / total * 100) : 0;
     return '<tr><td class="name-cell"><button class="link-button" data-open-project="' + project.id + '">' +
-      project.name + '</button><small>' + project.code + '</small></td><td>' + project.customer + '</td><td>' +
-      project.owner + '</td><td><div class="template-tags">' + project.templates.map(typeTag).join("") +
+      escapeHtml(project.name) + '</button><small>' + escapeHtml(project.code) + '</small></td><td>' + escapeHtml(project.customer) + '</td><td>' +
+      escapeHtml(project.owner) + '</td><td><div class="template-tags">' + project.templates.map(typeTag).join("") +
       '</div></td><td>' + project.events.length + ' 项</td><td><strong>' + percent +
       '%</strong></td><td><button class="button small" data-open-project="' + project.id + '">进入项目</button></td></tr>';
   }).join("");
@@ -342,8 +347,8 @@ function renderProject() {
       const progress = eventProgress(event);
       const iconClass = event.type === "receiving" ? "receiving" : event.type === "training" ? "training" : "";
       return '<article class="event-card"><span class="event-icon ' + iconClass + '">' + templateMap[event.type].icon +
-        '</span><div class="event-main"><strong>' + event.name + '</strong><small>' + templateMap[event.type].label +
-        ' · ' + formatDate(event.date) + ' · 经办人 ' + event.owner + ' · ' + event.files.length +
+        '</span><div class="event-main"><strong>' + escapeHtml(event.name) + '</strong><small>' + templateMap[event.type].label +
+        ' · ' + escapeHtml(formatDate(event.date)) + ' · 经办人 ' + escapeHtml(event.owner) + ' · ' + event.files.length +
         ' 份文件</small></div><div class="event-progress"><span>' + progress.done + ' / ' + progress.total +
         ' 个步骤完成 · ' + progress.percent + '%</span>' + progressBar(progress.percent) +
         '</div><button class="button small" data-open-event="' + event.id + '" data-project="' + project.id +
@@ -362,9 +367,9 @@ function renderProject() {
   viewNode.innerHTML =
     heading(project.code, project.name, project.note || "暂无项目备注",
       '<button class="button" data-action="edit-project">编辑项目</button><button class="button primary" data-action="new-event" data-project="' + project.id + '">＋ 新建业务事项</button>') +
-    '<section class="project-summary"><div class="summary-main"><h2>' + project.customer + '</h2><p>' +
-      (project.contact || "暂未填写客户联系人") + '</p></div><div class="summary-item"><small>项目负责人</small><strong>' +
-      project.owner + '</strong></div><div class="summary-item"><small>业务事项</small><strong>' +
+    '<section class="project-summary"><div class="summary-main"><h2>' + escapeHtml(project.customer) + '</h2><p>' +
+      escapeHtml(project.contact || "暂未填写客户联系人") + '</p></div><div class="summary-item"><small>项目负责人</small><strong>' +
+      escapeHtml(project.owner) + '</strong></div><div class="summary-item"><small>业务事项</small><strong>' +
       project.events.length + ' 项</strong></div><div class="summary-item summary-progress"><small>资料完成度　' +
       percent + '%</small>' + progressBar(percent) + '</div></section>' +
     '<div class="tabs"><button class="' + (appState.projectTab === "events" ? "active" : "") +
@@ -373,7 +378,7 @@ function renderProject() {
 }
 
 function infoItem(label, value) {
-  return '<div class="info-item"><small>' + label + '</small><strong>' + value + '</strong></div>';
+  return '<div class="info-item"><small>' + escapeHtml(label) + '</small><strong>' + escapeHtml(value) + '</strong></div>';
 }
 
 function renderPending() {
@@ -391,10 +396,10 @@ function renderPending() {
     const gapTags = item.gaps.map(function (gap) {
       return '<span class="tag ' + (gap === "待签字" ? "orange" : "gray") + '">' + gap + '</span>';
     }).join(" ");
-    return '<tr><td class="name-cell"><strong>' + item.file.name + '</strong><small>' +
-      (item.file.attachment || "暂未上传附件") + '</small></td><td>' + item.project.name + '</td><td>' +
-      item.event.name + '</td><td>' + gapTags + '</td><td>' + item.event.owner + '</td><td>' +
-      formatDate(item.event.date) + '</td><td><button class="button small" data-open-event="' +
+    return '<tr><td class="name-cell"><strong>' + escapeHtml(item.file.name) + '</strong><small>' +
+      escapeHtml(item.file.attachment || "暂未上传附件") + '</small></td><td>' + escapeHtml(item.project.name) + '</td><td>' +
+      escapeHtml(item.event.name) + '</td><td>' + gapTags + '</td><td>' + escapeHtml(item.event.owner) + '</td><td>' +
+      escapeHtml(formatDate(item.event.date)) + '</td><td><button class="button small" data-open-event="' +
       item.event.id + '" data-project="' + item.project.id + '">处理</button></td></tr>';
   }).join("");
   viewNode.innerHTML =
@@ -411,9 +416,9 @@ function renderTemplates() {
     const template = templateMap[type];
     const iconClass = type === "receiving" ? "receiving" : type === "training" ? "training" : "";
     const assetList = template.assets.map(function (asset, index) {
-      return '<div class="template-file"><span class="file-type">' + fileExtension(asset.name) +
-        '</span><span class="template-file-name"><strong>' + asset.name + '</strong><small>' +
-        asset.size + (asset.source === "upload" ? " · 已上传" : " · 演示文件") +
+      return '<div class="template-file"><span class="file-type">' + escapeHtml(fileExtension(asset.name)) +
+        '</span><span class="template-file-name"><strong>' + escapeHtml(asset.name) + '</strong><small>' +
+        escapeHtml(asset.size) + (asset.source === "upload" ? " · 已上传" : " · 演示文件") +
         '</small></span><button class="button text small" data-export-asset="' + type + '" data-asset-index="' +
         index + '">导出</button></div>';
     }).join("");
@@ -454,16 +459,16 @@ function openProjectModal(project) {
     '</h2><p>填写项目信息，选择需要导入的模板文件和保存位置。</p></div><button type="button" class="modal-close" data-close-modal>×</button></header>' +
     '<div class="modal-body"><div class="field-grid">' +
       '<div class="field full"><label>项目名称</label><input id="projectNameInput" name="name" placeholder="例如：华南工厂设备交付" value="' +
-      (project ? project.name : "") + '" required></div>' +
+      escapeHtml(project ? project.name : "") + '" required></div>' +
       fieldInput("客户名称", "customer", "客户公司名称", project ? project.customer : "", true, "") +
       '<div class="field"><label>项目负责人</label>' + ownerSelect(project ? project.owner : "陈佳") + '</div>' +
       fieldInput("客户联系人", "contact", "姓名、电话等", project ? project.contact : "", false, "full") +
       '<div class="field full"><span>导入项目的模板文件</span><div class="check-row">' + templateChecks +
       '</div><p class="form-help">创建项目时，会将所选模板组中的文件复制到项目文件夹；以后创建业务事项时也会优先显示这些模板。</p></div>' +
       '<div class="field full"><label>项目备注</label><textarea name="note" placeholder="简要说明项目内容">' +
-      (project ? project.note : "") + '</textarea></div>' +
+      escapeHtml(project ? project.note : "") + '</textarea></div>' +
       '<div class="field full"><span>项目文件夹</span><div class="folder-picker"><button type="button" class="button" data-action="select-folder">▣　选择上级文件夹</button>' +
-      '<div class="folder-preview" id="folderPreview"><strong>' + (project && project.folder ? project.folder : "尚未选择保存位置") +
+      '<div class="folder-preview" id="folderPreview"><strong>' + escapeHtml(project && project.folder ? project.folder : "尚未选择保存位置") +
       '</strong><small>' + (project && project.folder ? "更换位置后，会使用项目名称创建新文件夹" : "选择后将自动创建“上级文件夹、项目名称”目录") +
       '</small></div></div><p class="form-help">浏览器会在你选择的位置下创建与项目名称相同的文件夹，并按发货、收货或培训分类复制模板文件。</p></div>' +
     '</div></div><footer class="modal-footer"><button type="button" class="button" data-close-modal>取消</button><button type="submit" class="button primary">' +
@@ -472,12 +477,12 @@ function openProjectModal(project) {
 
 function fieldInput(label, name, placeholder, value, required, extraClass) {
   return '<div class="field ' + extraClass + '"><label>' + label + '</label><input name="' + name +
-    '" placeholder="' + placeholder + '" value="' + value + '" ' + (required ? "required" : "") + '></div>';
+    '" placeholder="' + placeholder + '" value="' + escapeHtml(value) + '" ' + (required ? "required" : "") + '></div>';
 }
 
 function ownerSelect(owner) {
   return '<select name="owner">' + ["陈佳","林晓","周远"].map(function (name) {
-    return '<option ' + (name === owner ? "selected" : "") + '>' + name + '</option>';
+    return '<option ' + (name === owner ? "selected" : "") + '>' + escapeHtml(name) + '</option>';
   }).join("") + '</select>';
 }
 
@@ -489,7 +494,7 @@ function updateFolderPreview() {
   const preview = document.querySelector("#folderPreview");
   if (!preview || !selectedDirectoryHandle) return;
   const projectName = safeFolderName(document.querySelector("#projectNameInput").value);
-  preview.innerHTML = '<strong>' + selectedDirectoryHandle.name + '\\' + projectName +
+  preview.innerHTML = '<strong>' + escapeHtml(selectedDirectoryHandle.name + '\\' + projectName) +
     '</strong><small>将创建项目文件夹，并导入当前勾选的模板文件</small>';
 }
 
@@ -562,7 +567,7 @@ function openEventModal(projectId) {
   const selectedId = projectId || appState.selectedProjectId || appState.projects[0].id;
   const projectOptions = appState.projects.map(function (project) {
     return '<option value="' + project.id + '" ' + (project.id === Number(selectedId) ? "selected" : "") +
-      '>' + project.name + '</option>';
+      '>' + escapeHtml(project.name) + '</option>';
   }).join("");
   const typeOptions = Object.keys(templateMap).map(function (type) {
     return '<option value="' + type + '">' + templateMap[type].label + '</option>';
@@ -598,18 +603,18 @@ function openEventDetail(projectId, eventId) {
   const rows = event.files.map(function (file, index) {
     const uploader = '<label class="upload-button ' + (file.attachment ? "has-file" : "") +
       '"><input type="file" data-upload="' + index + '" data-project="' + project.id + '" data-event="' +
-      event.id + '"><span>' + (file.attachment || "＋ 模拟上传") + '</span></label>';
-    return '<tr><td class="doc-name"><strong>' + file.name + '</strong><small>' + file.note +
+      event.id + '"><span>' + escapeHtml(file.attachment || "＋ 模拟上传") + '</span></label>';
+    return '<tr><td class="doc-name"><strong>' + escapeHtml(file.name) + '</strong><small>' + escapeHtml(file.note) +
       '</small></td><td>' + uploader + '</td>' +
       ["prepared","filled","signed","archived"].map(function (step) {
         return "<td>" + statusSelect(file[step], project.id, event.id, index, step) + "</td>";
       }).join("") + "</tr>";
   }).join("");
   modalNode.innerHTML =
-    '<div class="modal-backdrop"><div class="modal wide"><header class="modal-head"><div><h2>' + event.name +
-    '</h2><p>' + project.name + ' · ' + templateMap[event.type].label + ' · ' + formatDate(event.date) +
+    '<div class="modal-backdrop"><div class="modal wide"><header class="modal-head"><div><h2>' + escapeHtml(event.name) +
+    '</h2><p>' + escapeHtml(project.name) + ' · ' + templateMap[event.type].label + ' · ' + escapeHtml(formatDate(event.date)) +
     '</p></div><button type="button" class="modal-close" data-close-modal>×</button></header>' +
-    '<div class="modal-body"><div class="modal-meta"><span>经办人　<strong>' + event.owner +
+    '<div class="modal-body"><div class="modal-meta"><span>经办人　<strong>' + escapeHtml(event.owner) +
     '</strong></span><span>使用模板　<strong>' + templateMap[event.type].name +
     '</strong></span><span>文件数量　<strong>' + event.files.length + ' 份</strong></span></div>' +
     '<div class="completion-strip"><strong>' + progress.percent + '%</strong><span>' + progress.done +

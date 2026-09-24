@@ -1,4 +1,8 @@
 from pathlib import Path
+import json
+import re
+import shutil
+import subprocess
 import unittest
 
 
@@ -57,6 +61,32 @@ class DemoTest(unittest.TestCase):
         self.assertIn("getDirectoryHandle", script)
         self.assertIn("data-template-upload", script)
         self.assertIn("data-export-asset", script)
+
+    @unittest.skipUnless(shutil.which("node"), "需要 Node.js")
+    def test_escape_html_neutralizes_markup(self):
+        script = (DEMO / "app.js").read_text(encoding="utf-8")
+        source = re.search(r"function escapeHtml\(value\) \{.*?\n\}", script, re.S).group(0)
+        payload = "<img src=x onerror=\"alert('x')\">&"
+        result = subprocess.run(
+            ["node", "-e", source + "\nprocess.stdout.write(JSON.stringify([escapeHtml(process.argv[1]), escapeHtml(null), escapeHtml(3)]))", payload],
+            capture_output=True, text=True, check=True,
+        )
+        self.assertEqual(json.loads(result.stdout), ["&lt;img src=x onerror=&quot;alert(&#39;x&#39;)&quot;&gt;&amp;", "", "3"])
+
+    def test_user_fields_in_html_strings_are_escaped(self):
+        field = re.compile(r"\b(?:project|event|file|asset|pair\.event|pair\.project|item\.file|item\.project|item\.event)\.(?:name|customer|owner|contact|note|folder|attachment|code|size)\b")
+        unescaped = []
+        for number, line in enumerate((DEMO / "app.js").read_text(encoding="utf-8").splitlines(), 1):
+            if "'<" not in line and ">'" not in line:
+                continue
+            for match in field.finditer(line):
+                if line[match.end():].lstrip().startswith("?") or line.rfind("ownerSelect(", 0, match.start()) >= 0:
+                    continue
+                start = line.rfind("escapeHtml(", 0, match.start())
+                between = line[start:match.start()] if start >= 0 else ""
+                if start < 0 or between.count("(") <= between.count(")"):
+                    unescaped.append(f"{number}: {match.group(0)}")
+        self.assertEqual(unescaped, [])
 
 
 if __name__ == "__main__":

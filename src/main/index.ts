@@ -49,8 +49,9 @@ function registerIPC() {
   })
   handle('saveProject', input => {
     const grant = z.object({ directoryToken: z.string().uuid().optional() }).parse(input)
-    service.saveProject(input, grant.directoryToken ? directoryGrants.get(grant.directoryToken) : undefined)
+    const projectId = service.saveProject(input, grant.directoryToken ? directoryGrants.get(grant.directoryToken) : undefined)
     if (grant.directoryToken) directoryGrants.delete(grant.directoryToken)
+    return projectId
   })
   handle('deleteProject', value => { stringId.parse(value); service.deleteProject(value) })
   handle('relocateProject', async value => { stringId.parse(value); const folder = await selectFolder(); if (!folder) return false; service.relocateProject(value, folder); return true })

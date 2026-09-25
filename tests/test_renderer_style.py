@@ -38,6 +38,40 @@ class RendererStyleTest(unittest.TestCase):
         self.assertRegex(STYLE, r"\.back-button\s*\{[^}]*min-height: 28px[^}]*border: 1px solid transparent")
         self.assertIn(".back-button .back-icon", STYLE)
 
+    def test_target_pages_use_spacing_tokens_for_layout(self):
+        selectors = [
+            ".stat-grid",
+            ".stat-card",
+            ".home-grid",
+            ".attention-panel, .recent-panel",
+            ".attention-row",
+            ".project-mini",
+            ".project-list",
+            ".project-card-main",
+            ".project-card-footer",
+            ".filter-bar",
+            ".pending-file",
+            ".event-detail",
+            ".event-detail-heading",
+            ".event-progress-large",
+            ".event-progress-large > span",
+            ".event-actions",
+            ".event-title",
+            ".checklist-heading",
+            ".checklist th",
+            ".checklist td",
+            ".tags",
+            ".attachment-list",
+            ".inline-actions",
+        ]
+        for selector in selectors:
+            match = re.search(rf"(?m)^{re.escape(selector)}\s*\{{([^}}]*)\}}", REST)
+            self.assertIsNotNone(match, selector)
+            for declaration in re.findall(r"(?:gap|margin(?:-[a-z]+)?|padding(?:-[a-z]+)?)\s*:[^;]+", match.group(1)):
+                value = re.sub(r"var\(--spacing-[a-z]+\)", "0", declaration)
+                with self.subTest(selector=selector, declaration=declaration):
+                    self.assertIsNone(re.search(r"\d+px", value))
+
     def test_top_level_selectors_are_not_overridden_later(self):
         selectors = re.findall(r"(?m)^([.#@][^{/][^{]*)\{", REST)
         duplicates = sorted({name.strip() for name in selectors if selectors.count(name) > 1})

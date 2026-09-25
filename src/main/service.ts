@@ -47,7 +47,15 @@ function assetMatchesRule(assetName: string, ruleName: string) {
   return Boolean(asset && rule && (asset === rule || asset.includes(rule) || rule.includes(asset)))
 }
 const legacyWorkflowFolders: Record<string, string> = { shipping: '发货', receiving: '收货', training: '培训' }
-function workflowFolder(value: string) { return legacyWorkflowFolders[value] ?? value }
+const customTypePrefix = 'custom:'
+function workflowFolder(value: string) {
+  if (value.startsWith(customTypePrefix)) return value.slice(customTypePrefix.length)
+  return legacyWorkflowFolders[value] ?? value
+}
+// templates.name is the display name. Built-in templates.type stays shipping/receiving/training.
+// A custom templates.type is custom: plus the current safe name, so it cannot collide with those keys.
+// Older custom rows may still store a bare folder name; workflowFolder leaves those unchanged.
+// events.type is the templates.type captured at createEvent and is never rewritten.
 
 /** All disk access is in the main process. Rollbacks only remove paths created by this operation. */
 export class WorkPackService {
@@ -174,10 +182,13 @@ export class WorkPackService {
   saveTemplate(input: unknown) {
     const data = templateSchema.parse(input)
     if (data.id) {
-      this.db.prepare('UPDATE templates SET name=?, rules=? WHERE id=?').run(data.name, JSON.stringify(data.rules), data.id)
+      const existing = this.get('templates', data.id)
+      const type = existing.type in legacyWorkflowFolders ? existing.type : customTypePrefix + safeName(data.name)
+      const saved = this.db.prepare('UPDATE templates SET name=?, type=?, rules=? WHERE id=?').run(data.name, type, JSON.stringify(data.rules), data.id)
+      if (saved.changes !== 1) throw new Error('记录不存在，请刷新后重试')
     } else {
       const templateId = randomUUID()
-      this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(templateId, data.name, safeName(data.name), JSON.stringify(data.rules))
+      this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(templateId, data.name, customTypePrefix + safeName(data.name), JSON.stringify(data.rules))
     }
   }
   deleteTemplate(value: string) {

@@ -75,22 +75,33 @@ function registerIPC() {
   handle('removeAttachment', value => service.removeAttachment(stringId.parse(value)))
 }
 
-app.whenReady().then(() => {
-  service = new WorkPackService(app.getPath('userData'))
-  window = new BrowserWindow({
-    title: 'WorkPack · 项目资料管理', width: 1440, height: 960, minWidth: 1050, minHeight: 700,
-    backgroundColor: '#f5f7f6', show: false,
-    webPreferences: { preload: path.join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true }
+const hasInstanceLock = app.requestSingleInstanceLock()
+if (!hasInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (!window) return
+    if (window.isMinimized()) window.restore()
+    window.show()
+    window.focus()
   })
-  window.removeMenu()
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-  window.webContents.on('will-navigate', event => event.preventDefault())
-  window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
-  window.webContents.session.setPermissionCheckHandler(() => false)
-  registerIPC()
-  window.once('ready-to-show', () => window.show())
-  if (devURL) window.loadURL(devURL)
-  else window.loadFile(rendererFile)
-}).catch(error => { dialog.showErrorBox('WorkPack 启动失败', String(error)); app.quit() })
+  app.whenReady().then(() => {
+    service = new WorkPackService(app.getPath('userData'))
+    window = new BrowserWindow({
+      title: 'WorkPack · 项目资料管理', width: 1440, height: 960, minWidth: 1050, minHeight: 700,
+      backgroundColor: '#f5f7f6', show: false,
+      webPreferences: { preload: path.join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true }
+    })
+    window.removeMenu()
+    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    window.webContents.on('will-navigate', event => event.preventDefault())
+    window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+    window.webContents.session.setPermissionCheckHandler(() => false)
+    registerIPC()
+    window.once('ready-to-show', () => window.show())
+    if (devURL) window.loadURL(devURL)
+    else window.loadFile(rendererFile)
+  }).catch(error => { dialog.showErrorBox('WorkPack 启动失败', String(error)); app.quit() })
+}
 app.on('window-all-closed', () => app.quit())
 app.on('will-quit', () => service?.close())

@@ -48,6 +48,9 @@ function assetMatchesRule(assetName: string, ruleName: string) {
 }
 const legacyWorkflowFolders: Record<string, string> = { shipping: '发货', receiving: '收货', training: '培训' }
 function workflowFolder(value: string) { return legacyWorkflowFolders[value] ?? value }
+// templates.name is the editable display name. templates.type is the folder key:
+// built-in keys stay shipping/receiving/training; a custom key follows the current safe name.
+// events.type is a snapshot taken at createEvent and is never rewritten when the workflow is renamed.
 
 /** All disk access is in the main process. Rollbacks only remove paths created by this operation. */
 export class WorkPackService {
@@ -174,7 +177,10 @@ export class WorkPackService {
   saveTemplate(input: unknown) {
     const data = templateSchema.parse(input)
     if (data.id) {
-      this.db.prepare('UPDATE templates SET name=?, rules=? WHERE id=?').run(data.name, JSON.stringify(data.rules), data.id)
+      const existing = this.get('templates', data.id)
+      const type = existing.type in legacyWorkflowFolders ? existing.type : safeName(data.name)
+      const saved = this.db.prepare('UPDATE templates SET name=?, type=?, rules=? WHERE id=?').run(data.name, type, JSON.stringify(data.rules), data.id)
+      if (saved.changes !== 1) throw new Error('记录不存在，请刷新后重试')
     } else {
       const templateId = randomUUID()
       this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(templateId, data.name, safeName(data.name), JSON.stringify(data.rules))

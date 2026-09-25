@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -13,6 +14,9 @@ function tempDirectory() {
 }
 function inputForProject(templateId: string) {
   return { name: '测试项目', customer: '测试客户', contact: '13800000000', owner: '测试负责人', note: '用于自动化验证', templateIds: [templateId] }
+}
+function storedType(service: WorkPackService, table: 'templates' | 'events', id: string) {
+  return (service.db.prepare(`SELECT type FROM ${table} WHERE id=?`).get(id) as { type: string }).type
 }
 
 afterEach(() => {
@@ -296,6 +300,94 @@ describe('WorkPackService', () => {
       service.createEvent({ projectId: project.id, templateId: builtin.id, name: '仍在发货目录', date: '2026-09-25', owner: '测试负责人' })
       const builtinEvent = service.snapshot().projects[0].events.find(event => event.name === '仍在发货目录')!
       expect(fs.existsSync(path.join(project.folder, '发货', `2026-09-25_${builtinEvent.id}`))).toBe(true)
+    } finally { service.close() }
+  })
+
+  it('stores a custom workflow named shipping outside the built-in shipping folder', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const base = service.snapshot().templates[0]
+      service.saveTemplate({ name: 'shipping', rules: [{ ...base.rules[0], name: '运单' }] })
+      const custom = service.snapshot().templates.find(template => template.name === 'shipping')!
+      expect(storedType(service, 'templates', custom.id)).toBe('custom:shipping')
+      const source = path.join(root, '运单模板.docx')
+      fs.writeFileSync(source, 'template')
+      service.importTemplates(custom.id, [source])
+      const parent = path.join(root, 'projects')
+      fs.mkdirSync(parent)
+      service.saveProject(inputForProject(custom.id), parent)
+      let project = service.snapshot().projects[0]
+      service.createEvent({ projectId: project.id, templateId: custom.id, name: '旧事项', date: '2026-09-23', owner: '测试负责人' })
+      project = service.snapshot().projects[0]
+      const historical = project.events[0]
+      const historicalDir = path.join(project.folder, 'shipping', `2026-09-23_${historical.id}`)
+      expect(storedType(service, 'events', historical.id)).toBe('custom:shipping')
+      expect(fs.existsSync(historicalDir)).toBe(true)
+      expect(historical.items[0].attachments[0].exists).toBe(true)
+      expect(fs.existsSync(path.join(project.folder, '发货'))).toBe(false)
+
+      service.saveTemplate({ id: custom.id, name: '海外物流', rules: custom.rules })
+      expect(storedType(service, 'templates', custom.id)).toBe('custom:海外物流')
+      service.createEvent({ projectId: project.id, templateId: custom.id, name: '新事项', date: '2026-09-24', owner: '测试负责人' })
+      project = service.snapshot().projects[0]
+      const created = project.events.find(event => event.name === '新事项')!
+      expect(storedType(service, 'events', created.id)).toBe('custom:海外物流')
+      expect(storedType(service, 'events', historical.id)).toBe('custom:shipping')
+      expect(fs.existsSync(path.join(project.folder, '海外物流', `2026-09-24_${created.id}`))).toBe(true)
+      expect(fs.existsSync(path.join(project.folder, 'shipping', `2026-09-24_${created.id}`))).toBe(false)
+      const kept = project.events.find(event => event.id === historical.id)!
+      expect(fs.existsSync(historicalDir)).toBe(true)
+      expect(kept.items[0].attachments[0].exists).toBe(true)
+      expect(fs.existsSync(path.join(project.folder, '发货'))).toBe(false)
+    } finally { service.close() }
+  })
+
+  it('keeps the built-in shipping key when its display name changes', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const builtin = service.snapshot().templates.find(template => template.name === '发货资料模板')!
+      expect(storedType(service, 'templates', builtin.id)).toBe('shipping')
+      const source = path.join(root, '发货清单模板.docx')
+      fs.writeFileSync(source, 'shipping')
+      service.importTemplates(builtin.id, [source])
+      const parent = path.join(root, 'projects')
+      fs.mkdirSync(parent)
+      service.saveProject(inputForProject(builtin.id), parent)
+      const project = service.snapshot().projects[0]
+      service.saveTemplate({ id: builtin.id, name: '出库流程', rules: builtin.rules })
+      expect(storedType(service, 'templates', builtin.id)).toBe('shipping')
+      service.createEvent({ projectId: project.id, templateId: builtin.id, name: '仍在发货目录', date: '2026-09-25', owner: '测试负责人' })
+      const event = service.snapshot().projects[0].events[0]
+      expect(storedType(service, 'events', event.id)).toBe('shipping')
+      expect(fs.existsSync(path.join(project.folder, '发货', `2026-09-25_${event.id}`))).toBe(true)
+      expect(fs.existsSync(path.join(project.folder, '出库流程'))).toBe(false)
+      expect(fs.existsSync(path.join(project.folder, 'custom:shipping'))).toBe(false)
+    } finally { service.close() }
+  })
+
+  it('reads a legacy custom workflow type and stores new events in that folder', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const base = service.snapshot().templates[0]
+      const templateId = randomUUID()
+      service.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(templateId, '售后流程', '售后流程', JSON.stringify([{ ...base.rules[0], name: '维修记录' }]))
+      const source = path.join(root, '维修记录模板.docx')
+      fs.writeFileSync(source, 'template')
+      service.importTemplates(templateId, [source])
+      const parent = path.join(root, 'projects')
+      fs.mkdirSync(parent)
+      service.saveProject(inputForProject(templateId), parent)
+      const project = service.snapshot().projects[0]
+      service.createEvent({ projectId: project.id, templateId, name: '旧格式事项', date: '2026-09-23', owner: '测试负责人' })
+      const event = service.snapshot().projects[0].events[0]
+      expect(storedType(service, 'templates', templateId)).toBe('售后流程')
+      expect(storedType(service, 'events', event.id)).toBe('售后流程')
+      expect(fs.existsSync(path.join(project.folder, '售后流程', `2026-09-23_${event.id}`))).toBe(true)
+      expect(event.items[0].attachments[0].exists).toBe(true)
+      expect(fs.existsSync(path.join(project.folder, '发货', `2026-09-23_${event.id}`))).toBe(false)
     } finally { service.close() }
   })
 

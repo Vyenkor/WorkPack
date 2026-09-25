@@ -144,7 +144,7 @@ test('text, focus, and persistent error feedback follow the design rules', async
     .filter(node => node.textContent?.trim() && node.children.length === 0 && getComputedStyle(node).display !== 'none')
     .map(node => Number.parseFloat(getComputedStyle(node).fontSize)))
   expect(Math.min(...sizes)).toBeGreaterThanOrEqual(12)
-  for (const selector of ['.nav button.active', '.top-avatar', '.form-help', '.form-grid > label', '.modal-card .button.primary', '.modal-card .button.secondary']) {
+  for (const selector of ['.nav button.active', '.workspace-switch', '.form-help', '.form-grid > label', '.modal-card .button.primary', '.modal-card .button.secondary']) {
     expect(await contrastRatio(page, selector), selector).toBeGreaterThanOrEqual(4.5)
   }
 })
@@ -246,6 +246,18 @@ test('navigation keeps a single active item and the create button stays enabled'
     for (const [side, value] of Object.entries(shell.gaps)) expect(Math.abs(value - gutter), side).toBeLessThanOrEqual(1)
   }
   await expectFloatingShell(16)
+  await expect(page.locator('.today-label, .top-avatar, .sidebar-user')).toHaveCount(0)
+  await expect(page.locator('.topbar')).not.toContainText('陈')
+  await expect(page.locator('.sidebar')).not.toContainText('本机用户')
+  const workspace = page.locator('.sidebar-bottom .workspace-switch')
+  await expect(workspace).toHaveText('W我的工作空间')
+  const sidebarOrder = await page.evaluate(() => ({
+    nav: document.querySelector('.nav')!.getBoundingClientRect().bottom,
+    workspace: document.querySelector('.workspace-switch')!.getBoundingClientRect().top,
+    sidebar: document.querySelector('.sidebar')!.getBoundingClientRect().bottom
+  }))
+  expect(sidebarOrder.workspace).toBeGreaterThan(sidebarOrder.nav)
+  expect(sidebarOrder.sidebar - sidebarOrder.workspace).toBeLessThan(120)
   await snap('home_1280.png')
   await resize(1050)
   await expectFloatingShell(8)

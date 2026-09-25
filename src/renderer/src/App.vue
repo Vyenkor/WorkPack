@@ -149,7 +149,6 @@ function eventProgress(event: BusinessEvent) { return progress(event.items) }
 function eventPending(event: BusinessEvent) { return event.items.filter(item => gaps(item).length).length }
 function projectActivity(project: Project) { return project.events.reduce((latest, event) => event.date > latest ? event.date : latest, '') }
 function statusText(status: Status, step: Step) { return status === 'done' ? `已${stepLabels[step]}` : status === 'na' ? '不适用' : `待${stepLabels[step]}` }
-function todayLabel() { return new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) }
 
 async function refresh(showLoading: boolean | Event = true) {
   if (showLoading) loading.value = true
@@ -334,18 +333,17 @@ onBeforeUnmount(() => {
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand"><div class="brand-mark"><span></span><span></span><span></span></div><strong>WorkPack</strong></div>
-      <div class="workspace-switch"><span class="workspace-avatar">W</span><span>我的工作空间</span><b>⌄</b></div>
       <nav class="nav" aria-label="主导航">
         <button type="button" :class="{ active: view === 'home' }" @click="go('home')"><NavIcon class="nav-icon" name="home" />工作台</button>
         <button type="button" :class="{ active: view === 'projects' || view === 'project' }" @click="go('projects')"><NavIcon class="nav-icon" name="projects" />项目</button>
         <button type="button" :class="{ active: view === 'pending' }" @click="go('pending')"><NavIcon class="nav-icon" name="pending" />待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
         <button type="button" :class="{ active: view === 'templates' }" @click="go('templates')"><NavIcon class="nav-icon" name="templates" />流程</button>
       </nav>
-      <div class="sidebar-bottom"><div class="sidebar-user"><span class="user-avatar">陈</span><span><strong>本机用户</strong><small>项目负责人</small></span></div></div>
+      <div class="sidebar-bottom"><div class="workspace-switch"><span class="workspace-avatar">W</span><span>我的工作空间</span></div></div>
     </aside>
 
     <section class="content-shell">
-      <header class="topbar"><div class="breadcrumb"><span v-if="view === 'project'" class="breadcrumb-link" @click="go('projects')">项目</span><span v-if="view === 'project'" class="breadcrumb-divider">/</span>{{ currentBreadcrumb }}</div><div class="topbar-actions"><label class="global-search"><UiIcon name="search" class="search-icon" /><input v-model="search" type="search" placeholder="搜索项目或客户" aria-label="搜索项目或客户" @keyup.enter="runGlobalSearch"><kbd>↵</kbd></label><span class="today-label">{{ todayLabel() }}</span><span class="top-avatar">陈</span></div></header>
+      <header class="topbar"><div class="breadcrumb"><span v-if="view === 'project'" class="breadcrumb-link" @click="go('projects')">项目</span><span v-if="view === 'project'" class="breadcrumb-divider">/</span>{{ currentBreadcrumb }}</div><div class="topbar-actions"><label class="global-search"><UiIcon name="search" class="search-icon" /><input v-model="search" type="search" placeholder="搜索项目或客户" aria-label="搜索项目或客户" @keyup.enter="runGlobalSearch"><kbd>↵</kbd></label></div></header>
 
       <main class="view">
         <div v-if="loading" class="loading-state"><span class="spinner"></span><p>加载中…</p></div>

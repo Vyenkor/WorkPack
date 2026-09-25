@@ -2,7 +2,7 @@
 import { steps, stepLabels, gaps, type Item, type Step, type Status } from '../../../shared/model'
 const props = defineProps<{ items: Item[]; busy: boolean; savedItemId?: string }>()
 const emit = defineEmits<{
-  status: [id: string, step: Step, status: Status]
+  status: [id: string, step: Step, status: Status, control: HTMLElement]
   complete: [id: string]
   edit: [item: Item]
   remove: [item: Item]
@@ -16,13 +16,13 @@ function canToggle(item: Item, step: Step) {
   if (props.busy || item.states[step] === 'na') return false
   return step !== 'prepared' || item.states[step] === 'done' || item.attachments.some(file => file.exists)
 }
-function toggle(item: Item, step: Step) {
+function toggle(item: Item, step: Step, event: Event) {
   if (!canToggle(item, step)) return
-  emit('status', item.id, step, item.states[step] === 'done' ? 'pending' : 'done')
+  emit('status', item.id, step, item.states[step] === 'done' ? 'pending' : 'done', event.currentTarget as HTMLElement)
 }
 function moreState(event: Event, item: Item, step: Step) {
   const select = event.target as HTMLSelectElement
-  if (select.value) emit('status', item.id, step, select.value as Status)
+  if (select.value) emit('status', item.id, step, select.value as Status, select)
   select.value = ''
 }
 </script>
@@ -37,7 +37,7 @@ function moreState(event: Event, item: Item, step: Step) {
           <ul class="attachment-list"><li v-for="file in item.attachments" :key="file.id"><div><button class="link" :disabled="!file.exists || busy" :title="file.path" @click="emit('open', file.id)">{{ file.name }}</button><span v-if="!file.exists" class="file-warning">文件失效</span></div><div class="inline-actions"><button class="link secondary" :disabled="busy" @click="emit('relocate', file.id)">重新定位</button><button class="link danger" :disabled="busy" @click="emit('detach', file.id)">移除记录</button></div></li></ul>
           <button class="button small" :disabled="busy" @click="emit('upload', item.id)">上传</button>
         </td>
-        <td v-for="step in steps" :key="step" class="status-cell"><div class="status-actions"><span :title="step === 'prepared' && item.states[step] !== 'done' && !item.attachments.some(file => file.exists) ? '请先上传文件' : item.states[step] === 'na' ? '请用更多菜单改回待完成后再切换' : ''"><button class="status-toggle" :class="item.states[step]" type="button" :aria-label="`${item.name}的${stepLabels[step]}状态：${statusText(item.states[step], step)}${canToggle(item, step) ? '。点击切换' : ''}`" :disabled="!canToggle(item, step)" @click="toggle(item, step)">{{ statusText(item.states[step], step) }}</button></span><select class="status-more" value="" :aria-label="`${item.name}的${stepLabels[step]}更多状态`" :disabled="busy" @change="moreState($event, item, step)"><option value="">···</option><option value="pending">待{{ stepLabels[step] }}</option><option value="na">不适用</option></select></div></td>
+        <td v-for="step in steps" :key="step" class="status-cell"><div class="status-actions"><span :title="step === 'prepared' && item.states[step] !== 'done' && !item.attachments.some(file => file.exists) ? '请先上传文件' : item.states[step] === 'na' ? '请用更多菜单改回待完成后再切换' : ''"><button class="status-toggle" :class="item.states[step]" type="button" :aria-label="`${item.name}的${stepLabels[step]}状态：${statusText(item.states[step], step)}${canToggle(item, step) ? '。点击切换' : ''}`" :disabled="!canToggle(item, step)" @click="toggle(item, step, $event)">{{ statusText(item.states[step], step) }}</button></span><select class="status-more" value="" :aria-label="`${item.name}的${stepLabels[step]}更多状态`" :disabled="busy" @change="moreState($event, item, step)"><option value="">···</option><option value="pending">待{{ stepLabels[step] }}</option><option value="na">不适用</option></select></div></td>
         <td><div class="stack-actions"><button class="link" :disabled="busy || !gaps(item).length" @click="emit('complete', item.id)">完成</button><button class="link" :disabled="busy" @click="emit('edit', item)">编辑</button><button class="link danger" :disabled="busy" @click="emit('remove', item)">删除</button></div></td>
       </tr></tbody>
     </table>

@@ -214,6 +214,24 @@ test('navigation keeps a single active item and the create button stays enabled'
 
   await resize(1280)
   await expectOnly('工作台')
+  const shell = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement)
+    const read = (selector: string) => getComputedStyle(document.querySelector(selector)!)
+    return {
+      radius: root.getPropertyValue('--radius-lg').trim(),
+      padding: read('.app-shell').paddingTop,
+      canvas: read('.app-shell').backgroundColor,
+      sidebar: read('.sidebar').borderTopRightRadius,
+      sidebarFill: read('.sidebar').backgroundColor,
+      topbar: read('.topbar').borderRadius,
+      main: read('.view').borderRadius
+    }
+  })
+  expect(shell.padding).not.toBe('0px')
+  expect(shell.sidebar).toBe(shell.radius)
+  expect(shell.topbar).toBe(shell.radius)
+  expect(shell.main).toBe(shell.radius)
+  expect(shell.sidebarFill).not.toBe(shell.canvas)
   await page.screenshot({ path: path.join(shot, 'home_1280.png') })
   await nav.getByRole('button', { name: '项目', exact: true }).click()
   await expectOnly('项目')

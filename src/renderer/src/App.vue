@@ -4,6 +4,7 @@ import ItemChecklist from './components/ItemChecklist.vue'
 import NavIcon from './components/NavIcon.vue'
 import UiIcon from './components/UiIcon.vue'
 import RulesEditor from './components/RulesEditor.vue'
+import workpackLogo from './assets/workpack-logo.png'
 import {
   gaps,
   progress,
@@ -338,7 +339,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="app-shell">
     <aside class="sidebar">
-      <div class="brand"><div class="brand-mark"><span></span><span></span><span></span></div><strong>WorkPack</strong></div>
+      <div class="brand"><img class="brand-logo" :src="workpackLogo" alt="WorkPack"></div>
       <nav class="nav" aria-label="主导航">
         <button type="button" :class="{ active: view === 'home' }" @click="go('home')"><NavIcon class="nav-icon" name="home" />工作台</button>
         <button type="button" :class="{ active: view === 'projects' || view === 'project' }" @click="go('projects')"><NavIcon class="nav-icon" name="projects" />项目</button>

@@ -117,6 +117,7 @@ class DesignMdTest(unittest.TestCase):
     def test_brand_logo_is_an_image_outside_the_palette(self):
         self.assertIn("src/renderer/src/assets/workpack-logo.png", CONTENT)
         self.assertIn("不进入界面色板", CONTENT)
+        self.assertIn("在侧边栏内水平居中，左右留白相等", CONTENT)
         self.assertNotIn("`.brand strong` 仍有负字距", CONTENT)
 
     def test_workflow_identity_uses_one_shared_visual_treatment(self):

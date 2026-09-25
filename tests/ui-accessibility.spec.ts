@@ -265,13 +265,19 @@ test('navigation keeps a single active item and the create button stays enabled'
     const fit = await logo.evaluate(image => {
       const img = image as HTMLImageElement
       const box = img.getBoundingClientRect(), sidebar = img.closest('.sidebar')!.getBoundingClientRect()
-      return { loaded: img.complete && img.naturalWidth > 0, inside: box.left >= sidebar.left && box.right <= sidebar.right }
+      return {
+        loaded: img.complete && img.naturalWidth > 0,
+        inside: box.left >= sidebar.left && box.right <= sidebar.right,
+        leftGap: box.left - sidebar.left,
+        rightGap: sidebar.right - box.right
+      }
     })
-    expect(fit).toEqual({ loaded: true, inside: true })
+    expect(fit).toMatchObject({ loaded: true, inside: true })
+    expect(Math.abs(fit.leftGap - fit.rightGap)).toBeLessThanOrEqual(1)
     await expect(page.locator('.brand-mark, .brand strong')).toHaveCount(0)
   }
   await expectBrandLogo()
-  await snap('brand_home_1280.png')
+  await snap('brand_centered_1280.png')
   await expect(page.locator('.today-label, .top-avatar, .sidebar-user')).toHaveCount(0)
   await expect(page.locator('.topbar')).not.toContainText('陈')
   await expect(page.locator('.sidebar')).not.toContainText('本机用户')
@@ -289,7 +295,7 @@ test('navigation keeps a single active item and the create button stays enabled'
   await expectFloatingShell(8)
   await expectBrandLogo()
   await snap('home_1050.png')
-  await snap('brand_home_1050.png')
+  await snap('brand_centered_1050.png')
   await resize(1280)
   await nav.getByRole('button', { name: '项目', exact: true }).click()
   await expectOnly('项目')

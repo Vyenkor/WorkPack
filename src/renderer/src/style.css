@@ -130,6 +130,7 @@ button:disabled {
 }
 
 .brand {
+  justify-content: center;
   padding: 0 10px;
 }
 

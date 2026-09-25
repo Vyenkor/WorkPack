@@ -99,13 +99,20 @@ class DesignMdTest(unittest.TestCase):
 
     def test_palette_is_neutral_with_a_cool_accent(self):
         self.assertEqual(COLORS["primary"], "#3d5674")
-        self.assertEqual(COLORS["canvas"], "#f4f5f7")
+        self.assertEqual(COLORS["canvas"], "#eaecf0")
         self.assertNotEqual(COLORS["primary"], COLORS["status-done"])
         colors = CONTENT.split("## Colors\n", 1)[1].split("\n## Typography\n", 1)[0]
         for phrase in ("Accent", "status-done", "primary-soft", "surface-hover"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, colors)
         self.assertNotEqual(COLORS["primary"][:3], COLORS["status-done"][:3])
+
+    def test_shell_surfaces_float_on_the_canvas(self):
+        self.assertEqual(TOKENS["rounded"]["shell"], "16px")
+        layout = CONTENT.split("### 一级布局\n", 1)[1].split("\n### ", 1)[0]
+        for phrase in ("Level 0", "Level 1", "rounded.shell", "spacing.md", "spacing.xs", "不加阴影", "Level 2"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, layout)
 
     def test_workflow_identity_uses_one_shared_visual_treatment(self):
         self.assertIn("流程统一使用同一图标和主色", CONTENT)

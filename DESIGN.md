@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: WorkPack
-description: "A calm, light, information-dense Windows desktop tool for tracking project paperwork. Cool neutral canvas (#f4f5f7) and near-white surfaces, separated by quiet hairlines rather than shadows. Ink is near-black blue-gray (#1b1e24), not pure black. One low-saturation blue-gray accent (#3d5674) is reserved for primary actions, active navigation, selection, focus and links. Status stays separate: done green, pending brown, not-applicable gray, error red, always paired with a text label. Chinese-first typography: Microsoft YaHei UI, body at 14px with 1.6 line height, nothing below 12px."
+description: "A calm, light, information-dense Windows desktop tool for tracking project paperwork. Cool gray canvas (#eaecf0) with three near-white rounded shell surfaces (sidebar, top bar, main) floating on it, separated by canvas gutters and quiet hairlines rather than shadows. Ink is near-black blue-gray (#1b1e24), not pure black. One low-saturation blue-gray accent (#3d5674) is reserved for primary actions, active navigation, selection, focus and links. Status stays separate: done green, pending brown, not-applicable gray, error red, always paired with a text label. Chinese-first typography: Microsoft YaHei UI, body at 14px with 1.6 line height, nothing below 12px."
 
 colors:
   primary: "#3d5674"
@@ -9,7 +9,7 @@ colors:
   primary-soft: "#e7edf3"
   on-primary: "#ffffff"
   focus-ring: "#3d5674"
-  canvas: "#f4f5f7"
+  canvas: "#eaecf0"
   surface: "#fbfcfd"
   surface-subtle: "#f0f1f4"
   surface-hover: "#e8eaee"
@@ -97,6 +97,7 @@ rounded:
   md: 6px
   lg: 8px
   xl: 12px
+  shell: 16px
   pill: 9999px
 
 spacing:
@@ -282,7 +283,7 @@ WorkPack 是给项目交付、物流和培训岗位的办公人员使用的 Wind
 
 ### Neutral
 
-- `canvas` 是窗口背景，`surface` 是面板和卡片。两者只差一个轻微的冷灰阶，不要拉成纯白对深灰的强反差。
+- `canvas` 是窗口最底层背景，`surface` 是浮在它上面的面板。两者要在真实屏幕上一眼分得开，但仍是同一组冷灰，不要拉成纯白对深灰的强反差。
 - `sidebar` 使用中性表面，不带明显强调色。
 - `surface-subtle` 用于表头和面板底栏。`surface-hover` 只比普通 `surface` 略深，用来表示悬停。
 - `hairline` 和 `hairline-strong` 是安静的分隔线，不能单独作为控件边界。控件边界用 `control-border`。
@@ -339,6 +340,17 @@ WorkPack 是桌面端高信息密度操作界面，不是营销页。布局要�
 - 主内容占满这条内容区的横向空间。待处理、文件清单、项目列表这类数据密集页面优先提高横向利用率。
 - 不要为了装饰再套一层更窄的最大宽度，也不要用大面积留白把内容挤在中间。
 - 窗口骨架是：侧边导航 + 顶栏（面包屑、全局搜索）+ 内容区。内容区内部是一条工具栏，然后是数据或功能区。
+- 侧边导航自上而下是：品牌标识、主导航，底部是工作空间标识。顶栏只放面包屑和全局搜索，不放日期、头像这类没有操作的装饰控件。
+
+### 一级布局
+
+- Level 0 是 `canvas`，铺满整个窗口。
+- Level 1 是三块一级 Surface：侧边导航、顶栏、主内容。三块都用 `surface` 底色、1px `hairline` 边框和同一个圆角 `rounded.shell`，四个角都圆。
+- 三块 Surface 之间、以及它们和窗口四边之间，都要露出 `canvas`：1180px 及以上外圈留白和块间距都是 `spacing.md`；1050–1180px 都收到 `spacing.xs`。
+- 侧边导航的高度占满窗口可用高度。顶栏在主内容上方，两者之间露出 `canvas`。主内容在自己的 Surface 里滚动，顶栏保持在原位。
+- 浮层感只靠 `canvas` 与 `surface` 的色差、外圈留白、圆角和 `hairline` 表达。一级 Surface 不加阴影、渐变、发光或高饱和边框。
+- Level 2 是主内容里的统计、列表、表格和控件，继续按本文件原有规则绘制。不要因为有了一级 Surface，就把内部模块全部加白底、阴影或更大的圆角；空状态直接放在主内容 Surface 里，不再单独套一层卡片。
+- 窗口变窄时先缩小外圈留白和块间距，不压搜索框，不改表格最小宽度，也不让工具栏额外换行。
 
 ### 间距
 
@@ -439,7 +451,7 @@ WorkPack 是桌面端高信息密度操作界面，不是营销页。布局要�
 
 ## Elevation & Depth
 
-- 默认层级：`app-canvas` 上放 `surface` 面板，面板用 1px `hairline` 边框分隔，**不加阴影**。行与行、区块与区块之间用 `divider`，需要更明显的分隔时用 `divider-strong`。
+- 默认层级：`app-canvas` 上放三块一级 Surface（见 Layout 的一级布局），其中再放 `surface` 面板，面板用 1px `hairline` 边框分隔，**不加阴影**。行与行、区块与区块之间用 `divider`，需要更明显的分隔时用 `divider-strong`。
 - 阴影只用于浮在内容之上的元素：弹窗、抽屉、下拉菜单和提示条，统一使用 `0 12px 32px rgba(27, 30, 36, .16)`。
 - 可点击卡片悬停时，边框改为 `hairline-strong`，可以加一层很浅的阴影，但不要位移或放大。
 - 弹窗遮罩使用 `modal-overlay`（`overlay` 已包含 30% 不透明度）。
@@ -461,6 +473,7 @@ Stitch 的组件 token 不支持边框属性，边框统一按下表设置，宽
 ## Shapes
 
 - 标签和小元素用 `rounded.sm`–`md`，按钮和输入框用 `md`，面板、卡片和弹窗用 `xl`，状态标签用 `pill`。
+- `rounded.shell` 只给侧边导航、顶栏、主内容三块一级 Surface 使用，内部组件不跟着放大。
 - 同一层级的元素圆角保持一致，不要混用多种圆角。
 
 ## Components
@@ -468,7 +481,7 @@ Stitch 的组件 token 不支持边框属性，边框统一按下表设置，宽
 - **按钮**：主要按钮 `button-primary` 每个视图最多一个；其他操作用 `button-secondary`（边框见 Elevation & Depth 中的边框表）；表格和卡片内的操作用 `button-small` 或文字链接；删除用 `button-danger-text`，放在操作组的最后。不可用的按钮用 `button-disabled`，并通过悬停提示说明原因。按钮文案用动词，不超过 4 个字，如“新建项目”“上传”“完成”。
 - **返回按钮**：使用 16px 线性 `chevron-left` 图标配合简短文字，不使用文本箭头；悬停时只改变背景、边框和图标位置，保持方向明确。
 - **输入框**：`text-input` 边框为 `control-border`；获得焦点时（`text-input-focused`）边框改为 `focus-ring`，并加一圈 3px 的 `primary-soft` 光晕。标签放在输入框上方。必填项在提交时校验，错误信息用 `danger` 显示在字段下方。
-- **侧边导航**：`nav-item` 和 `nav-item-active`，待处理数量用 `status-pending` 的圆角数字徽标显示。
+- **侧边导航**：`nav-item` 和 `nav-item-active`，待处理数量用 `status-pending` 的圆角数字徽标显示。「我的工作空间」固定在侧边导航底部，只作标识，没有点击行为。WorkPack 是本机单用户应用，不显示用户头像或用户信息块。
 - **表格**：表头用 `table-header`，行用 `table-row`，可点击行悬停时用 `table-row-hover`。操作列固定在右侧。数字列右对齐，状态列居中。列宽、行高和横向利用率见 Layout。
 - **状态标签**：`status-done`、`status-pending`、`status-na`，文字格式固定为“已准备”“待签字”“不适用”。
 - **流程标识**：流程统一使用同一图标和主色，不按流程名称区分颜色。
@@ -527,15 +540,15 @@ Stitch 的组件 token 不支持边框属性，边框统一按下表设置，宽
 
 WorkPack 只运行在桌面端，需要适配的是窗口宽度，不是移动设备：
 
-- 1180px 及以上：导航 240px，流程卡片三列，事项卡片两列。
-- 1050–1180px：导航收窄到 216px，流程卡片两列，内容区左右内边距改为 `spacing.lg`。
+- 1180px 及以上：导航 240px，流程卡片三列，事项卡片两列。一级 Surface 的外圈留白和块间距为 `spacing.md`。
+- 1050–1180px：导航收窄到 216px，流程卡片两列，内容区左右内边距改为 `spacing.lg`，一级 Surface 的外圈留白和块间距收到 `spacing.xs`。
 - 表格超出宽度时横向滚动，第一列（文件名）和操作列保持可见。列宽仍按重要性分配，不改成平均分列。
 - 窗口变窄、继续单行会导致控件压缩、截断或溢出时，搜索、筛选、排序作为一组换行，主要操作仍靠右。换行后高度由内容决定。不要拆成标题、搜索、筛选各占一行。
 - 可点击区域至少 28×28px，主要按钮高度 36px。
 
 ## Agent Prompt Guide
 
-- 强调色 `#3d5674`，背景 `#f4f5f7`，面板 `#fbfcfd`，边框 `#e4e6eb`，正文 `#1b1e24`，辅助文字 `#5c6570`。
+- 强调色 `#3d5674`，背景 `#eaecf0`，面板 `#fbfcfd`，边框 `#e4e6eb`，正文 `#1b1e24`，辅助文字 `#5c6570`。
 - 状态色必须使用 DESIGN.md 顶部 colors token，不在页面或提示词中重复硬编码 HEX：`status-done`、`status-done-soft`、`status-pending`、`status-pending-soft`、`status-na`、`status-na-soft`、`danger`、`danger-soft`。
 - 示例提示词：“按照 DESIGN.md 把事项详情中的清单状态下拉框改为 `status-done` / `status-pending` 样式的可点击状态标签，遵循 Interaction Patterns 中的状态点击切换规则。”
 

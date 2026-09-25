@@ -235,11 +235,11 @@ button:disabled {
 }
 
 .nav button:hover {
-  color: var(--color-ink);
-  background: var(--color-status-na-soft);
+  background: var(--color-surface-hover);
 }
 
-.nav button.active {
+.nav button.active,
+.nav button.active:hover {
   color: var(--color-primary);
   background: var(--color-primary-soft);
   font-weight: 700;
@@ -319,6 +319,7 @@ button:disabled {
   height: 100vh;
   overflow-x: hidden;
   overflow-y: auto;
+  background: var(--color-canvas);
 }
 
 .topbar {
@@ -336,7 +337,7 @@ button:disabled {
 
 .breadcrumb {
   gap: 10px;
-  color: var(--color-status-na);
+  color: var(--color-ink-secondary);
   font-size: var(--font-body-sm);
   font-weight: 600;
 }
@@ -813,11 +814,17 @@ button:disabled {
 .filter-bar select {
   min-width: 132px;
   padding: 8px 28px 8px 10px;
-  color: var(--color-status-na);
-  border: 1px solid var(--color-hairline);
+  color: var(--color-ink-secondary);
+  border: 1px solid var(--color-control-border);
   border-radius: 7px;
   background: var(--color-surface);
   font-size: var(--font-caption);
+}
+
+.filter-search:hover,
+.filter-bar select:hover,
+.global-search:hover {
+  background: var(--color-surface-hover);
 }
 
 .filter-result {
@@ -1560,9 +1567,9 @@ button:disabled {
   padding: 36px;
   text-align: center;
   color: var(--color-ink-muted);
-  border: 1px dashed var(--color-hairline);
+  border: 1px solid var(--color-hairline);
   border-radius: 10px;
-  background: var(--color-sidebar);
+  background: var(--color-surface);
 }
 
 .empty.compact {
@@ -1573,7 +1580,7 @@ button:disabled {
 
 .empty h3, .empty strong {
   margin: 12px 0 5px;
-  color: var(--color-status-na);
+  color: var(--color-ink-secondary);
   font-size: var(--font-body-sm);
 }
 

@@ -337,7 +337,7 @@ onBeforeUnmount(() => {
       <div class="workspace-switch"><span class="workspace-avatar">W</span><span>我的工作空间</span><b>⌄</b></div>
       <nav class="nav" aria-label="主导航">
         <button type="button" :class="{ active: view === 'home' }" @click="go('home')"><NavIcon class="nav-icon" name="home" />工作台</button>
-        <button type="button" :class="{ active: view === 'projects' }" @click="go('projects')"><NavIcon class="nav-icon" name="projects" />项目</button>
+        <button type="button" :class="{ active: view === 'projects' || view === 'project' }" @click="go('projects')"><NavIcon class="nav-icon" name="projects" />项目</button>
         <button type="button" :class="{ active: view === 'pending' }" @click="go('pending')"><NavIcon class="nav-icon" name="pending" />待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
         <button type="button" :class="{ active: view === 'templates' }" @click="go('templates')"><NavIcon class="nav-icon" name="templates" />流程</button>
       </nav>

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { _electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
@@ -187,6 +188,14 @@ test('prepared status needs an attachment and other steps toggle by click', asyn
   await expect(firstItem.getByRole('button', { name: /填写状态/ })).toBeDisabled()
   await firstItem.getByRole('button', { name: /填写状态/ }).click({ force: true })
   await expect(firstItem.getByRole('button', { name: /填写状态/ })).toContainText('不适用')
+  const signed = firstItem.getByRole('button', { name: /签字状态/ })
+  const itemId = (await firstItem.getAttribute('data-testid'))!.replace(/^item-/, '')
+  execFileSync(electronExecutable, ['-e', `const Database = require('better-sqlite3'); const database = new Database(${JSON.stringify(path.join(testRoot, 'data', 'workpack.sqlite'))}); database.prepare('DELETE FROM items WHERE id = ?').run(${JSON.stringify(itemId)}); database.close()`], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } })
+  await signed.click()
+  await expect(page.getByRole('alert')).toContainText('记录不存在，请刷新后重试')
+  await expect(signed).toBeFocused()
+  await expect(signed).toContainText('待签字')
+  await page.getByRole('alert').getByRole('button', { name: '关闭错误提示' }).click()
   for (const selector of ['.project-overview-grid span', '.status-toggle.pending', '.status-toggle.na', '.tag.orange']) {
     expect(await contrastRatio(page, selector), selector).toBeGreaterThanOrEqual(4.5)
   }

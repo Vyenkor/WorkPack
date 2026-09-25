@@ -293,9 +293,15 @@ async function removeEvent(event: BusinessEvent) {
   const removed = await run(() => window.workpack.deleteEvent(event.id), '已删除')
   if (removed) closeEventDetail()
 }
-async function setItemStatus(id: string, step: Step, status: Status) {
+async function keepFocus<T>(action: () => Promise<T>, control: HTMLElement | null) {
+  const result = await action()
+  await nextTick()
+  if (control?.isConnected && !control.hasAttribute('disabled')) control.focus({ preventScroll: true })
+  return result
+}
+async function setItemStatus(id: string, step: Step, status: Status, control: HTMLElement | null = null) {
   const item = snapshot.value.projects.flatMap(project => project.events.flatMap(event => event.items)).find(candidate => candidate.id === id)
-  const result = await run(() => window.workpack.setStatus({ id, step, status }))
+  const result = await keepFocus(() => run(() => window.workpack.setStatus({ id, step, status })), control)
   if (result !== false && item) showInlineFeedback(item.eventId, id)
 }
 async function completeItem(id: string) {

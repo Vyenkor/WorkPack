@@ -208,31 +208,49 @@ test('navigation keeps a single active item and the create button stays enabled'
     await expect(nav.locator('button.active')).toHaveCount(1)
     await expect(nav.locator('button.active')).toHaveText(new RegExp(`^${label}`))
   }
+  async function snap(name: string) {
+    await page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== 'running'))
+    await page.screenshot({ path: path.join(shot, name) })
+  }
   async function resize(width: number) {
     await application.evaluate(({ BrowserWindow }, next) => BrowserWindow.getAllWindows()[0].setSize(next, 800), width)
   }
 
   await resize(1280)
   await expectOnly('工作台')
-  const shell = await page.evaluate(() => {
-    const root = getComputedStyle(document.documentElement)
-    const read = (selector: string) => getComputedStyle(document.querySelector(selector)!)
-    return {
-      radius: root.getPropertyValue('--radius-lg').trim(),
-      padding: read('.app-shell').paddingTop,
-      canvas: read('.app-shell').backgroundColor,
-      sidebar: read('.sidebar').borderTopRightRadius,
-      sidebarFill: read('.sidebar').backgroundColor,
-      topbar: read('.topbar').borderRadius,
-      main: read('.view').borderRadius
+  async function expectFloatingShell(gutter: number) {
+    const shell = await page.evaluate(() => {
+      const radius = getComputedStyle(document.documentElement).getPropertyValue('--radius-shell').trim()
+      const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
+      const style = (selector: string) => getComputedStyle(document.querySelector(selector)!)
+      const regions = ['.sidebar', '.topbar', '.view'].map(selector => ({
+        radii: ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'].map(key => style(selector)[key as 'borderTopLeftRadius']),
+        fill: style(selector).backgroundColor,
+        shadow: style(selector).boxShadow
+      }))
+      const sidebar = box('.sidebar'), topbar = box('.topbar'), main = box('.view')
+      return {
+        radius, regions, canvas: style('.app-shell').backgroundColor,
+        gaps: {
+          left: sidebar.left, top: sidebar.top, bottom: innerHeight - sidebar.bottom,
+          between: topbar.left - sidebar.right, topbarTop: topbar.top,
+          stack: main.top - topbar.bottom, right: innerWidth - main.right, mainBottom: innerHeight - main.bottom
+        }
+      }
+    })
+    for (const region of shell.regions) {
+      expect(region.radii).toEqual([shell.radius, shell.radius, shell.radius, shell.radius])
+      expect(region.fill).not.toBe(shell.canvas)
+      expect(region.shadow).toBe('none')
     }
-  })
-  expect(shell.padding).not.toBe('0px')
-  expect(shell.sidebar).toBe(shell.radius)
-  expect(shell.topbar).toBe(shell.radius)
-  expect(shell.main).toBe(shell.radius)
-  expect(shell.sidebarFill).not.toBe(shell.canvas)
-  await page.screenshot({ path: path.join(shot, 'home_1280.png') })
+    for (const [side, value] of Object.entries(shell.gaps)) expect(Math.abs(value - gutter), side).toBeLessThanOrEqual(1)
+  }
+  await expectFloatingShell(16)
+  await snap('home_1280.png')
+  await resize(1050)
+  await expectFloatingShell(8)
+  await snap('home_1050.png')
+  await resize(1280)
   await nav.getByRole('button', { name: '项目', exact: true }).click()
   await expectOnly('项目')
   await expect(page.getByRole('heading', { name: '项目', exact: true })).toBeVisible()
@@ -242,15 +260,15 @@ test('navigation keeps a single active item and the create button stays enabled'
   expect(primary).toBe('rgb(61, 86, 116)')
   await nav.getByRole('button', { name: '待处理', exact: true }).hover()
   await expectOnly('项目')
-  await page.screenshot({ path: path.join(shot, 'projects_empty_1280.png') })
+  await snap('projects_empty_1280.png')
   await resize(1050)
-  await page.screenshot({ path: path.join(shot, 'projects_empty_1050.png') })
+  await snap('projects_empty_1050.png')
   await resize(1280)
   await nav.getByRole('button', { name: '待处理', exact: true }).click()
   await expectOnly('待处理')
-  await page.screenshot({ path: path.join(shot, 'pending_empty_1280.png') })
+  await snap('pending_empty_1280.png')
   await resize(1050)
-  await page.screenshot({ path: path.join(shot, 'pending_empty_1050.png') })
+  await snap('pending_empty_1050.png')
   await resize(1280)
   await nav.getByRole('button', { name: '流程', exact: true }).click()
   await expectOnly('流程')
@@ -282,15 +300,15 @@ test('navigation keeps a single active item and the create button stays enabled'
   await page.getByRole('button', { name: '项目', exact: true }).first().click()
   await expect(page.getByRole('heading', { name: '项目', exact: true })).toBeVisible()
   await expectOnly('项目')
-  await page.screenshot({ path: path.join(shot, 'projects_1280.png') })
+  await snap('projects_1280.png')
   await resize(1050)
-  await page.screenshot({ path: path.join(shot, 'projects_1050.png') })
+  await snap('projects_1050.png')
   await resize(1280)
   await nav.getByRole('button', { name: /待处理/ }).click()
   await expectOnly('待处理')
   await expect(page.locator('.pending-row').first()).toBeVisible()
-  await page.screenshot({ path: path.join(shot, 'pending_1280.png') })
+  await snap('pending_1280.png')
   await resize(1050)
-  await page.screenshot({ path: path.join(shot, 'pending_1050.png') })
+  await snap('pending_1050.png')
   await testInfo.attach('nav-checked', { body: 'ok', contentType: 'text/plain' })
 })

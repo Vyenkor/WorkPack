@@ -5,7 +5,7 @@
   --color-primary-soft: #e7edf3;
   --color-on-primary: #ffffff;
   --color-focus-ring: #3d5674;
-  --color-canvas: #f4f5f7;
+  --color-canvas: #eaecf0;
   --color-surface: #fbfcfd;
   --color-surface-subtle: #f0f1f4;
   --color-surface-hover: #e8eaee;
@@ -39,6 +39,8 @@
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 12px;
+  --radius-shell: 16px;
+  --shell-gutter: var(--spacing-md);
   --radius-pill: 9999px;
   --spacing-xxs: 4px;
   --spacing-xs: 8px;
@@ -98,13 +100,13 @@ button:disabled {
 
 .app-shell {
   display: flex;
-  gap: var(--spacing-sm);
   min-height: 0;
   width: 100%;
   height: 100vh;
   min-width: 0;
   overflow: hidden;
-  padding: var(--spacing-sm);
+  gap: var(--shell-gutter);
+  padding: var(--shell-gutter);
   background: var(--color-canvas);
 }
 
@@ -118,7 +120,7 @@ button:disabled {
   padding: 27px 16px 18px;
   background: var(--color-surface);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-shell);
   overflow-y: auto;
 }
 
@@ -319,7 +321,7 @@ button:disabled {
 .content-shell {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--shell-gutter);
   min-width: 0;
   min-height: 0;
   flex: 1;
@@ -336,7 +338,7 @@ button:disabled {
   justify-content: space-between;
   padding: 0 var(--spacing-xl);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-shell);
   background: var(--color-surface);
   position: sticky;
   top: 0;
@@ -427,7 +429,7 @@ button:disabled {
   overflow: auto;
   padding: var(--spacing-xl);
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-shell);
   background: var(--color-surface);
 }
 
@@ -2204,13 +2206,8 @@ button:disabled {
 }
 
 @media (max-width: 1180px) {
-  .app-shell,
-  .content-shell {
-    gap: var(--spacing-xs);
-  }
-
-  .app-shell {
-    padding: var(--spacing-xs);
+  :root {
+    --shell-gutter: var(--spacing-xs);
   }
 
   .sidebar {

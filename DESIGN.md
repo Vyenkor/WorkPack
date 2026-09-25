@@ -535,8 +535,8 @@ WorkPack 只运行在桌面端，需要适配的是窗口宽度，不是移动�
 
 ## Agent Prompt Guide
 
-- 强调色 `#3d5674`，背景 `#f4f5f7`，面板 `#fbfcfd`，边框 `#e4e6eb`，正文 `#1b1e24`，辅助文字 `#5c6570`。状态色仍与强调色分开。
-- 状态：完成 `#1d6f4c` / `#e8f5ed`，待处理 `#9a5412` / `#fff2e5`，不适用 `#5f6a64` / `#eef1ef`，错误 `#b3261e` / `#fdecea`。
+- 强调色 `#3d5674`，背景 `#f4f5f7`，面板 `#fbfcfd`，边框 `#e4e6eb`，正文 `#1b1e24`，辅助文字 `#5c6570`。
+- 状态色必须使用 DESIGN.md 顶部 colors token，不在页面或提示词中重复硬编码 HEX：`status-done`、`status-done-soft`、`status-pending`、`status-pending-soft`、`status-na`、`status-na-soft`、`danger`、`danger-soft`。
 - 示例提示词：“按照 DESIGN.md 把事项详情中的清单状态下拉框改为 `status-done` / `status-pending` 样式的可点击状态标签，遵循 Interaction Patterns 中的状态点击切换规则。”
 
 ## Iteration Guide
@@ -556,8 +556,8 @@ WorkPack 只运行在桌面端，需要适配的是窗口宽度，不是移动�
 - `.brand strong` 仍有负字距。
 - 弹窗宽度 650px，规范为 640px。
 - 仍全局引入 Element Plus 默认样式，有主题蓝泄漏风险。
-- 工作台、项目列表、待处理和文件清单已按本文件的中性色与 Layout 落地。项目和事项卡片仍是概览组件。文件清单行含附件和状态控件，高度随内容增高。
-- 其余页面和弹窗里仍有非 4 倍数间距。单行 `table-row` 的组件 token 仍是 12px 内边距，约 45px，没有用固定高度或裁切去压到 32–40px。
+- 单行 `table-row` 的组件 token 仍是 12px 内边距，约 45px。没有用固定高度、内容裁切或 `overflow: hidden` 把它压到 32–40px。多行内容、附件和状态控件继续随内容增高。
+- 工作台、项目列表、待处理、文件清单以外的页面和弹窗，布局间距仍有非 4 倍数。
 
 以下内容受 Stitch 格式限制，只写在正文里，接入 CSS 变量时需要从正文取值：
 

@@ -1600,24 +1600,24 @@ button:disabled {
 }
 
 .event-detail {
-  padding: 22px;
+  padding: var(--spacing-lg);
 }
 
 .event-detail-heading {
   align-items: flex-start;
   justify-content: space-between;
-  padding-bottom: 21px;
+  padding-bottom: var(--spacing-lg);
   border-bottom: 1px solid var(--color-hairline);
 }
 
 .small-back {
-  margin-bottom: 12px;
+  margin-bottom: var(--spacing-sm);
 }
 
 .event-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--spacing-sm);
 }
 
 .event-title h2 {
@@ -1627,14 +1627,14 @@ button:disabled {
 }
 
 .event-title p {
-  margin: 6px 0 0;
+  margin: var(--spacing-xs) 0 0;
   color: var(--color-ink-muted);
   font-size: var(--font-caption);
 }
 
 .event-progress-large {
   width: 190px;
-  padding-top: 27px;
+  padding-top: var(--spacing-lg);
 }
 
 .event-progress-large strong {
@@ -1645,7 +1645,7 @@ button:disabled {
 
 .event-progress-large > span {
   display: block;
-  margin: 4px 0 10px;
+  margin: var(--spacing-xxs) 0 var(--spacing-xs);
   color: var(--color-ink-muted);
   font-size: var(--font-caption);
 }
@@ -2220,8 +2220,8 @@ button:disabled {
 .event-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
 }
 
 .event-actions .back-button {

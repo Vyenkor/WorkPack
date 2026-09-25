@@ -1,34 +1,34 @@
 ---
 version: alpha
 name: WorkPack
-description: "A calm, light, information-dense Windows desktop tool for tracking project paperwork. Warm off-white canvas (#f5f7f5), white panels separated by hairline borders rather than shadows, near-black green-tinted ink (#17221d), and one restrained brand green (#1f7a55) reserved for primary actions, focus and the active navigation item. Status is the loudest thing on screen: done green, pending orange, not-applicable gray, always paired with a text label. Chinese-first typography: Microsoft YaHei UI, body at 14px with 1.6 line height, nothing below 12px."
+description: "A calm, light, information-dense Windows desktop tool for tracking project paperwork. Cool neutral canvas (#f4f5f7) and near-white surfaces, separated by quiet hairlines rather than shadows. Ink is near-black blue-gray (#1b1e24), not pure black. One low-saturation blue-gray accent (#3d5674) is reserved for primary actions, active navigation, selection, focus and links. Status stays separate: done green, pending brown, not-applicable gray, error red, always paired with a text label. Chinese-first typography: Microsoft YaHei UI, body at 14px with 1.6 line height, nothing below 12px."
 
 colors:
-  primary: "#1f7a55"
-  primary-hover: "#1a6848"
-  primary-soft: "#e8f5ed"
+  primary: "#3d5674"
+  primary-hover: "#324860"
+  primary-soft: "#e7edf3"
   on-primary: "#ffffff"
-  focus-ring: "#3f9a70"
-  canvas: "#f5f7f5"
-  surface: "#ffffff"
-  surface-subtle: "#fafcfb"
-  surface-hover: "#f3f8f5"
-  sidebar: "#fbfcfb"
-  hairline: "#e3e9e4"
-  hairline-strong: "#cfd9d2"
-  control-border: "#859189"
-  ink: "#17221d"
-  ink-secondary: "#4a5850"
-  ink-muted: "#66736b"
-  status-done: "#1d6f4c"
-  status-done-soft: "#e8f5ed"
-  status-pending: "#9a5412"
-  status-pending-soft: "#fff2e5"
-  status-na: "#5f6a64"
-  status-na-soft: "#eef1ef"
-  danger: "#b3261e"
-  danger-soft: "#fdecea"
-  overlay: "rgba(35, 48, 41, 0.3)"
+  focus-ring: "#3d5674"
+  canvas: "#f4f5f7"
+  surface: "#fbfcfd"
+  surface-subtle: "#f0f1f4"
+  surface-hover: "#e8eaee"
+  sidebar: "#f3f4f6"
+  hairline: "#e4e6eb"
+  hairline-strong: "#d0d3da"
+  control-border: "#6e7582"
+  ink: "#1b1e24"
+  ink-secondary: "#3d4450"
+  ink-muted: "#5c6570"
+  status-done: "#1d6b4a"
+  status-done-soft: "#e6f1eb"
+  status-pending: "#8f5a24"
+  status-pending-soft: "#f6efe6"
+  status-na: "#5c656e"
+  status-na-soft: "#eef0f2"
+  danger: "#a33b34"
+  danger-soft: "#f6eceb"
+  overlay: "rgba(27, 30, 36, 0.3)"
 
 typography:
   page-title:
@@ -269,22 +269,40 @@ components:
 
 WorkPack 是给项目交付、物流和培训岗位的办公人员使用的 Windows 桌面工具，用户每天要在大量文件清单里找出“还缺什么”。界面的目标是**安静、清楚、高信息密度**：
 
-- 浅色、低饱和的背景，让状态颜色成为页面上最醒目的信息。
-- 面板之间用细线分隔，不靠阴影和大色块制造层次。
-- 品牌绿只用在主要按钮、焦点和当前导航项上，不做装饰。
+- 浅色、中性、低饱和的背景。层级靠间距、对齐、细边框和轻微的表面色差，不靠阴影、渐变、光晕或大面积品牌色。
+- 强调色是低饱和的冷灰蓝，只用于主要按钮、当前导航、选中、焦点、链接和少量交互强调，不做装饰。
+- 状态色与强调色分开，并且始终配文字标签。
 - 用户大多不是技术人员：文案直白，操作结果立即可见，删除这类不可逆操作之前一定要确认。
 
 风格参考 Notion 的温和极简和 Linear 的克制原则，但 WorkPack 使用浅色主题，并以中文排版为准。
 
 ## Colors
 
-### 品牌与界面
+颜色方向是 neutral / quiet / crisp / dense：中性、安静、清楚、密。不是绿色品牌的 SaaS 仪表盘。具体色值写在头部 token 里，页面不得另写一套 HEX。
 
-- `primary` 用于主要按钮、当前导航项、焦点、链接和进度条，每个视图里的主要按钮不超过一个。
-- `canvas` 是窗口背景，`surface` 是面板和卡片，`surface-subtle` 用于表头和面板底栏，`surface-hover` 用于可点击行的悬停状态。
-- 文字分三级：`ink` 用于标题和正文，`ink-secondary` 用于次要正文和按钮，`ink-muted` 用于说明、表头和时间等辅助信息，也是最浅的文字色。禁用状态通过 `surface-subtle` 背景和去掉悬停效果来表达，不通过调低文字颜色或透明度，保证禁用按钮上的文字仍然看得清。
+### Neutral
+
+- `canvas` 是窗口背景，`surface` 是面板和卡片。两者只差一个轻微的冷灰阶，不要拉成纯白对深灰的强反差。
+- `sidebar` 使用中性表面，不带明显强调色。
+- `surface-subtle` 用于表头和面板底栏。`surface-hover` 只比普通 `surface` 略深，用来表示悬停。
+- `hairline` 和 `hairline-strong` 是安静的分隔线，不能单独作为控件边界。控件边界用 `control-border`。
+- 文字分三级：`ink` 用于标题和正文，对比度要高，但不是纯黑；`ink-secondary` 用于次要正文和按钮；`ink-muted` 用于说明、表头和时间，明确退后，也是最浅的文字色。
+- 禁用状态通过 `surface-subtle` 背景和去掉悬停效果来表达，不通过调低文字颜色或透明度。
+
+### Accent
+
+`primary` 是低饱和冷灰蓝。`primary-hover` 只用于主要按钮的悬停，`primary-soft` 是低饱和浅底，`focus-ring` 用同一冷灰蓝、清晰可见，不加高饱和光晕。`on-primary` 只放在 `primary` 填充上。
+
+Accent 只用于：主要操作、当前导航、选中、焦点、链接、进度条，以及少量交互强调。每个视图里的主要按钮不超过一个。不要用 Accent 做大面积色块或装饰。
+
+- 悬停：用 `surface-hover`，只比普通表面略有区别。
+- 选中：比悬停更明确，但仍用浅表面或细边界，不要铺成大块 Accent。
+- 当前导航：`nav-item-active` 使用 `primary-soft` 浅底，文字和图标用 `primary`。
+- 焦点：3px `focus-ring`，偏移 2px。鼠标点击不显示焦点框。
 
 ### 状态色（最重要）
+
+状态色继续与 Accent 分离。Done、Pending、Not Applicable、Error 各用自己的色相。背景可以降低饱和度，让标签更克制，但语义必须一眼能分开，并且必须有文字标签。不能把状态色改成 Accent。
 
 | 状态 | 文字 | 背景 | 含义 |
 | --- | --- | --- | --- |
@@ -380,6 +398,7 @@ WorkPack 是桌面端高信息密度操作界面，不是营销页。布局要�
 - 单行数据行的目标高度是 32–40px。现有 `table-row` 的 padding 是 12px，加上 `body-sm` 单行，实际大约 45px。收紧这个 token 之前，单行行高以组件 token 为准，不要为了贴进 32–40px 去裁切文字。收紧项记在 Known Gaps。
 - 内容本身超过一行时，行高随内容增高，不受 40px 限制。这包括两行文件名、错误信息、辅助 metadata、多行状态说明，以及行内 Badge、操作按钮或其他控件确实需要额外垂直空间的情况。
 - 不要为了呼吸感把单行数据行做成 48px、56px 或 64px。单行文本使用 `body-sm`，不要再加大行高。
+- 不通过裁切内容、固定 `height` 或 `overflow: hidden` 把多行内容压进 32–40px。项目卡片和事项卡片继续作为概览组件，不把所有内容都改成表格。
 - 常规按钮和输入框 28–36px，对应现有组件 token，不另设高度。工具栏高度见上一节。
 
 ### 对齐
@@ -516,7 +535,7 @@ WorkPack 只运行在桌面端，需要适配的是窗口宽度，不是移动�
 
 ## Agent Prompt Guide
 
-- 主色 `#1f7a55`，背景 `#f5f7f5`，面板 `#ffffff`，边框 `#e3e9e4`，正文 `#17221d`，辅助文字 `#66736b`。
+- 强调色 `#3d5674`，背景 `#f4f5f7`，面板 `#fbfcfd`，边框 `#e4e6eb`，正文 `#1b1e24`，辅助文字 `#5c6570`。状态色仍与强调色分开。
 - 状态：完成 `#1d6f4c` / `#e8f5ed`，待处理 `#9a5412` / `#fff2e5`，不适用 `#5f6a64` / `#eef1ef`，错误 `#b3261e` / `#fdecea`。
 - 示例提示词：“按照 DESIGN.md 把事项详情中的清单状态下拉框改为 `status-done` / `status-pending` 样式的可点击状态标签，遵循 Interaction Patterns 中的状态点击切换规则。”
 
@@ -538,6 +557,7 @@ WorkPack 只运行在桌面端，需要适配的是窗口宽度，不是移动�
 - 弹窗宽度 650px，规范为 640px。
 - 工作台“待处理”统计图标仍使用状态橙色做装饰。
 - 仍全局引入 Element Plus 默认样式，有主题蓝泄漏风险。
+- 渲染样式仍使用上一版绿色强调色和偏绿中性色，尚未换成头部的冷灰中性色与 `#3d5674` Accent。
 - 页面布局尚未按 Layout 落地，后续界面改造再动，当前页面代码保持原样：
   - 间距仍有非 4 倍数的值。
   - 工具栏和筛选栏仍纵向拆开，而不是默认单行、必要时整组换行。

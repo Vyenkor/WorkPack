@@ -97,6 +97,16 @@ class DesignMdTest(unittest.TestCase):
                 with self.subTest(indicator=indicator, background=background):
                     self.assertGreaterEqual(contrast(COLORS[indicator], COLORS[background]), 3)
 
+    def test_palette_is_neutral_with_a_cool_accent(self):
+        self.assertEqual(COLORS["primary"], "#3d5674")
+        self.assertEqual(COLORS["canvas"], "#f4f5f7")
+        self.assertNotEqual(COLORS["primary"], COLORS["status-done"])
+        colors = CONTENT.split("## Colors\n", 1)[1].split("\n## Typography\n", 1)[0]
+        for phrase in ("Accent", "status-done", "primary-soft", "surface-hover"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, colors)
+        self.assertNotEqual(COLORS["primary"][:3], COLORS["status-done"][:3])
+
     def test_workflow_identity_uses_one_shared_visual_treatment(self):
         self.assertIn("流程统一使用同一图标和主色", CONTENT)
 
@@ -133,6 +143,7 @@ class DesignMdTest(unittest.TestCase):
         self.assertIn("换行", toolbar)
         self.assertRegex(rows, r"32\s*[–-]\s*40\s*px")
         self.assertRegex(rows, r"45\s*px")
+        self.assertIn("裁切", rows)
         self.assertIn("Badge", rows)
         self.assertIn("垂直空间", rows)
         self.assertRegex(rows, r"28\s*[–-]\s*36\s*px")

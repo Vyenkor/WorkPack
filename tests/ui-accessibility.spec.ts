@@ -150,6 +150,70 @@ test('text, focus, and persistent error feedback follow the design rules', async
   }
 })
 
+test('search boxes, list rows and dropdowns use rounded surfaces', async ({}, testInfo) => {
+  const nav = page.getByRole('navigation', { name: '主导航' })
+  await page.locator('.global-search').click()
+  await page.keyboard.type('x')
+  const searchInput = page.locator('.global-search input')
+  await expect(searchInput).toBeFocused()
+  await expect(searchInput).toHaveCSS('outline-style', 'none')
+  await expect(searchInput).toHaveCSS('box-shadow', 'none')
+  await expect(page.locator('.global-search')).toHaveCSS('border-color', 'rgb(61, 86, 116)')
+  await page.screenshot({ path: testInfo.outputPath('search-focus.png'), clip: (await page.locator('.topbar').boundingBox())! })
+
+  const parent = path.join(testRoot, 'projects')
+  fs.mkdirSync(parent)
+  await application.evaluate(({ dialog }, folder) => {
+    Object.defineProperty(dialog, 'showOpenDialog', { configurable: true, value: async () => ({ canceled: false, filePaths: [folder] }) })
+  }, parent)
+  await page.getByRole('button', { name: '新建项目' }).first().click()
+  await page.getByRole('textbox', { name: '项目名称' }).fill('圆角检查')
+  await page.getByRole('textbox', { name: '客户名称' }).fill('测试客户')
+  await page.getByRole('textbox', { name: '负责人' }).fill('测试负责人')
+  await page.locator('.template-check input').first().check()
+  await page.getByRole('button', { name: '选择文件夹' }).click()
+  await page.locator('.modal-card button[type="submit"]').click()
+  await page.getByRole('button', { name: '新建事项' }).first().click()
+  await page.getByRole('textbox', { name: '事项名称' }).fill('第一批交付')
+  await page.locator('.modal-card button[type="submit"]').click()
+  await expect(page.getByRole('heading', { name: '第一批交付' })).toBeVisible()
+
+  await nav.getByRole('button', { name: '工作台', exact: true }).click()
+  const row = page.locator('.attention-row').first()
+  await row.hover()
+  await expect(row).toHaveCSS('border-top-left-radius', '6px')
+  await expect(row).toHaveCSS('background-color', 'rgb(232, 234, 238)')
+  await expect(page.locator('.project-mini').first()).toHaveCSS('border-top-left-radius', '6px')
+  await page.screenshot({ path: testInfo.outputPath('attention-hover.png'), clip: (await page.locator('.attention-panel').boundingBox())! })
+
+  await nav.getByRole('button', { name: /待处理/ }).click()
+  await page.locator('.filter-search input').click()
+  await expect(page.locator('.filter-search input')).toHaveCSS('outline-style', 'none')
+  await page.screenshot({ path: testInfo.outputPath('pending-search-focus.png'), clip: (await page.locator('.page-heading').boundingBox())! })
+
+  await nav.getByRole('button', { name: '项目', exact: true }).click()
+  const status = page.locator('.filter-bar select')
+  await expect(status).toHaveCSS('appearance', 'base-select')
+  await status.click()
+  const picker = await page.evaluate(() => {
+    const select = document.querySelector('.filter-bar select')!
+    const style = getComputedStyle(select, '::picker(select)')
+    return { open: select.matches(':open'), radius: style.borderTopLeftRadius, shadow: style.boxShadow }
+  })
+  expect(picker.open).toBe(true)
+  expect(picker.radius).toBe('8px')
+  expect(picker.shadow).not.toBe('none')
+  const viewBox = (await page.locator('.view').boundingBox())!
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: testInfo.outputPath('select-open.png'), clip: { x: viewBox.x, y: viewBox.y, width: viewBox.width, height: 260 } })
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  await expect(status).toHaveValue('open')
+  await page.mouse.move(0, 0)
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: testInfo.outputPath('select-closed.png'), clip: { x: viewBox.x, y: viewBox.y, width: viewBox.width, height: 120 } })
+})
+
 test('prepared status needs an attachment and other steps toggle by click', async ({}, testInfo) => {
   const parent = path.join(testRoot, 'projects')
   fs.mkdirSync(parent)

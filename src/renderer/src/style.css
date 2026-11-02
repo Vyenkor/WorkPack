@@ -1103,6 +1103,7 @@ button:disabled {
 .template-card-head {
   align-items: flex-start;
   gap: 11px;
+  margin-bottom: var(--spacing-sm);
 }
 
 .template-icon {

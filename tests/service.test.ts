@@ -238,6 +238,54 @@ describe('WorkPackService', () => {
     } finally { service.close() }
   })
 
+  it('deletes the event folder with its work copies and keeps other project files', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const template = service.snapshot().templates.find(item => item.name === '发货资料模板')!
+      const source = path.join(root, '客户签收单模板.docx')
+      fs.writeFileSync(source, 'template')
+      service.importTemplates(template.id, [source])
+      const parent = path.join(root, 'projects')
+      fs.mkdirSync(parent)
+      service.saveProject(inputForProject(template.id), parent)
+      const project = service.snapshot().projects[0]
+      const keepId = service.createEvent({ projectId: project.id, templateId: template.id, name: '保留事项', date: '2026-09-22', owner: '测试负责人' })
+      const eventId = service.createEvent({ projectId: project.id, templateId: template.id, name: '待删除事项', date: '2026-09-23', owner: '测试负责人' })
+      const workflowDir = path.join(project.folder, '发货')
+      const eventDir = path.join(workflowDir, `2026-09-23_${eventId}`)
+      const keepDir = path.join(workflowDir, `2026-09-22_${keepId}`)
+      expect(fs.existsSync(eventDir)).toBe(true)
+
+      service.deleteEvent(eventId)
+      expect(service.snapshot().projects[0].events.map(event => event.id)).toEqual([keepId])
+      expect(fs.existsSync(eventDir)).toBe(false)
+      expect(fs.existsSync(keepDir)).toBe(true)
+      expect(fs.existsSync(path.join(project.folder, '模板文件'))).toBe(true)
+
+      service.deleteEvent(keepId)
+      expect(fs.existsSync(workflowDir)).toBe(false)
+      expect(fs.existsSync(path.join(project.folder, '.workpack-project.json'))).toBe(true)
+    } finally { service.close() }
+  })
+
+  it('still deletes event records when the project folder is missing', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const template = service.snapshot().templates[0]
+      const parent = path.join(root, 'projects')
+      fs.mkdirSync(parent)
+      service.saveProject(inputForProject(template.id), parent)
+      const project = service.snapshot().projects[0]
+      const eventId = service.createEvent({ projectId: project.id, templateId: template.id, name: '待删除事项', date: '2026-09-23', owner: '测试负责人' })
+      fs.rmSync(project.folder, { recursive: true, force: true })
+
+      service.deleteEvent(eventId)
+      expect(service.snapshot().projects[0].events).toHaveLength(0)
+    } finally { service.close() }
+  })
+
   it('deletes project records while preserving the project folder and files', () => {
     const root = tempDirectory()
     const service = new WorkPackService(path.join(root, 'data'))

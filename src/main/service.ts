@@ -349,13 +349,30 @@ export class WorkPackService {
     }
   }
   deleteEvent(value: string) {
-    const event = this.get('events', value)
-    this.db.transaction(() => {
-      const items = this.db.prepare('SELECT id FROM items WHERE event_id=?').all(event.id) as Row[]
-      for (const item of items) this.db.prepare('DELETE FROM attachments WHERE item_id=?').run(item.id)
-      this.db.prepare('DELETE FROM items WHERE event_id=?').run(event.id)
-      this.db.prepare('DELETE FROM events WHERE id=?').run(event.id)
-    })()
+    const event = this.get('events', value), project = this.get('projects', event.project_id)
+    let root: string | null = null
+    try { root = this.root(project) } catch { /* Records can still be removed when the project folder is gone. */ }
+    const workflowDir = root ? inside(root, workflowFolder(event.type)) : null
+    const eventDir = workflowDir ? inside(workflowDir, `${event.date}_${event.id}`) : null
+    const trash = eventDir ? inside(workflowDir!, `.deleting_${event.id}`) : null
+    let moved = false
+    if (eventDir && trash && fs.existsSync(eventDir)) {
+      try { fs.renameSync(eventDir, trash); moved = true }
+      catch { throw new Error('事项文件夹中有文件正在使用，请关闭相关文件后重试') }
+    }
+    try {
+      this.db.transaction(() => {
+        const items = this.db.prepare('SELECT id FROM items WHERE event_id=?').all(event.id) as Row[]
+        for (const item of items) this.db.prepare('DELETE FROM attachments WHERE item_id=?').run(item.id)
+        this.db.prepare('DELETE FROM items WHERE event_id=?').run(event.id)
+        this.db.prepare('DELETE FROM events WHERE id=?').run(event.id)
+      })()
+    } catch (error) {
+      if (moved) fs.renameSync(trash!, eventDir!)
+      throw error
+    }
+    if (moved) fs.rmSync(trash!, { recursive: true, force: true })
+    if (workflowDir && fs.existsSync(workflowDir) && !fs.readdirSync(workflowDir).length) fs.rmdirSync(workflowDir)
   }
   private hasFile(itemId: string, root: string) {
     const attachments = this.db.prepare('SELECT path FROM attachments WHERE item_id=?').all(itemId) as Row[]

@@ -16,8 +16,8 @@ class PlaywrightConfigTest(unittest.TestCase):
     @unittest.skipUnless(shutil.which("npx"), "需要 npx")
     def test_playwright_does_not_load_vitest_files(self):
         result = subprocess.run(
-            ["npx", "playwright", "test", "--list"],
-            cwd=ROOT, capture_output=True, text=True, timeout=60, check=False,
+            [shutil.which("npx"), "playwright", "test", "--list"],
+            cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, check=False,
         )
         output = result.stdout + result.stderr
         self.assertEqual(result.returncode, 0, output)

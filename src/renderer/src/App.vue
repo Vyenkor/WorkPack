@@ -290,7 +290,7 @@ async function removeItem(item: Item) {
   await run(() => window.workpack.deleteItem(item.id), '已删除')
 }
 async function removeEvent(event: BusinessEvent) {
-  if (!window.confirm(`删除事项“${event.name}”？清单记录会被删除，工作副本会保留。`)) return
+  if (!window.confirm(`删除事项“${event.name}”？清单记录和项目文件夹中该事项的工作副本、附件都会删除，其他文件会保留。`)) return
   const removed = await run(() => window.workpack.deleteEvent(event.id), '已删除')
   if (removed) closeEventDetail()
 }

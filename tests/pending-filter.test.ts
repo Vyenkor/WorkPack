@@ -1,14 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import {
   cachedProjectPercent,
+  defaultPendingFilter,
+  defaultPendingViewState,
   gaps,
+  groupPendingRows,
   itemMatchesGap,
   matchesCompletionFilter,
   matchesPendingQuery,
+  normalizePendingViewState,
+  parsePendingViewState,
+  serializePendingViewState,
   type Attachment,
   type BusinessEvent,
   type Item,
   type PendingFilterQuery,
+  type PendingGroupBy,
   type Project,
   type Status,
   type Step
@@ -201,5 +208,74 @@ describe('pending filters', () => {
     expect(gaps(brokenWhileNotApplicable)).toEqual(['附件失效'])
     expect(itemMatchesGap(brokenWhileNotApplicable, 'unprepared')).toBe(true)
     expect(itemMatchesGap(brokenWhileNotApplicable, 'unfilled')).toBe(false)
+  })
+})
+
+describe('pending grouping and remembered filters', () => {
+  function row(id: string, project: { id: string; name: string }, owner: string) {
+    return sample({ project, event: { owner }, item: { id, name: id } })
+  }
+
+  it('groups after filtering, keeps first-seen order, and omits empty groups', () => {
+    const alpha = row('a1', { id: 'a', name: '甲项目' }, '经办甲')
+    const beta = row('b1', { id: 'b', name: '乙项目' }, '经办甲')
+    const alphaAgain = row('a2', { id: 'a', name: '甲项目' }, ' 经办乙 ')
+    const rows = [beta, alpha, alphaAgain]
+    const filtered = rows.filter(item => matchesPendingQuery(item, { ...openQuery(), projectId: 'a' }, '', 40))
+    const byProject = groupPendingRows(filtered, 'project')
+    expect(byProject.map(group => [group.key, group.label, group.rows.map(item => item.item.id)])).toEqual([['a', '甲项目', ['a1', 'a2']]])
+
+    const byOwner = groupPendingRows(rows, 'owner')
+    expect(byOwner.map(group => [group.key, group.label, group.rows.map(item => item.item.id)])).toEqual([
+      ['经办甲', '经办甲', ['b1', 'a1']],
+      ['经办乙', '经办乙', ['a2']]
+    ])
+    expect(groupPendingRows([beta, alpha], 'project').map(group => group.label)).toEqual(['乙项目', '甲项目'])
+    expect(groupPendingRows(rows, 'none')).toEqual([{ key: '', label: '', rows }])
+    expect(groupPendingRows([], 'project')).toEqual([])
+    expect(groupPendingRows([], 'none')).toEqual([])
+  })
+
+  it('separates same-named projects and labels blank project or owner', () => {
+    const named = row('a1', { id: 'a', name: '甲项目' }, '经办甲')
+    const sameName = row('c1', { id: 'c', name: '甲项目' }, '经办甲')
+    expect(groupPendingRows([named, sameName], 'project').map(group => group.key)).toEqual(['a', 'c'])
+    const unnamed = row('u1', { id: 'u', name: '  ' }, '   ')
+    expect(groupPendingRows([unnamed], 'project')[0]).toMatchObject({ key: 'u', label: '未命名项目' })
+    expect(groupPendingRows([unnamed], 'owner')[0]).toMatchObject({ key: '', label: '未填写经办人' })
+  })
+
+  it('parses stored pending view json and falls back when it is unusable', () => {
+    const state = {
+      filter: { keyword: ' 清单 ', projectId: 'p', customer: '客户', templateId: 't', owner: '经办', status: 'open' as const, gap: 'unsigned' as const },
+      groupBy: 'owner' as const
+    }
+    expect(parsePendingViewState(serializePendingViewState(state))).toEqual(state)
+    expect(defaultPendingViewState()).toEqual({ filter: defaultPendingFilter(), groupBy: 'project' })
+    expect(parsePendingViewState(null)).toEqual(defaultPendingViewState())
+    expect(parsePendingViewState(' ')).toEqual(defaultPendingViewState())
+    expect(parsePendingViewState('{')).toEqual(defaultPendingViewState())
+    expect(parsePendingViewState(['nope'])).toEqual(defaultPendingViewState())
+    expect(parsePendingViewState({ filter: { status: 'nope', gap: 'nope', keyword: 1, projectId: 'kept' }, groupBy: 'team' })).toEqual({
+      filter: { ...openQuery(), projectId: 'kept' },
+      groupBy: 'project'
+    })
+    expect(parsePendingViewState({ groupBy: 'none' }).filter).toEqual(openQuery())
+    expect(JSON.parse(serializePendingViewState({ filter: openQuery(), groupBy: 'team' as PendingGroupBy })).groupBy).toBe('project')
+  })
+
+  it('clears project and workflow ids that no longer exist and keeps the other filters', () => {
+    const state = {
+      filter: { ...openQuery(), keyword: '签收', projectId: 'gone-project', customer: '客户甲', templateId: 'gone-workflow', owner: '经办甲', status: 'open' as const, gap: 'unfilled' as const },
+      groupBy: 'none' as const
+    }
+    expect(normalizePendingViewState(state, { projectIds: [], templateIds: [] })).toEqual({
+      filter: { ...state.filter, projectId: '', templateId: '' },
+      groupBy: 'none'
+    })
+    expect(normalizePendingViewState(state, { projectIds: ['gone-project'], templateIds: ['gone-workflow'] })).toEqual(state)
+    expect(normalizePendingViewState(state, { projectIds: ['gone-project'], templateIds: [] }).filter.templateId).toBe('')
+    expect(normalizePendingViewState(state, { projectIds: ['gone-project'], templateIds: [] }).filter.projectId).toBe('gone-project')
+    expect(normalizePendingViewState({ filter: openQuery(), groupBy: 'owner' }, { projectIds: [], templateIds: [] })).toEqual({ filter: openQuery(), groupBy: 'owner' })
   })
 })

@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   cachedProjectPercent,
+  defaultPendingFilter,
   defaultPendingViewState,
   gaps,
   groupPendingRows,
   itemMatchesGap,
   matchesCompletionFilter,
   matchesPendingQuery,
-  PENDING_VIEW_STORAGE_KEY,
+  normalizePendingViewState,
   parsePendingViewState,
-  readPendingViewState,
   serializePendingViewState,
-  writePendingViewState,
   type Attachment,
   type BusinessEvent,
   type Item,
@@ -246,27 +245,16 @@ describe('pending grouping and remembered filters', () => {
     expect(groupPendingRows([unnamed], 'owner')[0]).toMatchObject({ key: '', label: '未填写经办人' })
   })
 
-  it('persists the pending filters and grouping mode, and ignores unusable storage', () => {
+  it('parses stored pending view json and falls back when it is unusable', () => {
     const state = {
       filter: { keyword: ' 清单 ', projectId: 'p', customer: '客户', templateId: 't', owner: '经办', status: 'open' as const, gap: 'unsigned' as const },
       groupBy: 'owner' as const
     }
-    const store = new Map<string, string>()
-    writePendingViewState((key, value) => store.set(key, value), state)
-    expect(store.has(PENDING_VIEW_STORAGE_KEY)).toBe(true)
-    expect(readPendingViewState(key => store.get(key) ?? null)).toEqual(state)
-    expect(JSON.parse(serializePendingViewState(state))).toEqual(state)
-
-    writePendingViewState((key, value) => store.set(key, value), { filter: { ...openQuery(), status: 'done', gap: 'unprepared' }, groupBy: 'none' })
-    const cleared = readPendingViewState(key => store.get(key) ?? null)
-    expect(cleared.groupBy).toBe('none')
-    expect(cleared.filter).toMatchObject({ keyword: '', status: 'done', gap: 'unprepared' })
-
-    expect(defaultPendingViewState().groupBy).toBe('project')
-    expect(readPendingViewState(() => null)).toEqual(defaultPendingViewState())
-    expect(readPendingViewState(() => ' ')).toEqual(defaultPendingViewState())
-    expect(readPendingViewState(() => '{')).toEqual(defaultPendingViewState())
-    expect(readPendingViewState(() => { throw new Error('denied') })).toEqual(defaultPendingViewState())
+    expect(parsePendingViewState(serializePendingViewState(state))).toEqual(state)
+    expect(defaultPendingViewState()).toEqual({ filter: defaultPendingFilter(), groupBy: 'project' })
+    expect(parsePendingViewState(null)).toEqual(defaultPendingViewState())
+    expect(parsePendingViewState(' ')).toEqual(defaultPendingViewState())
+    expect(parsePendingViewState('{')).toEqual(defaultPendingViewState())
     expect(parsePendingViewState(['nope'])).toEqual(defaultPendingViewState())
     expect(parsePendingViewState({ filter: { status: 'nope', gap: 'nope', keyword: 1, projectId: 'kept' }, groupBy: 'team' })).toEqual({
       filter: { ...openQuery(), projectId: 'kept' },
@@ -274,5 +262,20 @@ describe('pending grouping and remembered filters', () => {
     })
     expect(parsePendingViewState({ groupBy: 'none' }).filter).toEqual(openQuery())
     expect(JSON.parse(serializePendingViewState({ filter: openQuery(), groupBy: 'team' as PendingGroupBy })).groupBy).toBe('project')
+  })
+
+  it('clears project and workflow ids that no longer exist and keeps the other filters', () => {
+    const state = {
+      filter: { ...openQuery(), keyword: '签收', projectId: 'gone-project', customer: '客户甲', templateId: 'gone-workflow', owner: '经办甲', status: 'open' as const, gap: 'unfilled' as const },
+      groupBy: 'none' as const
+    }
+    expect(normalizePendingViewState(state, { projectIds: [], templateIds: [] })).toEqual({
+      filter: { ...state.filter, projectId: '', templateId: '' },
+      groupBy: 'none'
+    })
+    expect(normalizePendingViewState(state, { projectIds: ['gone-project'], templateIds: ['gone-workflow'] })).toEqual(state)
+    expect(normalizePendingViewState(state, { projectIds: ['gone-project'], templateIds: [] }).filter.templateId).toBe('')
+    expect(normalizePendingViewState(state, { projectIds: ['gone-project'], templateIds: [] }).filter.projectId).toBe('gone-project')
+    expect(normalizePendingViewState({ filter: openQuery(), groupBy: 'owner' }, { projectIds: [], templateIds: [] })).toEqual({ filter: openQuery(), groupBy: 'owner' })
   })
 })

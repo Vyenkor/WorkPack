@@ -8,17 +8,17 @@ import workpackLogo from './assets/workpack-logo.png'
 import {
   cachedProjectPercent,
   gaps,
+  defaultPendingFilter,
   groupPendingRows,
   matchesCompletionFilter,
   matchesPendingQuery,
   progress,
-  readPendingViewState,
   stepLabels,
   steps,
-  writePendingViewState,
   type CompletionFilter,
   type PendingFilterQuery,
   type PendingGroupBy,
+  type PendingViewState,
   type BusinessEvent,
   type Item,
   type Project,
@@ -32,7 +32,7 @@ import {
 type MainView = 'home' | 'projects' | 'pending' | 'templates' | 'project'
 type ModalName = 'project' | 'event' | 'template' | 'item' | null
 
-const emptySnapshot = (): Snapshot => ({ projects: [], templates: [], dataDirectory: '' })
+const emptySnapshot = (): Snapshot => ({ projects: [], templates: [], dataDirectory: '', pendingView: { filter: defaultPendingFilter(), groupBy: 'project' } })
 const snapshot = ref<Snapshot>(emptySnapshot())
 const view = ref<MainView>('home')
 const activeProjectId = ref<string | null>(null)
@@ -43,13 +43,37 @@ const busy = ref(false)
 const errorMessage = ref('')
 const search = ref('')
 const projectFilter = reactive({ keyword: '', status: 'all' as CompletionFilter })
-const initialPendingView = readPendingViewState(key => localStorage.getItem(key))
-const pendingFilter = reactive<PendingFilterQuery>(initialPendingView.filter)
-const pendingGroupBy = ref<PendingGroupBy>(initialPendingView.groupBy)
-watch([() => ({ ...pendingFilter }), pendingGroupBy], () => {
-  try { writePendingViewState((key, value) => localStorage.setItem(key, value), { filter: pendingFilter, groupBy: pendingGroupBy.value }) }
-  catch { /* Preference storage is best-effort; this session still filters and groups. */ }
-})
+const pendingFilter = reactive<PendingFilterQuery>(defaultPendingFilter())
+const pendingGroupBy = ref<PendingGroupBy>('project')
+let applyingPendingView = false
+let pendingViewReady = false
+let savingPendingView = false
+let pendingViewDirty = false
+function currentPendingView(): PendingViewState {
+  return { filter: { ...pendingFilter }, groupBy: pendingGroupBy.value }
+}
+async function flushPendingView() {
+  if (applyingPendingView || !pendingViewReady) return
+  if (savingPendingView) { pendingViewDirty = true; return }
+  savingPendingView = true
+  try {
+    do {
+      pendingViewDirty = false
+      const requested = currentPendingView()
+      const saved = await window.workpack.savePendingView(requested)
+      if (pendingViewDirty) continue
+      const projectChanged = saved.filter.projectId !== pendingFilter.projectId
+      const templateChanged = saved.filter.templateId !== pendingFilter.templateId
+      if (!projectChanged && !templateChanged) continue
+      applyingPendingView = true
+      if (projectChanged) pendingFilter.projectId = saved.filter.projectId
+      if (templateChanged) pendingFilter.templateId = saved.filter.templateId
+      applyingPendingView = false
+    } while (pendingViewDirty)
+  } catch { /* This session still filters and groups when the database write fails. */ }
+  finally { savingPendingView = false }
+}
+watch([() => ({ ...pendingFilter }), pendingGroupBy], () => { void flushPendingView() }, { flush: 'sync' })
 const modal = ref<ModalName>(null)
 const toast = ref({ visible: false, message: '', tone: 'success' as 'success' | 'error' })
 let toastTimer: ReturnType<typeof setTimeout> | undefined
@@ -92,13 +116,19 @@ function withSelected(options: string[], selected: string) {
 }
 const pendingProjectOptions = computed(() => {
   const names = new Map(pendingRows.value.map(row => [row.project.id, row.project.name]))
-  if (pendingFilter.projectId && !names.has(pendingFilter.projectId)) names.set(pendingFilter.projectId, snapshot.value.projects.find(project => project.id === pendingFilter.projectId)?.name ?? '已删除项目')
+  if (pendingFilter.projectId && !names.has(pendingFilter.projectId)) {
+    const project = snapshot.value.projects.find(item => item.id === pendingFilter.projectId)
+    if (project) names.set(project.id, project.name)
+  }
   return [...names.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
 })
 const pendingCustomerOptions = computed(() => withSelected(sortedUnique(pendingRows.value.map(row => row.project.customer)), pendingFilter.customer))
 const pendingWorkflowOptions = computed(() => {
   const names = new Map(pendingRows.value.map(row => [row.event.templateId, workflowLabel(row.event.templateId)]))
-  if (pendingFilter.templateId && !names.has(pendingFilter.templateId)) names.set(pendingFilter.templateId, workflowLabel(pendingFilter.templateId))
+  if (pendingFilter.templateId && !names.has(pendingFilter.templateId)) {
+    const template = templateFor(pendingFilter.templateId)
+    if (template) names.set(template.id, template.name)
+  }
   return [...names.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
 })
 const pendingOwnerOptions = computed(() => withSelected(sortedUnique(pendingRows.value.map(row => row.event.owner)), pendingFilter.owner))
@@ -199,6 +229,15 @@ async function refresh(showLoading: boolean | Event = true) {
   try {
     snapshot.value = await window.workpack.snapshot()
     snapshot.value.projects.sort((a, b) => projectActivity(b).localeCompare(projectActivity(a)))
+    if (!pendingViewReady) {
+      applyingPendingView = true
+      Object.assign(pendingFilter, snapshot.value.pendingView.filter)
+      pendingGroupBy.value = snapshot.value.pendingView.groupBy
+      applyingPendingView = false
+      pendingViewReady = true
+    }
+    if (pendingFilter.projectId && !snapshot.value.projects.some(project => project.id === pendingFilter.projectId)) pendingFilter.projectId = ''
+    if (pendingFilter.templateId && !snapshot.value.templates.some(template => template.id === pendingFilter.templateId)) pendingFilter.templateId = ''
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '无法读取本地数据'
   } finally {

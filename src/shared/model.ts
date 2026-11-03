@@ -9,7 +9,7 @@ export interface Attachment extends Asset { itemId: string; createdAt: string }
 export interface Item extends Rule { eventId: string; states: Record<Step, Status>; attachments: Attachment[] }
 export interface BusinessEvent { id: string; projectId: string; templateId: string; name: string; date: string; owner: string; items: Item[] }
 export interface Project { id: string; name: string; customer: string; contact: string; owner: string; note: string; folder: string; templateIds: string[]; folderExists: boolean; events: BusinessEvent[] }
-export interface Snapshot { projects: Project[]; templates: Template[]; dataDirectory: string }
+export interface Snapshot { projects: Project[]; templates: Template[]; dataDirectory: string; pendingView: PendingViewState }
 export interface ProjectInput { id?: string; name: string; customer: string; contact: string; owner: string; note: string; templateIds: string[]; directoryToken?: string }
 export interface EventInput { projectId: string; templateId: string; name: string; date: string; owner: string }
 export interface EventUpdateInput extends EventInput { id: string }
@@ -17,6 +17,7 @@ export interface TemplateInput { id?: string; name: string; rules: Rule[] }
 export interface ItemInput { id?: string; eventId: string; name: string; note: string; required: Step[] }
 export interface WorkPackAPI {
   snapshot(): Promise<Snapshot>
+  savePendingView(input: PendingViewState): Promise<PendingViewState>
   chooseDirectory(): Promise<{ token: string; path: string } | null>
   saveProject(input: ProjectInput): Promise<string>
   deleteProject(id: string): Promise<void>
@@ -111,7 +112,7 @@ export function matchesPendingQuery(row: { project: Project; event: BusinessEven
 export type PendingGroupBy = 'project' | 'owner' | 'none'
 export interface PendingGroup<T> { key: string; label: string; rows: T[] }
 export interface PendingViewState { filter: PendingFilterQuery; groupBy: PendingGroupBy }
-export const PENDING_VIEW_STORAGE_KEY = 'workpack.pending.view'
+export const PENDING_VIEW_PREFERENCE_KEY = 'pending.view'
 const pendingGroupModes: readonly PendingGroupBy[] = ['project', 'owner', 'none']
 const completionFilters: readonly CompletionFilter[] = ['all', 'open', 'done']
 const gapFilters: readonly PendingGapFilter[] = ['all', 'unprepared', 'unfilled', 'unsigned', 'unarchived']
@@ -149,11 +150,18 @@ export function parsePendingViewState(raw: unknown): PendingViewState {
   }
 }
 export function serializePendingViewState(state: PendingViewState) { return JSON.stringify(parsePendingViewState(state)) }
-export function readPendingViewState(read: (key: string) => string | null): PendingViewState {
-  try { return parsePendingViewState(read(PENDING_VIEW_STORAGE_KEY)) } catch { return defaultPendingViewState() }
-}
-export function writePendingViewState(write: (key: string, value: string) => void, state: PendingViewState) {
-  write(PENDING_VIEW_STORAGE_KEY, serializePendingViewState(state))
+export function normalizePendingViewState(state: PendingViewState, existing: { projectIds: readonly string[]; templateIds: readonly string[] }): PendingViewState {
+  const parsed = parsePendingViewState(state)
+  const projects = new Set(existing.projectIds)
+  const templates = new Set(existing.templateIds)
+  return {
+    filter: {
+      ...parsed.filter,
+      projectId: projects.has(parsed.filter.projectId) ? parsed.filter.projectId : '',
+      templateId: templates.has(parsed.filter.templateId) ? parsed.filter.templateId : ''
+    },
+    groupBy: parsed.groupBy
+  }
 }
 export function groupPendingRows<T extends { project: Pick<Project, 'id' | 'name'>; event: Pick<BusinessEvent, 'owner'> }>(rows: readonly T[], groupBy: PendingGroupBy): PendingGroup<T>[] {
   if (!rows.length) return []

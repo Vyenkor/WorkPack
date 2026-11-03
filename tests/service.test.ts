@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { WorkPackService } from '../src/main/service'
-import { progress, steps } from '../src/shared/model'
+import { defaultPendingFilter, defaultPendingViewState, PENDING_VIEW_PREFERENCE_KEY, progress, steps } from '../src/shared/model'
 
 const temporaryDirectories: string[] = []
 function tempDirectory() {
@@ -454,5 +454,122 @@ describe('WorkPackService', () => {
       expect(service.snapshot().templates.map(template => template.id)).not.toContain(created.id)
       expect(service.snapshot().templates).toHaveLength(before)
     } finally { service.close() }
+  })
+})
+
+describe('pending view preferences', () => {
+  function storedPendingView(service: WorkPackService) {
+    return service.db.prepare('SELECT value FROM preferences WHERE key=?').get(PENDING_VIEW_PREFERENCE_KEY) as { value: string } | undefined
+  }
+
+  it('stores the pending view in the sqlite file and reloads it from a copy of that file', () => {
+    const data = path.join(tempDirectory(), 'data')
+    const service = new WorkPackService(data)
+    const templateId = service.snapshot().templates[0].id
+    const parent = path.join(path.dirname(data), 'projects')
+    fs.mkdirSync(parent)
+    const projectId = service.saveProject({ ...inputForProject(templateId), name: '筛选甲' }, parent)
+    const saved = service.savePendingView({
+      filter: { ...defaultPendingFilter(), keyword: '签收', projectId, customer: '测试客户', templateId, owner: '经办甲', status: 'open', gap: 'unfilled' },
+      groupBy: 'owner'
+    })
+    expect(saved).toEqual(service.snapshot().pendingView)
+    expect(service.db.pragma('user_version', { simple: true })).toBe(2)
+    service.db.pragma('wal_checkpoint(TRUNCATE)')
+    service.close()
+
+    const copied = path.join(tempDirectory(), 'copied')
+    fs.mkdirSync(copied)
+    fs.copyFileSync(path.join(data, 'workpack.sqlite'), path.join(copied, 'workpack.sqlite'))
+    const reopened = new WorkPackService(copied)
+    try {
+      expect(reopened.snapshot().pendingView).toEqual(saved)
+      expect(reopened.snapshot().projects.map(project => project.id)).toEqual([projectId])
+    } finally { reopened.close() }
+  })
+
+  it('rewrites corrupt values and unknown project or workflow ids back to a usable view', () => {
+    const service = new WorkPackService(path.join(tempDirectory(), 'data'))
+    try {
+      const templateId = service.snapshot().templates[0].id
+      service.db.prepare('INSERT INTO preferences (key, value) VALUES (?, ?)').run(PENDING_VIEW_PREFERENCE_KEY, '{')
+      expect(service.snapshot().pendingView).toEqual(defaultPendingViewState())
+      expect(JSON.parse(storedPendingView(service)!.value)).toEqual(defaultPendingViewState())
+
+      const stale = {
+        filter: { ...defaultPendingFilter(), keyword: '签收', projectId: randomUUID(), templateId: randomUUID(), customer: '客户甲', status: 'done' as const, gap: 'unsigned' as const },
+        groupBy: 'none' as const
+      }
+      service.db.prepare('UPDATE preferences SET value=? WHERE key=?').run(JSON.stringify(stale), PENDING_VIEW_PREFERENCE_KEY)
+      const healed = service.snapshot().pendingView
+      expect(healed.filter).toMatchObject({ projectId: '', templateId: '', keyword: '签收', customer: '客户甲', status: 'done', gap: 'unsigned' })
+      expect(healed.groupBy).toBe('none')
+      expect(JSON.parse(storedPendingView(service)!.value).filter.projectId).toBe('')
+
+      const dropped = service.savePendingView({ filter: { ...defaultPendingFilter(), projectId: randomUUID(), templateId, keyword: '留下' }, groupBy: 'team' })
+      expect(dropped.filter.projectId).toBe('')
+      expect(dropped.filter.templateId).toBe(templateId)
+      expect(dropped.filter.keyword).toBe('留下')
+      expect(dropped.groupBy).toBe('project')
+    } finally { service.close() }
+  })
+
+  it('clears a deleted project or workflow id and keeps the other pending filters', () => {
+    const root = tempDirectory()
+    const service = new WorkPackService(path.join(root, 'data'))
+    try {
+      const template = service.snapshot().templates[0]
+      const parent = path.join(root, 'projects')
+      fs.mkdirSync(parent)
+      const projectId = service.saveProject(inputForProject(template.id), parent)
+      service.saveTemplate({ name: '临时流程', rules: [{ ...template.rules[0], id: randomUUID(), name: '临时文件' }] })
+      const extraId = service.snapshot().templates.find(item => item.name === '临时流程')!.id
+      service.savePendingView({
+        filter: { ...defaultPendingFilter(), projectId, templateId: extraId, keyword: '签收', owner: '经办甲' },
+        groupBy: 'none'
+      })
+
+      service.deleteTemplate(extraId)
+      let view = service.snapshot().pendingView
+      expect(view.filter.templateId).toBe('')
+      expect(view.filter.projectId).toBe(projectId)
+      expect(view.filter.keyword).toBe('签收')
+      expect(view.groupBy).toBe('none')
+
+      service.deleteProject(projectId)
+      view = service.snapshot().pendingView
+      expect(view.filter.projectId).toBe('')
+      expect(view.filter.keyword).toBe('签收')
+      expect(view.filter.owner).toBe('经办甲')
+      expect(view.groupBy).toBe('none')
+      expect(JSON.parse(storedPendingView(service)!.value).filter.projectId).toBe('')
+    } finally { service.close() }
+  })
+
+  it('upgrades a version 1 database without reseeding templates', () => {
+    const data = path.join(tempDirectory(), 'data')
+    const first = new WorkPackService(data)
+    const names = first.snapshot().templates.map(template => template.name)
+    first.db.exec('DROP TABLE preferences')
+    first.db.pragma('user_version = 1')
+    first.db.pragma('wal_checkpoint(TRUNCATE)')
+    first.close()
+
+    const service = new WorkPackService(data)
+    try {
+      expect(service.db.pragma('user_version', { simple: true })).toBe(2)
+      expect(service.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='preferences'").get()).toEqual({ name: 'preferences' })
+      expect(service.snapshot().templates.map(template => template.name)).toEqual(names)
+      expect(service.snapshot().pendingView).toEqual(defaultPendingViewState())
+      expect(storedPendingView(service)).toBeUndefined()
+    } finally { service.close() }
+  })
+
+  it('refuses a database written by a newer app', () => {
+    const data = path.join(tempDirectory(), 'data')
+    const first = new WorkPackService(data)
+    first.db.pragma('user_version = 3')
+    first.close()
+    expect(() => new WorkPackService(data)).toThrow('数据来自更新版本，请使用新版 WorkPack 打开')
   })
 })

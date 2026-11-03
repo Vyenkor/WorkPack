@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { steps, type Snapshot, type Project, type Template, type Item, type Asset, type BusinessEvent } from '../shared/model'
+import { normalizePendingViewState, parsePendingViewState, PENDING_VIEW_PREFERENCE_KEY, serializePendingViewState, steps, type PendingViewState, type Snapshot, type Project, type Template, type Item, type Asset, type BusinessEvent } from '../shared/model'
 
 const name = z.string().trim().min(1, '名称不能为空').max(100)
 const text = z.string().max(4000)
@@ -69,7 +69,7 @@ export class WorkPackService {
     this.db.pragma('foreign_keys = ON')
     this.db.pragma('journal_mode = WAL')
     const version = this.db.pragma('user_version', { simple: true }) as number
-    if (version > 1) { this.db.close(); throw new Error('数据来自更新版本，请使用新版 WorkPack 打开') }
+    if (version > 2) { this.db.close(); throw new Error('数据来自更新版本，请使用新版 WorkPack 打开') }
     if (version < 1) this.db.transaction(() => {
       this.db.exec(`
         CREATE TABLE templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL, rules TEXT NOT NULL);
@@ -90,6 +90,9 @@ export class WorkPackService {
         training: [['培训计划', ['prepared', 'filled', 'archived']], ['培训签到表', [...steps]], ['培训记录', [...steps]], ['现场照片', ['prepared', 'archived']]]
       }
       for (const type of Object.keys(seeds)) this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(randomUUID(), `${legacyWorkflowFolders[type]}资料模板`, type, JSON.stringify(seeds[type].map(([name, required]) => ({ id: randomUUID(), name, note: '', required }))))
+    })()
+    if ((this.db.pragma('user_version', { simple: true }) as number) < 2) this.db.transaction(() => {
+      this.db.exec(`CREATE TABLE IF NOT EXISTS preferences (key TEXT PRIMARY KEY, value TEXT NOT NULL); PRAGMA user_version = 2;`)
     })()
   }
   close() { this.db.close() }
@@ -177,7 +180,32 @@ export class WorkPackService {
     for (const project of projects) for (const event of project.events) for (const item of event.items) {
       if (!item.attachments.some(a => a.exists) && item.states.prepared === 'done') item.states.prepared = 'pending'
     }
-    return { projects, templates: templates.map(template => ({ id: template.id, name: template.name, rules: template.rules, assets: template.assets })), dataDirectory: this.dataDirectory }
+    return { projects, templates: templates.map(template => ({ id: template.id, name: template.name, rules: template.rules, assets: template.assets })), dataDirectory: this.dataDirectory, pendingView: this.reconcilePendingView() }
+  }
+  savePendingView(input: unknown): PendingViewState {
+    const normalized = normalizePendingViewState(parsePendingViewState(input), this.pendingFilterIds())
+    this.writePreference(PENDING_VIEW_PREFERENCE_KEY, serializePendingViewState(normalized))
+    return normalized
+  }
+  private preference(key: string) {
+    const row = this.db.prepare('SELECT value FROM preferences WHERE key=?').get(key) as { value: string } | undefined
+    return row?.value ?? null
+  }
+  private writePreference(key: string, value: string) {
+    this.db.prepare('INSERT OR REPLACE INTO preferences (key, value) VALUES (?, ?)').run(key, value)
+  }
+  private pendingFilterIds() {
+    return {
+      projectIds: (this.db.prepare('SELECT id FROM projects').all() as Array<{ id: string }>).map(row => row.id),
+      templateIds: (this.db.prepare('SELECT id FROM templates').all() as Array<{ id: string }>).map(row => row.id)
+    }
+  }
+  private reconcilePendingView(): PendingViewState {
+    const raw = this.preference(PENDING_VIEW_PREFERENCE_KEY)
+    const normalized = normalizePendingViewState(parsePendingViewState(raw), this.pendingFilterIds())
+    const serialized = serializePendingViewState(normalized)
+    if (raw !== null && raw !== serialized) this.writePreference(PENDING_VIEW_PREFERENCE_KEY, serialized)
+    return normalized
   }
   saveTemplate(input: unknown) {
     const data = templateSchema.parse(input)
@@ -196,6 +224,7 @@ export class WorkPackService {
     if (this.all('projects').some(p => JSON.parse(p.template_ids).includes(value))) throw new Error('流程仍被项目使用，请先调整项目设置')
     if (this.db.prepare('SELECT 1 FROM events WHERE template_id=? LIMIT 1').get(value)) throw new Error('流程已被事项使用，不能删除')
     this.db.prepare('DELETE FROM templates WHERE id=?').run(value)
+    this.reconcilePendingView()
   }
   importTemplates(value: string, sources: string[]) {
     this.get('templates', value)
@@ -278,6 +307,7 @@ export class WorkPackService {
       this.db.prepare('DELETE FROM project_copies WHERE project_id=?').run(project.id)
       this.db.prepare('DELETE FROM projects WHERE id=?').run(project.id)
     })()
+    this.reconcilePendingView()
   }
   relocateProject(value: string, destination: string) {
     const project = this.get('projects', value), folder = directory(destination)

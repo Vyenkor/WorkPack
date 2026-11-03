@@ -40,6 +40,7 @@ function registerIPC() {
   }
   const open = async (file: string) => { const error = await shell.openPath(file); if (error) throw new Error(`无法打开：${error}`) }
   handle('snapshot', () => service.snapshot())
+  handle('savePendingView', value => service.savePendingView(value))
   handle('chooseDirectory', async () => {
     const folder = await selectFolder()
     if (!folder) return null

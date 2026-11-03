@@ -31,7 +31,7 @@ WorkPack 是一个面向 Windows 的本地桌面应用，用于按项目整理�
 
 | 数据 | 位置 |
 | --- | --- |
-| SQLite 数据库 `workpack.sqlite` | Electron 应用数据目录（`userData`），Windows 下通常为 `%APPDATA%\workpack` |
+| SQLite 数据库 `workpack.sqlite` | Electron 应用数据目录（`userData`），Windows 下通常为 `%APPDATA%\workpack`。待处理筛选和分组也记在这个文件里。 |
 | 流程的模板原件 | 应用数据目录下的 `templates/` |
 | 项目文件和附件 | 用户选择的项目文件夹 |
 

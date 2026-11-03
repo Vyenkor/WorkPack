@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Node.js 26 Linux binaries link against libatomic. node-gyp also needs a
+      # C++ toolchain and Python 3 to rebuild better-sqlite3 for Electron.
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential python3 libatomic1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          check-latest: true
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

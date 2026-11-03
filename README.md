@@ -77,7 +77,7 @@ DESIGN.md                 # 界面设计规范（设计 token 与交互规则）
 
 ## 开发
 
-需要 Node.js 和 npm。仓库同时保留了 `package-lock.json` 和 `pnpm-lock.yaml`。
+需要 Node.js 和 npm。依赖版本由 `package-lock.json` 锁定。
 
 ```bash
 npm ci              # 安装依赖；postinstall 会为 Electron 重新编译 better-sqlite3
@@ -111,6 +111,12 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 服务层测试使用临时目录和临时数据库，不会触碰真实数据。修改 `DESIGN.md` 后，还可以运行 `npx @google/design.md lint DESIGN.md` 检查格式。
 
 `npm run test:e2e` 会先构建，再用 Playwright 运行 `tests` 下的 `*.spec.ts`。配置在 `playwright.config.ts`，不会加载 Vitest 的 `*.test.ts`。
+
+## 持续集成
+
+推送到 `main` 以及所有拉取请求都会运行 [`.github/workflows/ci.yml`](.github/workflows/ci.yml)。流水线使用 Ubuntu 和 Node.js 26（当前 Active LTS）：先安装编译原生模块所需的工具链（C++ 编译器、Python 3、`libatomic1`），再依次执行 `npm ci`、`npm run typecheck` 和 `npm test`。`npm ci` 会触发 `postinstall`，为当前 Electron 版本重新编译 better-sqlite3。
+
+`npm run test:e2e` 不在该流水线中，需要在本地单独运行。
 
 ## 首版范围
 

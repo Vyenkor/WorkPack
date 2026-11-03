@@ -395,6 +395,12 @@ button:disabled {
   margin-bottom: 0;
 }
 
+.page-heading .pending-filters {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .page-heading > .button,
 .page-heading > .heading-actions,
 .page-heading > .summary-pill {
@@ -794,6 +800,28 @@ button:disabled {
 .filter-bar select:hover,
 .global-search:hover {
   background: var(--color-surface-hover);
+}
+
+.pending-filters {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.pending-filters .filter-search {
+  width: auto;
+  flex: 1 1 220px;
+  min-width: 200px;
+  max-width: 320px;
+}
+
+.pending-filters select {
+  flex: 1 1 132px;
+  width: auto;
+  max-width: 180px;
+}
+
+.pending-filters .button {
+  flex: 0 0 auto;
 }
 
 .filter-result {

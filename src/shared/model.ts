@@ -54,10 +54,57 @@ export function progress(items: Item[]) {
 export function unfinished(items: Item[]): number {
   return items.filter(item => gaps(item).length > 0).length
 }
+export type CompletionFilter = 'all' | 'open' | 'done'
+export type PendingGapFilter = 'all' | 'unprepared' | 'unfilled' | 'unsigned' | 'unarchived'
+export interface PendingFilterQuery {
+  keyword: string
+  projectId: string
+  customer: string
+  templateId: string
+  owner: string
+  status: CompletionFilter
+  gap: PendingGapFilter
+}
+export function matchesCompletionFilter(percent: number, hasWork: boolean, status: CompletionFilter) {
+  if (status === 'all') return true
+  const complete = percent === 100 && hasWork
+  return status === 'done' ? complete : !complete
+}
+const gapStep: Record<Exclude<PendingGapFilter, 'all' | 'unprepared'>, Step> = { unfilled: 'filled', unsigned: 'signed', unarchived: 'archived' }
+const unpreparedLabels = new Set(['未上传', '待准备', '附件失效'])
 export function gaps(item: Item): string[] {
   const result: string[] = []
   if (item.states.prepared !== 'na' && !item.attachments.some(a => a.exists)) result.push('未上传')
   for (const step of steps) if (item.states[step] === 'pending') result.push(`待${stepLabels[step]}`)
   if (item.attachments.some(a => !a.exists)) result.push('附件失效')
   return result
+}
+export function itemMatchesGap(item: Item, gap: PendingGapFilter) {
+  if (gap === 'all') return true
+  const labels = gaps(item)
+  if (gap === 'unprepared') return labels.some(label => unpreparedLabels.has(label))
+  return labels.includes(`待${stepLabels[gapStep[gap]]}`)
+}
+export function cachedProjectPercent(projectId: string, cache: Map<string, number>, compute: () => number) {
+  const cached = cache.get(projectId)
+  if (cached !== undefined) return cached
+  const percent = compute()
+  cache.set(projectId, percent)
+  return percent
+}
+export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery, workflowName: string, projectPercent: number | (() => number)) {
+  const customer = query.customer.trim()
+  const owner = query.owner.trim()
+  if (query.projectId && row.project.id !== query.projectId) return false
+  if (customer && row.project.customer.trim() !== customer) return false
+  if (query.templateId && row.event.templateId !== query.templateId) return false
+  if (owner && row.event.owner.trim() !== owner) return false
+  if (query.status !== 'all') {
+    const percent = typeof projectPercent === 'function' ? projectPercent() : projectPercent
+    if (!matchesCompletionFilter(percent, row.project.events.length > 0, query.status)) return false
+  }
+  if (!itemMatchesGap(row.item, query.gap)) return false
+  const keyword = query.keyword.trim().toLowerCase()
+  if (!keyword) return true
+  return [row.project.name, row.project.customer, row.project.owner, row.event.name, row.event.owner, row.item.name, workflowName].some(value => value.toLowerCase().includes(keyword))
 }

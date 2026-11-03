@@ -2,7 +2,7 @@ const { spawnSync } = require('node:child_process')
 const electron = require('electron')
 const findPython = require('./find-python.cjs')
 
-const vitest = spawnSync(electron, ['node_modules/vitest/vitest.mjs', 'run', 'tests/service.test.ts'], {
+const vitest = spawnSync(electron, ['node_modules/vitest/vitest.mjs', 'run', 'tests/service.test.ts', 'tests/pending-filter.test.ts'], {
   stdio: 'inherit', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
 })
 if (vitest.status !== 0) process.exit(vitest.status ?? 1)

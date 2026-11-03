@@ -41,6 +41,10 @@ class EventDrawerTest(unittest.TestCase):
         self.assertIn("准备步骤需有文件。", drawer)
         self.assertIn('class="drawer-scrim"', APP)
         self.assertIn("view.value === 'pending'", APP)
+        self.assertIn("openEvent(row.project, row.event, { projectPage: true })", APP)
+        self.assertIn('@click="openEvent(row.project, row.event)"', APP)
+        self.assertIn("closeDrawer(true)", APP)
+        self.assertIn("restoreDrawerFocus", APP)
 
     def test_drawer_is_a_720px_overlay_with_the_floating_shadow(self):
         drawer = css_block(".event-drawer")

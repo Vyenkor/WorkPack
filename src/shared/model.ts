@@ -108,3 +108,69 @@ export function matchesPendingQuery(row: { project: Project; event: BusinessEven
   if (!keyword) return true
   return [row.project.name, row.project.customer, row.project.owner, row.event.name, row.event.owner, row.item.name, workflowName].some(value => value.toLowerCase().includes(keyword))
 }
+export type PendingGroupBy = 'project' | 'owner' | 'none'
+export interface PendingGroup<T> { key: string; label: string; rows: T[] }
+export interface PendingViewState { filter: PendingFilterQuery; groupBy: PendingGroupBy }
+export const PENDING_VIEW_STORAGE_KEY = 'workpack.pending.view'
+const pendingGroupModes: readonly PendingGroupBy[] = ['project', 'owner', 'none']
+const completionFilters: readonly CompletionFilter[] = ['all', 'open', 'done']
+const gapFilters: readonly PendingGapFilter[] = ['all', 'unprepared', 'unfilled', 'unsigned', 'unarchived']
+export function defaultPendingFilter(): PendingFilterQuery {
+  return { keyword: '', projectId: '', customer: '', templateId: '', owner: '', status: 'all', gap: 'all' }
+}
+export function defaultPendingViewState(): PendingViewState {
+  return { filter: defaultPendingFilter(), groupBy: 'project' }
+}
+function storedString(value: unknown) { return typeof value === 'string' ? value : '' }
+function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value) ? value as T : fallback
+}
+export function parsePendingViewState(raw: unknown): PendingViewState {
+  const fallback = defaultPendingViewState()
+  let parsed: unknown = raw
+  if (typeof raw === 'string') {
+    if (!raw.trim()) return fallback
+    try { parsed = JSON.parse(raw) } catch { return fallback }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fallback
+  const record = parsed as Record<string, unknown>
+  const filterSource = record.filter && typeof record.filter === 'object' && !Array.isArray(record.filter) ? record.filter as Record<string, unknown> : {}
+  return {
+    filter: {
+      keyword: storedString(filterSource.keyword),
+      projectId: storedString(filterSource.projectId),
+      customer: storedString(filterSource.customer),
+      templateId: storedString(filterSource.templateId),
+      owner: storedString(filterSource.owner),
+      status: oneOf(filterSource.status, completionFilters, 'all'),
+      gap: oneOf(filterSource.gap, gapFilters, 'all')
+    },
+    groupBy: oneOf(record.groupBy, pendingGroupModes, 'project')
+  }
+}
+export function serializePendingViewState(state: PendingViewState) { return JSON.stringify(parsePendingViewState(state)) }
+export function readPendingViewState(read: (key: string) => string | null): PendingViewState {
+  try { return parsePendingViewState(read(PENDING_VIEW_STORAGE_KEY)) } catch { return defaultPendingViewState() }
+}
+export function writePendingViewState(write: (key: string, value: string) => void, state: PendingViewState) {
+  write(PENDING_VIEW_STORAGE_KEY, serializePendingViewState(state))
+}
+export function groupPendingRows<T extends { project: Pick<Project, 'id' | 'name'>; event: Pick<BusinessEvent, 'owner'> }>(rows: readonly T[], groupBy: PendingGroupBy): PendingGroup<T>[] {
+  if (!rows.length) return []
+  if (groupBy === 'none') return [{ key: '', label: '', rows: [...rows] }]
+  const groups: PendingGroup<T>[] = []
+  const index = new Map<string, PendingGroup<T>>()
+  for (const row of rows) {
+    const byOwner = groupBy === 'owner'
+    const key = byOwner ? row.event.owner.trim() : row.project.id
+    const label = byOwner ? key || '未填写经办人' : row.project.name.trim() || '未命名项目'
+    const existing = index.get(key)
+    if (existing) existing.rows.push(row)
+    else {
+      const group = { key, label, rows: [row] }
+      index.set(key, group)
+      groups.push(group)
+    }
+  }
+  return groups
+}

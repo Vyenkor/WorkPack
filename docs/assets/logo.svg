@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="221" height="56" viewBox="0 0 221 56" fill="none" role="img" aria-label="WorkPack">
-  <rect width="56" height="56" rx="14" fill="#3d5674"/>
-  <rect x="19.04" y="11.2" width="25.76" height="29.12" rx="3.4" fill="#d5dee8"/>
-  <rect x="11.2" y="16.8" width="25.76" height="29.12" rx="3.4" fill="#fbfcfd"/>
-  <rect x="15.68" y="24.64" width="14.56" height="2.52" rx="1.1" fill="#3d5674"/>
-  <rect x="15.68" y="30.24" width="17.92" height="2.52" rx="1.1" fill="#8ea0b3"/>
-  <rect x="15.68" y="35.84" width="11.2" height="2.52" rx="1.1" fill="#8ea0b3"/>
-  <text x="70" y="36" fill="#1b1e24" font-family="Segoe UI, Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Noto Sans, sans-serif" font-size="30" font-weight="700">WorkPack</text>
-</svg>

@@ -1,8 +1,8 @@
 # WorkPack
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
-  <img alt="WorkPack" src="docs/assets/logo.png" width="220" height="56">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/workpack-logo-on-light.png">
+  <img alt="WorkPack" src="src/renderer/src/assets/workpack-logo.png" width="260" height="72">
 </picture>
 
 WorkPack 是一个面向 Windows 的本地桌面应用，用于按项目整理发货、收货、培训等业务文件，并跟踪每份文件的**准备、填写、签字、归档**状态。
@@ -91,7 +91,7 @@ src/
 tests/                    # Vitest 服务测试与 Python 检查
 demo/                     # 早期静态网页原型，可直接用浏览器打开，数据不持久化
 scripts/test.cjs          # 用 Electron 自带的 Node 运行 Vitest（匹配 better-sqlite3 原生模块）
-docs/assets/              # 首页标志、界面截图，以及可作仓库社交预览的 social-preview.png
+docs/assets/              # 深色主题下垫了浅底的侧栏标志、界面截图，以及可作仓库社交预览的 social-preview.png
 DESIGN.md                 # 界面设计规范（设计 token 与交互规则），修改界面前先阅读
 产品设计文档_MVP.md
 技术方案_MVP.md

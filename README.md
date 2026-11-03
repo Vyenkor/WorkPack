@@ -1,8 +1,27 @@
 # WorkPack
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
+  <img alt="WorkPack" src="docs/assets/logo.png" width="220" height="56">
+</picture>
+
 WorkPack 是一个面向 Windows 的本地桌面应用，用于按项目整理发货、收货、培训等业务文件，并跟踪每份文件的**准备、填写、签字、归档**状态。
 
 它主要解决两个问题：每个业务事项应该有哪些文件，以及哪些文件还没有完成。
+
+## 界面
+
+![待处理页按项目分组，并筛出进行中、尚未签字的文件](docs/assets/pending.png)
+
+待处理把还没做完的文件按项目收在一起，也可以改成按经办人分组或不分组。筛选和分组会记住上次的选择。
+
+![项目页从右侧抽屉打开事项清单](docs/assets/project-drawer.png)
+
+在项目页点开一个事项，文件清单从右侧抽屉展开，项目页留在后面。
+
+![事项清单中的步骤状态和附件](docs/assets/checklist.png)
+
+每份文件单独记下准备、填写、签字、归档。准备要先有可用附件，才能标成已完成。
 
 ## 核心概念
 
@@ -72,6 +91,7 @@ src/
 tests/                    # Vitest 服务测试与 Python 检查
 demo/                     # 早期静态网页原型，可直接用浏览器打开，数据不持久化
 scripts/test.cjs          # 用 Electron 自带的 Node 运行 Vitest（匹配 better-sqlite3 原生模块）
+docs/assets/              # 首页标志、界面截图，以及可作仓库社交预览的 social-preview.png
 DESIGN.md                 # 界面设计规范（设计 token 与交互规则），修改界面前先阅读
 产品设计文档_MVP.md
 技术方案_MVP.md

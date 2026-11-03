@@ -34,6 +34,15 @@ class ReadmeTest(unittest.TestCase):
             with self.subTest(topic=topic):
                 self.assertIn(topic, README)
 
+    def test_landing_visuals_are_linked(self):
+        self.assertIn("prefers-color-scheme: dark", README)
+        for name in ("logo.png", "logo-dark.png", "pending.png", "project-drawer.png", "checklist.png"):
+            with self.subTest(name=name):
+                self.assertIn(f"docs/assets/{name}", README)
+                self.assertTrue((ROOT / "docs" / "assets" / name).is_file())
+        self.assertIn("social-preview.png", README)
+        self.assertTrue((ROOT / "docs" / "assets" / "social-preview.png").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

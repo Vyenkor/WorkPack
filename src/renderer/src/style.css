@@ -269,6 +269,7 @@ button:disabled {
 }
 
 .content-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--shell-gutter);
@@ -1857,9 +1858,53 @@ button:disabled {
   white-space: nowrap;
 }
 
+.drawer-scrim {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  background: var(--color-overlay);
+}
+
+.event-drawer {
+  position: fixed;
+  z-index: 20;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: 720px;
+  max-width: 100%;
+  overflow: auto;
+  border-left: 1px solid var(--color-hairline);
+  border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--floating-shadow);
+  animation: drawer-slide .18s ease-out;
+}
+
+.event-drawer .event-detail {
+  flex: 1;
+}
+
+.event-drawer .event-detail-heading {
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+}
+
+.event-drawer .event-detail-heading > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+@keyframes drawer-slide {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 .modal-backdrop {
   position: fixed;
-  z-index: 10;
+  z-index: 25;
   inset: 0;
   display: flex;
   align-items: center;
@@ -2619,4 +2664,10 @@ option::checkmark {
 
 .status-more option::checkmark {
   display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .event-drawer {
+    animation: none;
+  }
 }

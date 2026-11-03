@@ -6,6 +6,7 @@ import UiIcon from './components/UiIcon.vue'
 import RulesEditor from './components/RulesEditor.vue'
 import workpackLogo from './assets/workpack-logo.png'
 import {
+  cachedProjectPercent,
   gaps,
   matchesCompletionFilter,
   matchesPendingQuery,
@@ -101,7 +102,10 @@ function clearPendingFilters() {
   pendingFilter.status = 'all'
   pendingFilter.gap = 'all'
 }
-const filteredPending = computed(() => pendingRows.value.filter(row => matchesPendingQuery(row, pendingFilter, workflowLabel(row.event.templateId), projectProgress(row.project).percent)))
+const filteredPending = computed(() => {
+  const percents = new Map<string, number>()
+  return pendingRows.value.filter(row => matchesPendingQuery(row, pendingFilter, workflowLabel(row.event.templateId), () => cachedProjectPercent(row.project.id, percents, () => projectProgress(row.project).percent)))
+})
 const currentBreadcrumb = computed(() => {
   if (view.value !== 'project') return ({ home: '工作台', projects: '项目', pending: '待处理', templates: '流程' } as Record<Exclude<MainView, 'project'>, string>)[view.value]
   return activeProject.value?.name ?? '项目详情'

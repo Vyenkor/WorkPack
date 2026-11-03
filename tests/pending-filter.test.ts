@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cachedProjectPercent,
   gaps,
   itemMatchesGap,
   matchesCompletionFilter,
@@ -125,6 +126,28 @@ describe('pending filters', () => {
     const emptyProject = sample({ project: { events: [] } })
     expect(matchesPendingQuery(emptyProject, { ...openQuery(), status: 'done' }, '', 100)).toBe(false)
     expect(matchesPendingQuery(emptyProject, { ...openQuery(), status: 'open' }, '', 100)).toBe(true)
+  })
+
+  it('skips project progress unless completion status is filtered, and caches it per project', () => {
+    const row = sample()
+    let calls = 0
+    const percent = () => { calls += 1; return 40 }
+    expect(matchesPendingQuery(row, openQuery(), '', percent)).toBe(true)
+    expect(calls).toBe(0)
+    expect(matchesPendingQuery(row, { ...openQuery(), projectId: 'other', status: 'open' }, '', percent)).toBe(false)
+    expect(calls).toBe(0)
+    expect(matchesPendingQuery(row, { ...openQuery(), status: 'open' }, '', percent)).toBe(true)
+    expect(calls).toBe(1)
+
+    const cache = new Map<string, number>()
+    let computes = 0
+    const compute = () => { computes += 1; return 15 }
+    expect(cachedProjectPercent('project', cache, compute)).toBe(15)
+    expect(cachedProjectPercent('project', cache, compute)).toBe(15)
+    expect(cachedProjectPercent('other', cache, compute)).toBe(15)
+    expect(computes).toBe(2)
+    expect(cachedProjectPercent('zero', cache, () => 0)).toBe(0)
+    expect(cachedProjectPercent('zero', cache, () => { throw new Error('cached') })).toBe(0)
   })
 
   it('locates unprepared, unfilled, unsigned, and unarchived gaps without treating 不适用 as missing', () => {

@@ -85,14 +85,24 @@ export function itemMatchesGap(item: Item, gap: PendingGapFilter) {
   if (gap === 'unprepared') return labels.some(label => unpreparedLabels.has(label))
   return labels.includes(`待${stepLabels[gapStep[gap]]}`)
 }
-export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery, workflowName: string, projectPercent: number) {
+export function cachedProjectPercent(projectId: string, cache: Map<string, number>, compute: () => number) {
+  const cached = cache.get(projectId)
+  if (cached !== undefined) return cached
+  const percent = compute()
+  cache.set(projectId, percent)
+  return percent
+}
+export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery, workflowName: string, projectPercent: number | (() => number)) {
   const customer = query.customer.trim()
   const owner = query.owner.trim()
   if (query.projectId && row.project.id !== query.projectId) return false
   if (customer && row.project.customer.trim() !== customer) return false
   if (query.templateId && row.event.templateId !== query.templateId) return false
   if (owner && row.event.owner.trim() !== owner) return false
-  if (!matchesCompletionFilter(projectPercent, row.project.events.length > 0, query.status)) return false
+  if (query.status !== 'all') {
+    const percent = typeof projectPercent === 'function' ? projectPercent() : projectPercent
+    if (!matchesCompletionFilter(percent, row.project.events.length > 0, query.status)) return false
+  }
   if (!itemMatchesGap(row.item, query.gap)) return false
   const keyword = query.keyword.trim().toLowerCase()
   if (!keyword) return true

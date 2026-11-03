@@ -34,6 +34,23 @@ class ReadmeTest(unittest.TestCase):
             with self.subTest(topic=topic):
                 self.assertIn(topic, README)
 
+    def test_landing_visuals_are_linked(self):
+        self.assertIn("src/renderer/src/assets/workpack-logo.png", README)
+        self.assertTrue((ROOT / "src/renderer/src/assets/workpack-logo.png").is_file())
+        self.assertIn("prefers-color-scheme: dark", README)
+        self.assertIn("docs/assets/workpack-logo-on-light.png", README)
+        self.assertTrue((ROOT / "docs" / "assets" / "workpack-logo-on-light.png").is_file())
+        for name in ("pending.png", "project-drawer.png", "checklist.png"):
+            with self.subTest(name=name):
+                self.assertIn(f"docs/assets/{name}", README)
+                self.assertTrue((ROOT / "docs" / "assets" / name).is_file())
+        self.assertIn("social-preview.png", README)
+        self.assertTrue((ROOT / "docs" / "assets" / "social-preview.png").is_file())
+        for name in ("logo.png", "logo-dark.png", "logo.svg", "logo-dark.svg"):
+            with self.subTest(removed=name):
+                self.assertNotIn(f"docs/assets/{name}", README)
+                self.assertFalse((ROOT / "docs" / "assets" / name).exists())
+
 
 if __name__ == "__main__":
     unittest.main()

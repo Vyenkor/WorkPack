@@ -22,7 +22,8 @@ class RendererCopyTest(unittest.TestCase):
 
     def test_projects_and_events_show_workflow_names(self):
         self.assertIn('templateFor(event.templateId)?.name', APP)
-        self.assertIn('templateFor(row.event.templateId)?.name', APP)
+        self.assertIn('workflowLabel(row.event.templateId)', APP)
+        self.assertIn("templateFor(id)?.name || '流程已删除'", APP)
         self.assertNotIn('typeLabel(', APP)
 
     def test_workflow_categories_do_not_drive_icons_or_filters(self):
@@ -30,6 +31,13 @@ class RendererCopyTest(unittest.TestCase):
         self.assertNotIn('projectFilter.type', APP)
         self.assertNotIn('pendingFilter.type', APP)
         self.assertNotIn('availableTypes', APP)
+
+    def test_pending_page_filters_cover_mvp_dimensions_and_gaps(self):
+        for label in ("全部项目", "全部客户", "全部流程", "全部负责人", "全部完成状态", "未准备", "未填写", "未签字", "未归档", "没有符合条件的待处理项"):
+            self.assertIn(label, APP)
+        self.assertIn("matchesPendingQuery", APP)
+        self.assertIn("clearPendingFilters", APP)
+        self.assertIn("pending-filters", APP)
 
     def test_back_buttons_use_the_shared_linear_icon(self):
         self.assertIn('<UiIcon name="back" class="back-icon" />', APP)

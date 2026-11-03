@@ -54,6 +54,39 @@ export function progress(items: Item[]) {
 export function unfinished(items: Item[]): number {
   return items.filter(item => gaps(item).length > 0).length
 }
+export type CompletionFilter = 'all' | 'open' | 'done'
+export type PendingGapFilter = 'all' | 'unprepared' | 'unfilled' | 'unsigned' | 'unarchived'
+export interface PendingFilterQuery {
+  keyword: string
+  projectId: string
+  customer: string
+  templateId: string
+  owner: string
+  status: CompletionFilter
+  gap: PendingGapFilter
+}
+export function matchesCompletionFilter(percent: number, hasWork: boolean, status: CompletionFilter) {
+  if (status === 'all') return true
+  const complete = percent === 100 && hasWork
+  return status === 'done' ? complete : !complete
+}
+const gapStep: Record<Exclude<PendingGapFilter, 'all' | 'unprepared'>, Step> = { unfilled: 'filled', unsigned: 'signed', unarchived: 'archived' }
+export function itemMatchesGap(item: Item, gap: PendingGapFilter) {
+  if (gap === 'all') return true
+  if (gap === 'unprepared') return item.states.prepared !== 'na' && (item.states.prepared === 'pending' || !item.attachments.some(attachment => attachment.exists))
+  return item.states[gapStep[gap]] === 'pending'
+}
+export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery, workflowName: string, projectPercent: number) {
+  if (query.projectId && row.project.id !== query.projectId) return false
+  if (query.customer && row.project.customer !== query.customer) return false
+  if (query.templateId && row.event.templateId !== query.templateId) return false
+  if (query.owner && row.event.owner !== query.owner) return false
+  if (!matchesCompletionFilter(projectPercent, row.project.events.length > 0, query.status)) return false
+  if (!itemMatchesGap(row.item, query.gap)) return false
+  const keyword = query.keyword.trim().toLowerCase()
+  if (!keyword) return true
+  return [row.project.name, row.project.customer, row.project.owner, row.event.name, row.event.owner, row.item.name, workflowName].some(value => value.toLowerCase().includes(keyword))
+}
 export function gaps(item: Item): string[] {
   const result: string[] = []
   if (item.states.prepared !== 'na' && !item.attachments.some(a => a.exists)) result.push('未上传')

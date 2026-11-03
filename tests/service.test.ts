@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import Database from 'better-sqlite3'
 import { afterEach, describe, expect, it } from 'vitest'
 import { WorkPackService } from '../src/main/service'
 import { defaultPendingFilter, defaultPendingViewState, PENDING_VIEW_PREFERENCE_KEY, progress, steps } from '../src/shared/model'
@@ -462,30 +463,68 @@ describe('pending view preferences', () => {
     return service.db.prepare('SELECT value FROM preferences WHERE key=?').get(PENDING_VIEW_PREFERENCE_KEY) as { value: string } | undefined
   }
 
-  it('stores the pending view in the sqlite file and reloads it from a copy of that file', () => {
+  function preferenceInFile(file: string) {
+    let db: Database.Database | undefined
+    try {
+      db = new Database(file, { readonly: true, fileMustExist: true })
+      const table = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='preferences'").get()
+      if (!table) return null
+      const row = db.prepare('SELECT value FROM preferences WHERE key=?').get(PENDING_VIEW_PREFERENCE_KEY) as { value: string } | undefined
+      return row?.value ?? null
+    } catch { return null }
+    finally { db?.close() }
+  }
+
+  it('loses a just-saved pending view when only the main database file is copied while it is open', () => {
     const data = path.join(tempDirectory(), 'data')
     const service = new WorkPackService(data)
-    const templateId = service.snapshot().templates[0].id
-    const parent = path.join(path.dirname(data), 'projects')
-    fs.mkdirSync(parent)
-    const projectId = service.saveProject({ ...inputForProject(templateId), name: '筛选甲' }, parent)
-    const saved = service.savePendingView({
-      filter: { ...defaultPendingFilter(), keyword: '签收', projectId, customer: '测试客户', templateId, owner: '经办甲', status: 'open', gap: 'unfilled' },
-      groupBy: 'owner'
-    })
-    expect(saved).toEqual(service.snapshot().pendingView)
-    expect(service.db.pragma('user_version', { simple: true })).toBe(2)
-    service.db.pragma('wal_checkpoint(TRUNCATE)')
-    service.close()
-
-    const copied = path.join(tempDirectory(), 'copied')
-    fs.mkdirSync(copied)
-    fs.copyFileSync(path.join(data, 'workpack.sqlite'), path.join(copied, 'workpack.sqlite'))
-    const reopened = new WorkPackService(copied)
     try {
-      expect(reopened.snapshot().pendingView).toEqual(saved)
-      expect(reopened.snapshot().projects.map(project => project.id)).toEqual([projectId])
-    } finally { reopened.close() }
+      // A preference write is smaller than the default checkpoint threshold, so it can sit in the WAL. Pin that state.
+      service.db.pragma('wal_autocheckpoint = 0')
+      const saved = service.savePendingView({ filter: { ...defaultPendingFilter(), keyword: '仅在wal' }, groupBy: 'none' })
+      expect(service.db.open).toBe(true)
+      expect(service.snapshot().pendingView).toEqual(saved)
+      const naive = path.join(tempDirectory(), 'naive.sqlite')
+      fs.copyFileSync(path.join(data, 'workpack.sqlite'), naive)
+      expect(preferenceInFile(naive) ?? '').not.toContain('仅在wal')
+      expect(service.snapshot().pendingView.filter.keyword).toBe('仅在wal')
+    } finally { service.close() }
+  })
+
+  it('writes a consistent database backup while the connection stays open', () => {
+    const data = path.join(tempDirectory(), 'data')
+    const service = new WorkPackService(data)
+    try {
+      service.db.pragma('wal_autocheckpoint = 0')
+      const templateId = service.snapshot().templates[0].id
+      const parent = path.join(path.dirname(data), 'projects')
+      fs.mkdirSync(parent)
+      const projectId = service.saveProject({ ...inputForProject(templateId), name: '筛选甲' }, parent)
+      const saved = service.savePendingView({
+        filter: { ...defaultPendingFilter(), keyword: '签收', projectId, customer: '测试客户', templateId, owner: '经办甲', status: 'open', gap: 'unfilled' },
+        groupBy: 'owner'
+      })
+      expect(service.db.pragma('user_version', { simple: true })).toBe(2)
+      expect(() => service.backupDatabase(path.join(data, 'workpack.sqlite'))).toThrow('不能覆盖正在使用的数据库文件')
+      const naive = path.join(tempDirectory(), 'naive.sqlite')
+      fs.copyFileSync(path.join(data, 'workpack.sqlite'), naive)
+      expect(preferenceInFile(naive) ?? '').not.toContain('签收')
+
+      const destination = path.join(tempDirectory(), 'backup.sqlite')
+      service.backupDatabase(destination)
+      expect(service.db.open).toBe(true)
+      expect(service.snapshot().pendingView).toEqual(saved)
+      expect(preferenceInFile(destination)).toContain('签收')
+
+      const restoredDir = path.join(tempDirectory(), 'restored')
+      fs.mkdirSync(restoredDir)
+      fs.copyFileSync(destination, path.join(restoredDir, 'workpack.sqlite'))
+      const restored = new WorkPackService(restoredDir)
+      try {
+        expect(restored.snapshot().pendingView).toEqual(saved)
+        expect(restored.snapshot().projects.map(project => project.id)).toEqual([projectId])
+      } finally { restored.close() }
+    } finally { service.close() }
   })
 
   it('rewrites corrupt values and unknown project or workflow ids back to a usable view', () => {

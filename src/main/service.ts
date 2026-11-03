@@ -67,6 +67,7 @@ export class WorkPackService {
     fs.mkdirSync(this.templateRoot, { recursive: true })
     this.db = new Database(path.join(dataDirectory, 'workpack.sqlite'))
     this.db.pragma('foreign_keys = ON')
+    // WAL keeps recent commits in workpack.sqlite-wal. Copying only the main file while this connection is open can miss them.
     this.db.pragma('journal_mode = WAL')
     const version = this.db.pragma('user_version', { simple: true }) as number
     if (version > 2) { this.db.close(); throw new Error('数据来自更新版本，请使用新版 WorkPack 打开') }
@@ -193,6 +194,23 @@ export class WorkPackService {
   }
   private writePreference(key: string, value: string) {
     this.db.prepare('INSERT OR REPLACE INTO preferences (key, value) VALUES (?, ?)').run(key, value)
+  }
+  /** Single-file snapshot of this open connection, including commits that are still only in the WAL. */
+  backupDatabase(destination: string) {
+    if (!destination.trim()) throw new Error('请指定备份文件')
+    const target = path.resolve(destination)
+    const live = path.resolve(this.db.name)
+    if (target === live || target === `${live}-wal` || target === `${live}-shm`) throw new Error('不能覆盖正在使用的数据库文件')
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    const image = this.db.serialize()
+    if (!image?.byteLength) throw new Error('无法生成数据库备份')
+    const temporary = path.join(path.dirname(target), `.${path.basename(target)}.${randomUUID()}.tmp`)
+    fs.writeFileSync(temporary, image)
+    try { fs.renameSync(temporary, target) }
+    catch (error) {
+      fs.rmSync(temporary, { force: true })
+      throw error
+    }
   }
   private pendingFilterIds() {
     return {

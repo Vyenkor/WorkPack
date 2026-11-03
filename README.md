@@ -31,7 +31,7 @@ WorkPack 是一个面向 Windows 的本地桌面应用，用于按项目整理�
 
 | 数据 | 位置 |
 | --- | --- |
-| SQLite 数据库 `workpack.sqlite` | Electron 应用数据目录（`userData`），Windows 下通常为 `%APPDATA%\workpack`。待处理筛选和分组也记在这个文件里。 |
+| SQLite 数据库 `workpack.sqlite` | Electron 应用数据目录（`userData`），Windows 下通常为 `%APPDATA%\workpack`。待处理筛选和分组也记在这个数据库里。 |
 | 流程的模板原件 | 应用数据目录下的 `templates/` |
 | 项目文件和附件 | 用户选择的项目文件夹 |
 
@@ -45,6 +45,8 @@ WorkPack 是一个面向 Windows 的本地桌面应用，用于按项目整理�
 ```
 
 每台电脑的数据相互独立。数据库和项目文件夹是分开存放的，备份或迁移时两部分都要带上。不要把数据库放在 NAS 或共享目录中让多台电脑同时写入。
+
+数据库使用 WAL。应用还在运行时，刚保存的筛选、分组和其他写入可能只在 `workpack.sqlite-wal` 里，这时只复制 `workpack.sqlite` 会丢掉这些内容。手工备份要先完全退出 WorkPack，再复制 `workpack.sqlite`；如果退出后同目录还有 `workpack.sqlite-wal` 或 `workpack.sqlite-shm`，这三个文件要一起复制。进程内需要一份一致的单文件副本时，用 `WorkPackService.backupDatabase()`：它在数据库连接仍然打开时写出包含最新提交的文件，不必先关闭数据库。
 
 在应用中删除项目或附件，只会删除数据库记录，项目文件夹和实际文件会保留。删除事项时，会一并删除项目文件夹中该事项的目录（`<流程目录>/<日期>_<事项ID>/`，含工作副本和附件），流程目录为空时也会移除；目录中有文件被占用时删除会失败，记录保持不变。
 

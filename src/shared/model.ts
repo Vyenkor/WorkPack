@@ -71,26 +71,30 @@ export function matchesCompletionFilter(percent: number, hasWork: boolean, statu
   return status === 'done' ? complete : !complete
 }
 const gapStep: Record<Exclude<PendingGapFilter, 'all' | 'unprepared'>, Step> = { unfilled: 'filled', unsigned: 'signed', unarchived: 'archived' }
-export function itemMatchesGap(item: Item, gap: PendingGapFilter) {
-  if (gap === 'all') return true
-  if (gap === 'unprepared') return item.states.prepared !== 'na' && (item.states.prepared === 'pending' || !item.attachments.some(attachment => attachment.exists))
-  return item.states[gapStep[gap]] === 'pending'
-}
-export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery, workflowName: string, projectPercent: number) {
-  if (query.projectId && row.project.id !== query.projectId) return false
-  if (query.customer && row.project.customer !== query.customer) return false
-  if (query.templateId && row.event.templateId !== query.templateId) return false
-  if (query.owner && row.event.owner !== query.owner) return false
-  if (!matchesCompletionFilter(projectPercent, row.project.events.length > 0, query.status)) return false
-  if (!itemMatchesGap(row.item, query.gap)) return false
-  const keyword = query.keyword.trim().toLowerCase()
-  if (!keyword) return true
-  return [row.project.name, row.project.customer, row.project.owner, row.event.name, row.event.owner, row.item.name, workflowName].some(value => value.toLowerCase().includes(keyword))
-}
+const unpreparedLabels = new Set(['未上传', '待准备', '附件失效'])
 export function gaps(item: Item): string[] {
   const result: string[] = []
   if (item.states.prepared !== 'na' && !item.attachments.some(a => a.exists)) result.push('未上传')
   for (const step of steps) if (item.states[step] === 'pending') result.push(`待${stepLabels[step]}`)
   if (item.attachments.some(a => !a.exists)) result.push('附件失效')
   return result
+}
+export function itemMatchesGap(item: Item, gap: PendingGapFilter) {
+  if (gap === 'all') return true
+  const labels = gaps(item)
+  if (gap === 'unprepared') return labels.some(label => unpreparedLabels.has(label))
+  return labels.includes(`待${stepLabels[gapStep[gap]]}`)
+}
+export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery, workflowName: string, projectPercent: number) {
+  const customer = query.customer.trim()
+  const owner = query.owner.trim()
+  if (query.projectId && row.project.id !== query.projectId) return false
+  if (customer && row.project.customer.trim() !== customer) return false
+  if (query.templateId && row.event.templateId !== query.templateId) return false
+  if (owner && row.event.owner.trim() !== owner) return false
+  if (!matchesCompletionFilter(projectPercent, row.project.events.length > 0, query.status)) return false
+  if (!itemMatchesGap(row.item, query.gap)) return false
+  const keyword = query.keyword.trim().toLowerCase()
+  if (!keyword) return true
+  return [row.project.name, row.project.customer, row.project.owner, row.event.name, row.event.owner, row.item.name, workflowName].some(value => value.toLowerCase().includes(keyword))
 }

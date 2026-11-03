@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  gaps,
   itemMatchesGap,
   matchesCompletionFilter,
   matchesPendingQuery,
@@ -97,6 +98,18 @@ describe('pending filters', () => {
     expect(matchesPendingQuery(row, { ...openQuery(), keyword: '流程已删除' }, '流程已删除', 40)).toBe(true)
   })
 
+  it('trims customer and owner on both the query and the row', () => {
+    const row = sample({ project: { customer: ' 客户甲 ' }, event: { owner: ' 经办甲 ' } })
+    expect(matchesPendingQuery(row, { ...openQuery(), customer: '客户甲' }, '', 40)).toBe(true)
+    expect(matchesPendingQuery(row, { ...openQuery(), customer: ' 客户甲 ' }, '', 40)).toBe(true)
+    expect(matchesPendingQuery(row, { ...openQuery(), owner: '经办甲' }, '', 40)).toBe(true)
+    expect(matchesPendingQuery(row, { ...openQuery(), owner: ' 经办甲 ' }, '', 40)).toBe(true)
+    expect(matchesPendingQuery(row, { ...openQuery(), customer: '   ' }, '', 40)).toBe(true)
+    expect(matchesPendingQuery(row, { ...openQuery(), owner: '   ' }, '', 40)).toBe(true)
+    expect(matchesPendingQuery(row, { ...openQuery(), customer: '客户乙' }, '', 40)).toBe(false)
+    expect(matchesPendingQuery(row, { ...openQuery(), owner: '经办乙' }, '', 40)).toBe(false)
+  })
+
   it('filters completion status with the same open and done rule as projects', () => {
     expect(matchesCompletionFilter(100, true, 'done')).toBe(true)
     expect(matchesCompletionFilter(100, true, 'open')).toBe(false)
@@ -152,7 +165,18 @@ describe('pending filters', () => {
       states: states({ prepared: 'done', filled: 'done', signed: 'done', archived: 'done' }),
       attachments: [attachment(true), { ...attachment(false), id: 'missing' }]
     })
-    expect(itemMatchesGap(brokenExtra, 'unprepared')).toBe(false)
-    expect(itemMatchesGap(brokenExtra, 'all')).toBe(true)
+    expect(gaps(brokenExtra)).toEqual(['附件失效'])
+    expect(itemMatchesGap(brokenExtra, 'unprepared')).toBe(true)
+    expect(itemMatchesGap(brokenExtra, 'unfilled')).toBe(false)
+    expect(itemMatchesGap(brokenExtra, 'unsigned')).toBe(false)
+    expect(itemMatchesGap(brokenExtra, 'unarchived')).toBe(false)
+
+    const brokenWhileNotApplicable = sampleItem({
+      states: states({ prepared: 'na', filled: 'na', signed: 'na', archived: 'na' }),
+      attachments: [attachment(false)]
+    })
+    expect(gaps(brokenWhileNotApplicable)).toEqual(['附件失效'])
+    expect(itemMatchesGap(brokenWhileNotApplicable, 'unprepared')).toBe(true)
+    expect(itemMatchesGap(brokenWhileNotApplicable, 'unfilled')).toBe(false)
   })
 })

@@ -31,7 +31,7 @@ test('pending page filters by project, customer, workflow, owner, status, and ga
   const nav = page.getByRole('navigation', { name: '主导航' })
   await nav.getByRole('button', { name: '待处理', exact: true }).click()
   await expect(page.getByRole('heading', { name: '已完成' })).toBeVisible()
-  for (const name of ['项目', '客户', '流程', '负责人']) await expect(page.getByRole('combobox', { name }).locator('option')).toHaveCount(1)
+  for (const name of ['项目', '客户', '流程', '经办人']) await expect(page.getByRole('combobox', { name }).locator('option')).toHaveCount(1)
   await expect(page.getByRole('button', { name: '清除' })).toHaveCount(0)
   await nav.getByRole('button', { name: '项目', exact: true }).click()
 
@@ -56,7 +56,10 @@ test('pending page filters by project, customer, workflow, owner, status, and ga
 
   await nav.getByRole('button', { name: /待处理/ }).click()
   await expect(page.locator('.pending-row')).toHaveCount(4)
-  await expect(page.getByRole('combobox', { name: '负责人' }).locator('option')).toHaveText(['全部负责人', '经办甲'])
+  const handler = page.getByRole('combobox', { name: '经办人' })
+  await expect(handler).toHaveAttribute('title', '事项经办人')
+  await expect(handler.locator('option')).toHaveText(['全部经办人', '经办甲'])
+  await expect(page.locator('.pending-table-head')).toContainText('经办人')
   await expect(page.locator('.pending-row').first()).toContainText('客户甲')
 
   await selectFilter('缺口', '未填写')
@@ -86,7 +89,7 @@ test('pending page filters by project, customer, workflow, owner, status, and ga
   await selectFilter('客户', '客户甲')
   await selectFilter('项目', '筛选甲')
   await selectFilter('流程', '发货资料模板')
-  await selectFilter('负责人', '经办甲')
+  await selectFilter('经办人', '经办甲')
   await selectFilter('缺口', '未准备')
   await expect(page.locator('.pending-row')).toHaveCount(4)
 

@@ -33,7 +33,7 @@ class RendererCopyTest(unittest.TestCase):
         self.assertNotIn('availableTypes', APP)
 
     def test_pending_page_filters_cover_mvp_dimensions_and_gaps(self):
-        for label in ("全部项目", "全部客户", "全部流程", "全部负责人", "全部完成状态", "未准备", "未填写", "未签字", "未归档", "没有符合条件的待处理项"):
+        for label in ("全部项目", "全部客户", "全部流程", "全部经办人", "事项经办人", "全部完成状态", "未准备", "未填写", "未签字", "未归档", "没有符合条件的待处理项"):
             self.assertIn(label, APP)
         self.assertIn("matchesPendingQuery", APP)
         self.assertIn("clearPendingFilters", APP)

@@ -18,9 +18,10 @@ class RendererCopyTest(unittest.TestCase):
         self.assertNotIn('适用流程', APP)
 
     def test_pending_page_filters_cover_relevant_dimensions(self):
-        for label in ("全部项目", "全部客户", "全部经办人", "事项经办人", "全部完成状态", "没有符合条件的待处理项"):
+        for label in ("全部项目", "全部客户", "全部经办人", "事项经办人", "全部文件", "全部完成状态", "没有符合条件的待处理项"):
             self.assertIn(label, APP)
         self.assertNotIn('aria-label="流程"', APP)
+        self.assertNotIn('流程已删除', APP)
         self.assertNotIn('v-model="pendingFilter.gap"', APP)
         self.assertIn("matchesPendingQuery", APP)
         self.assertIn("cachedProjectPercent", APP)

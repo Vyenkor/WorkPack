@@ -8,7 +8,7 @@ export interface Template { id: string; name: string; rules: Rule[]; assets: Ass
 export interface LibraryCategory { id: string; name: string }
 export interface DocumentTask { id: string; itemId: string; name: string; done: boolean; position: number }
 export interface Attachment extends Asset { itemId: string; createdAt: string }
-export interface Item extends Rule { eventId: string; states: Record<Step, Status>; attachments: Attachment[]; tasks?: DocumentTask[] }
+export interface Item extends Rule { eventId: string; states: Record<Step, Status>; attachments: Attachment[]; tasks?: DocumentTask[]; templateId?: string | null }
 export interface BusinessEvent { id: string; projectId: string; templateId: string; templateIds?: string[]; name: string; date: string; owner: string; items: Item[] }
 export interface Project { id: string; name: string; customer: string; contact: string; owner: string; note: string; folder: string; templateIds: string[]; folderExists: boolean; events: BusinessEvent[] }
 export interface Snapshot { projects: Project[]; templates: Template[]; categories?: LibraryCategory[]; dataDirectory: string; pendingView: PendingViewState }
@@ -106,12 +106,19 @@ export function cachedProjectPercent(projectId: string, cache: Map<string, numbe
   cache.set(projectId, percent)
   return percent
 }
+/** Library rows match the checklist item's file. Older rows still match the event's file list. */
+export function pendingFileIds(row: { event: Pick<BusinessEvent, 'templateId' | 'templateIds'>; item: Pick<Item, 'templateId'> }): string[] {
+  if (row.item.templateId) return [row.item.templateId]
+  if (row.item.templateId === null) return []
+  if (row.event.templateIds?.length) return [...row.event.templateIds]
+  return row.event.templateId ? [row.event.templateId] : []
+}
 export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery, workflowName: string, projectPercent: number | (() => number)) {
   const customer = query.customer.trim()
   const owner = query.owner.trim()
   if (query.projectId && row.project.id !== query.projectId) return false
   if (customer && row.project.customer.trim() !== customer) return false
-  if (query.templateId && row.event.templateId !== query.templateId) return false
+  if (query.templateId && !pendingFileIds(row).includes(query.templateId)) return false
   if (owner && row.event.owner.trim() !== owner) return false
   if (query.status !== 'all') {
     const percent = typeof projectPercent === 'function' ? projectPercent() : projectPercent

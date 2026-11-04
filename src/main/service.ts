@@ -100,7 +100,27 @@ export class WorkPackService {
         CREATE TABLE IF NOT EXISTS library_meta (template_id TEXT PRIMARY KEY REFERENCES templates(id) ON DELETE CASCADE, category_id TEXT REFERENCES library_categories(id) ON DELETE SET NULL, purpose TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS event_templates (event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE, template_id TEXT NOT NULL, PRIMARY KEY(event_id, template_id));
         CREATE TABLE IF NOT EXISTS document_tasks (id TEXT PRIMARY KEY, item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE, name TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL);`)
+      this.ensureItemTemplateLink()
     }
+  }
+  /** Items created before the file link existed are matched once by name within the matter. */
+  private ensureItemTemplateLink() {
+    const columns = this.db.prepare('PRAGMA table_info(items)').all() as Array<{ name: string }>
+    if (columns.some(column => column.name === 'template_id')) return
+    this.db.transaction(() => {
+      this.db.exec('ALTER TABLE items ADD COLUMN template_id TEXT')
+      const templates = new Map((this.db.prepare('SELECT id, name FROM templates').all() as Array<{ id: string; name: string }>).map(row => [row.id, row.name]))
+      const links = this.db.prepare('SELECT event_id, template_id FROM event_templates ORDER BY rowid').all() as Array<{ event_id: string; template_id: string }>
+      const items = this.db.prepare('SELECT id, event_id, name FROM items').all() as Array<{ id: string; event_id: string; name: string }>
+      const claimed = new Set<string>()
+      const update = this.db.prepare('UPDATE items SET template_id=? WHERE id=?')
+      for (const item of items) {
+        const matches = links.filter(link => link.event_id === item.event_id && templates.get(link.template_id) === item.name && !claimed.has(`${link.event_id}\0${link.template_id}`))
+        if (matches.length !== 1) continue
+        claimed.add(`${item.event_id}\0${matches[0].template_id}`)
+        update.run(matches[0].template_id, item.id)
+      }
+    })()
   }
   close() { this.db.close() }
   private get(table: string, value: string): Row {
@@ -178,7 +198,7 @@ export class WorkPackService {
       events: allEvents.filter(e => e.project_id === p.id).map(e => ({
         id: e.id, projectId: p.id, templateId: e.template_id, templateIds: this.libraryMode ? eventTemplates.filter(link => link.event_id === e.id).map(link => link.template_id) : undefined, name: e.name, date: e.date, owner: e.owner,
         items: allItems.filter(i => i.event_id === e.id).map(i => ({
-          id: i.id, eventId: e.id, name: i.name, note: i.note, required: JSON.parse(i.required), states: JSON.parse(i.states), tasks: this.libraryMode ? tasks.filter(task => task.item_id === i.id).sort((a,b) => a.position - b.position).map(task => ({ id: task.id, itemId: i.id, name: task.name, done: Boolean(task.done), position: task.position })) : undefined,
+          id: i.id, eventId: e.id, name: i.name, note: i.note, required: JSON.parse(i.required), states: JSON.parse(i.states), templateId: this.libraryMode ? i.template_id ?? null : undefined, tasks: this.libraryMode ? tasks.filter(task => task.item_id === i.id).sort((a,b) => a.position - b.position).map(task => ({ id: task.id, itemId: i.id, name: task.name, done: Boolean(task.done), position: task.position })) : undefined,
           attachments: attachments.filter(a => a.item_id === i.id).map(a => {
             let exists = false
             try { exists = folderExists && present(inside(p.folder, a.path)) } catch { /* Invalid paths are shown as missing. */ }
@@ -251,7 +271,7 @@ export class WorkPackService {
     this.get('templates', value)
     if (this.libraryMode && this.db.prepare('SELECT 1 FROM event_templates WHERE template_id=? LIMIT 1').get(value)) throw new Error('文件已被事项使用，不能删除')
     if (this.all('projects').some(p => JSON.parse(p.template_ids).includes(value))) throw new Error('流程仍被项目使用，请先调整项目设置')
-    if (this.db.prepare('SELECT 1 FROM events WHERE template_id=? LIMIT 1').get(value)) throw new Error('流程已被事项使用，不能删除')
+    if (!this.libraryMode && this.db.prepare('SELECT 1 FROM events WHERE template_id=? LIMIT 1').get(value)) throw new Error('流程已被事项使用，不能删除')
     this.db.prepare('DELETE FROM templates WHERE id=?').run(value)
     this.reconcilePendingView()
   }
@@ -361,7 +381,7 @@ export class WorkPackService {
       for (const rule of rules) {
         const itemId = randomUUID()
         const states = stateMap(rule.required)
-        this.db.prepare('INSERT INTO items VALUES (?, ?, ?, ?, ?, ?)').run(itemId, eventId, rule.name, rule.note, JSON.stringify(rule.required), JSON.stringify(states))
+        this.db.prepare('INSERT INTO items (id, event_id, name, note, required, states) VALUES (?, ?, ?, ?, ?, ?)').run(itemId, eventId, rule.name, rule.note, JSON.stringify(rule.required), JSON.stringify(states))
         const asset = assets.find(candidate => !usedAssets.has(candidate.id) && (candidate.id === rule.assetId || assetMatchesRule(candidate.name, rule.name)))
         if (asset) {
           const source = inside(this.templateRoot, asset.path)
@@ -473,12 +493,26 @@ export class WorkPackService {
     } else {
       const itemId = randomUUID()
       this.db.transaction(() => {
-        this.db.prepare('INSERT INTO items VALUES (?, ?, ?, ?, ?, ?)').run(itemId, data.eventId, data.name, data.note, JSON.stringify(data.required), JSON.stringify(stateMap(data.required)))
+        this.db.prepare('INSERT INTO items (id, event_id, name, note, required, states) VALUES (?, ?, ?, ?, ?, ?)').run(itemId, data.eventId, data.name, data.note, JSON.stringify(data.required), JSON.stringify(stateMap(data.required)))
         if (this.libraryMode) this.db.prepare('INSERT INTO document_tasks VALUES (?, ?, ?, 0, 0)').run(randomUUID(), itemId, '准备文件')
       })()
     }
   }
-  deleteItem(value: string) { this.get('items', value); this.db.prepare('DELETE FROM items WHERE id=?').run(value) }
+  private releaseItemTemplate(item: Row) {
+    if (!this.libraryMode || !item.template_id) return
+    this.db.prepare('DELETE FROM event_templates WHERE event_id=? AND template_id=?').run(item.event_id, item.template_id)
+    const event = this.get('events', item.event_id)
+    if (event.template_id !== item.template_id) return
+    const next = this.db.prepare('SELECT template_id FROM event_templates WHERE event_id=? ORDER BY rowid LIMIT 1').get(item.event_id) as { template_id: string } | undefined
+    this.db.prepare('UPDATE events SET template_id=? WHERE id=?').run(next?.template_id ?? '', item.event_id)
+  }
+  deleteItem(value: string) {
+    const item = this.get('items', value)
+    this.db.transaction(() => {
+      this.releaseItemTemplate(item)
+      this.db.prepare('DELETE FROM items WHERE id=?').run(value)
+    })()
+  }
   setStatus(input: unknown) {
     const data = statusSchema.parse(input), item = this.get('items', data.id)
     if (data.step === 'prepared' && data.status === 'done') {
@@ -573,7 +607,7 @@ export class WorkPackService {
         this.db.prepare('INSERT INTO event_templates VALUES (?, ?)').run(eventId, template.id)
         const itemId = randomUUID()
         const purpose = (this.db.prepare('SELECT purpose FROM library_meta WHERE template_id=?').get(template.id) as {purpose:string}|undefined)?.purpose ?? ''
-        this.db.prepare('INSERT INTO items VALUES (?, ?, ?, ?, ?, ?)').run(itemId, eventId, template.name, purpose, '["prepared"]', JSON.stringify(stateMap(['prepared'])))
+        this.db.prepare('INSERT INTO items (id, event_id, name, note, required, states, template_id) VALUES (?, ?, ?, ?, ?, ?, ?)').run(itemId, eventId, template.name, purpose, '["prepared"]', JSON.stringify(stateMap(['prepared'])), template.id)
         const taskId = randomUUID()
         this.db.prepare('INSERT INTO document_tasks VALUES (?, ?, ?, 0, 0)').run(taskId, itemId, '准备文件')
         const asset = this.db.prepare('SELECT * FROM assets WHERE template_id=? ORDER BY rowid LIMIT 1').get(template.id) as Row | undefined
@@ -592,10 +626,11 @@ export class WorkPackService {
     if (!this.libraryMode) throw new Error('文件库不可用')
     const data = z.object({ id: id.optional(), itemId: id, name }).parse(input)
     this.get('items', data.itemId)
-    if (!data.id && data.name === '准备文件') throw new Error('准备文件已自动加入清单')
-    if (data.id) {
-      const task = this.get('document_tasks', data.id)
-      if (task.item_id !== data.itemId) throw new Error('待办不属于此文件')
+    const task = data.id ? this.get('document_tasks', data.id) : undefined
+    if (task && task.item_id !== data.itemId) throw new Error('待办不属于此文件')
+    if (task?.name === '准备文件' && data.name !== '准备文件') throw new Error('准备文件是默认待办，不能修改')
+    if (data.name === '准备文件' && task?.name !== '准备文件') throw new Error('准备文件已自动加入清单')
+    if (task) {
       this.db.prepare('UPDATE document_tasks SET name=? WHERE id=?').run(data.name, data.id)
     } else {
       const next = (this.db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS position FROM document_tasks WHERE item_id=?').get(data.itemId) as {position:number}).position

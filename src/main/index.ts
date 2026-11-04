@@ -59,7 +59,7 @@ function registerIPC() {
   handle('openProject', value => open(service.projectPath(stringId.parse(value))))
   handle('saveTemplate', value => service.saveTemplate(value))
   handle('deleteTemplate', value => service.deleteTemplate(stringId.parse(value)))
-  handle('importTemplates', async value => { stringId.parse(value); const files = await selectFiles(); if (!files.length) return false; service.importTemplates(value, files); return true })
+  handle('importTemplates', async value => { stringId.parse(value); const files = await selectFiles(false); if (!files.length) return false; service.importTemplates(value, files); return true })
   handle('removeTemplateAsset', value => service.removeTemplateAsset(stringId.parse(value)))
   handle('exportTemplates', async value => { z.array(stringId).min(1).parse(value); const folder = await selectFolder(); return folder ? service.exportTemplates(value, folder) : 0 })
   handle('createEvent', value => service.createEvent(value))

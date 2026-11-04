@@ -27,13 +27,13 @@ function directory(value: string) {
   if (!path.isAbsolute(value) || !fs.statSync(value).isDirectory()) throw new Error('目录不存在，请重新选择')
   return fs.realpathSync(value)
 }
-function inside(root: string, relative: string): string {
+export function inside(root: string, relative: string, area = '项目'): string {
   const target = path.resolve(root, relative)
   const rel = path.relative(root, target)
-  if (path.isAbsolute(relative) || !rel || rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('文件路径超出项目目录')
+  if (path.isAbsolute(relative) || !rel || rel.startsWith('..') || path.isAbsolute(rel)) throw new Error(`文件路径超出${area}目录`)
   let check = target
   while (check !== root) {
-    if (fs.existsSync(check) && fs.lstatSync(check).isSymbolicLink()) throw new Error('项目内包含符号链接，请使用普通文件夹')
+    if (fs.existsSync(check) && fs.lstatSync(check).isSymbolicLink()) throw new Error(`${area}内包含符号链接，请使用普通文件夹`)
     check = path.dirname(check)
   }
   return target
@@ -57,6 +57,8 @@ function workflowFolder(value: string) {
 // Older custom rows may still store a bare folder name; workflowFolder leaves those unchanged.
 // events.type is the templates.type captured at createEvent and is never rewritten.
 
+export const libraryDatabaseFile = 'workpack-v3.sqlite'
+
 /** All disk access is in the main process. Rollbacks only remove paths created by this operation. */
 export class WorkPackService {
   db: Database.Database
@@ -67,7 +69,7 @@ export class WorkPackService {
     this.templateRoot = locations.templateRoot ?? path.join(dataDirectory, 'templates')
     this.projectRoot = locations.projectRoot
     fs.mkdirSync(this.templateRoot, { recursive: true })
-    this.db = new Database(path.join(dataDirectory, libraryMode ? 'workpack-v3.sqlite' : 'workpack.sqlite'))
+    this.db = new Database(path.join(dataDirectory, libraryMode ? libraryDatabaseFile : 'workpack.sqlite'))
     this.db.pragma('foreign_keys = ON')
     // WAL keeps recent commits in workpack.sqlite-wal. Copying only the main file while this connection is open can miss them.
     this.db.pragma('journal_mode = WAL')

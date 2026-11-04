@@ -61,6 +61,12 @@ class RendererCopyTest(unittest.TestCase):
         for phrase in redundant:
             self.assertNotIn(phrase, APP)
 
+    def test_workspace_move_explains_the_kept_database(self):
+        self.assertIn("workpack-v3.sqlite", APP)
+        self.assertIn("迁回原目录前", APP)
+        self.assertIn("-wal", APP)
+        self.assertIn("-shm", APP)
+
     def test_keeps_operational_copy_and_short_actions(self):
         self.assertIn('每份文件都有独立的待办清单。', APP)
         self.assertIn('新文件默认包含“准备文件”待办。', APP)

@@ -2718,3 +2718,5 @@ option::checkmark {
 .storage-row strong { font-weight: 600; }
 .storage-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-muted); font-family: "Cascadia Mono", Consolas, monospace; font-size: var(--font-mono); }
 .storage-row .button { flex: none; }
+.settings-content .warning-banner { margin: 0 0 var(--spacing-md); }
+.storage-note { margin: var(--spacing-xxs) 0 0; white-space: normal; }

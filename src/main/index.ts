@@ -88,9 +88,8 @@ function registerIPC() {
     const kind = z.enum(['project', 'template', 'workspace']).parse(value) as StorageKind
     const folder = await selectFolder()
     if (!folder) return null
-    const locations = storage.change(kind, folder)
-    service = storage.service
-    return locations
+    try { return storage.change(kind, folder) }
+    finally { service = storage.service }
   })
 }
 

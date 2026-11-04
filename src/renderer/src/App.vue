@@ -522,7 +522,7 @@ onBeforeUnmount(() => {
         <button type="button" :class="{ active: view === 'pending' }" @click="go('pending')"><NavIcon class="nav-icon" name="pending" />待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
         <button type="button" :class="{ active: view === 'templates' }" @click="go('templates')"><NavIcon class="nav-icon" name="templates" />文件库</button>
       </nav>
-      <div class="sidebar-bottom"><div v-if="workspaceMenu" class="workspace-popover"><button type="button" @click="go('settings')"><UiIcon name="settings" />设置</button></div><button type="button" class="workspace-switch" :aria-expanded="workspaceMenu" @click="workspaceMenu = !workspaceMenu" @keydown.esc="workspaceMenu = false"><span class="workspace-avatar">W</span><span>我的工作空间</span><UiIcon name="chevron-down" /></button></div>
+      <div class="sidebar-bottom"><button type="button" class="workspace-switch" aria-controls="workspace-menu" :aria-expanded="workspaceMenu" @click="workspaceMenu = !workspaceMenu" @keydown.esc="workspaceMenu = false"><span class="workspace-avatar">W</span><span>我的工作空间</span><UiIcon name="chevron-down" /></button><div v-if="workspaceMenu" id="workspace-menu" class="workspace-popover" @keydown.esc="workspaceMenu = false"><section class="whats-new" aria-label="这次更新了什么"><h3>这次更新了什么</h3><ul><li>文件库可分类管理模板</li><li>事项文件可自定义待办</li><li>可分别设置三个存储位置</li><li>卸载时可选清理工作空间记录</li></ul></section><button type="button" @click="go('settings')"><UiIcon name="settings" />设置</button></div></div>
     </aside>
 
     <section class="content-shell" :aria-hidden="drawerOpen ? 'true' : undefined">

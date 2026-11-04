@@ -25,6 +25,10 @@ async function createEvent() {
   await application.evaluate(({ dialog }, folder) => {
     Object.defineProperty(dialog, 'showOpenDialog', { configurable: true, value: async () => ({ canceled: false, filePaths: [folder] }) })
   }, projects)
+  await page.getByRole('button', { name: '我的工作空间' }).click()
+  await page.getByRole('button', { name: '设置', exact: true }).click()
+  await page.locator('.storage-row').first().getByRole('button', { name: '选择文件夹' }).click()
+  await expect(page.locator('.storage-row').first()).toContainText(projects)
 
   const nav = page.getByRole('navigation', { name: '主导航' })
   await nav.getByRole('button', { name: '文件库' }).click()
@@ -39,7 +43,6 @@ async function createEvent() {
   await page.getByRole('textbox', { name: '项目名称' }).fill('抽屉项目')
   await page.getByRole('textbox', { name: '客户名称' }).fill('测试客户')
   await page.getByRole('textbox', { name: '负责人' }).fill('测试负责人')
-  await page.getByRole('button', { name: '选择文件夹' }).click()
   await page.locator('.modal-card button[type="submit"]').click()
   await expect(page.locator('.project-detail h1')).toHaveText('抽屉项目')
   await page.getByRole('button', { name: '新建事项' }).first().click()

@@ -29,6 +29,11 @@ class RendererStyleTest(unittest.TestCase):
         self.assertRegex(STYLE, r"\.document-task input:checked\s*\{[^}]*--color-primary")
         self.assertRegex(STYLE, r"\.document-task input:focus-visible\s*\{[^}]*--color-primary")
 
+    def test_retired_workflow_controls_have_no_styles(self):
+        for selector in (".flow-card", ".rule-editor", ".step-checks", ".status-toggle", ".status-more", ".template-stats"):
+            with self.subTest(selector=selector):
+                self.assertNotIn(selector, STYLE)
+
     def test_panels_do_not_cast_shadows_or_move_on_hover(self):
         self.assertNotRegex(STYLE, r"\.panel\s*\{[^}]*box-shadow")
         self.assertNotRegex(STYLE, r"\.(?:project-card|event-card):hover\s*\{[^}]*transform")

@@ -12,6 +12,7 @@ export interface Item extends Rule { eventId: string; states: Record<Step, Statu
 export interface BusinessEvent { id: string; projectId: string; templateId: string; templateIds?: string[]; name: string; date: string; owner: string; items: Item[] }
 export interface Project { id: string; name: string; customer: string; contact: string; owner: string; note: string; folder: string; templateIds: string[]; folderExists: boolean; events: BusinessEvent[] }
 export interface Snapshot { projects: Project[]; templates: Template[]; categories?: LibraryCategory[]; dataDirectory: string; pendingView: PendingViewState }
+export interface StorageLocations { project: string; template: string; workspace: string }
 export interface ProjectInput { id?: string; name: string; customer: string; contact: string; owner: string; note: string; templateIds: string[]; directoryToken?: string }
 export interface EventInput { projectId: string; templateId: string; name: string; date: string; owner: string }
 export interface EventUpdateInput extends EventInput { id: string }
@@ -49,6 +50,8 @@ export interface WorkPackAPI {
   saveDocumentTask(input: { id?: string; itemId: string; name: string }): Promise<void>
   setDocumentTaskDone(input: { id: string; done: boolean }): Promise<void>
   deleteDocumentTask(id: string): Promise<void>
+  storageLocations(): Promise<StorageLocations>
+  chooseStorageLocation(kind: keyof StorageLocations): Promise<StorageLocations | null>
 }
 export function progress(items: Item[]) {
   let total = 0

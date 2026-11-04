@@ -108,6 +108,11 @@ class InstallerConfigTest(unittest.TestCase):
         spec = (ROOT / "tests" / "installed-app.spec.ts").read_text(encoding="utf-8")
         self.assertIn("test.skip(!installedExe", spec)
         self.assertIn("app.isPackaged", spec)
+        self.assertIn("scripts/check-installer-asar.cjs", text)
+        scanner = (ROOT / "scripts" / "check-installer-asar.cjs").read_text(encoding="utf-8")
+        self.assertIn("listPackage(archive)", scanner)
+        self.assertIn("extractFile(archive, file)", scanner)
+        self.assertIn("workpack.sqlite", scanner)
 
 
 if __name__ == "__main__":

@@ -37,6 +37,28 @@ class InstallerConfigTest(unittest.TestCase):
         install = text[text.index("!macro customInstall"):]
         self.assertIn('Delete "$newDesktopLink"', install)
 
+    def test_uninstall_entry_records_location_and_empty_parent_is_removed(self):
+        text = INCLUDE.read_text(encoding="utf-8-sig")
+        install = text[text.index("!macro customInstall"):text.index("!macroend", text.index("!macro customInstall"))]
+        self.assertIn('WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" InstallLocation "$INSTDIR"', install)
+        uninstall = text[text.index("!macro customHeader"):]
+        self.assertIn("!ifdef BUILD_UNINSTALLER", uninstall)
+        self.assertIn("Function un.onUninstSuccess", uninstall)
+        self.assertIn("${isUpdated}", uninstall)
+        self.assertIn('$LOCALAPPDATA\\Programs', uninstall)
+        self.assertIn('RMDir "$0"', uninstall)
+        self.assertNotIn("RMDir /r", uninstall)
+
+    def test_package_only_ships_what_the_installed_app_needs(self):
+        package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+        self.assertEqual(sorted(package["dependencies"]), ["better-sqlite3", "zod"],
+                         "渲染进程依赖由 Vite 打包，放进 dependencies 会被重复装进 app.asar")
+        for name in ["vue", "element-plus"]:
+            with self.subTest(name=name):
+                self.assertIn(name, package["devDependencies"])
+        self.assertEqual(BUILD["electronLanguages"], ["zh-CN", "en-US"])
+        self.assertIn("!node_modules/better-sqlite3/{deps,src}/**", BUILD["files"])
+
     def test_executable_gets_the_icon_without_requiring_a_certificate(self):
         win = BUILD["win"]
         self.assertNotIn("signAndEditExecutable", win)
@@ -62,7 +84,7 @@ class InstallerConfigTest(unittest.TestCase):
     def test_smoke_script_covers_install_launch_and_uninstall(self):
         text = SMOKE.read_text(encoding="utf-8-sig")
         for needle in ["/S /currentuser", "/D=$installDir", "Uninstall WorkPack.exe", "better_sqlite3.node", "--no-desktop-shortcut",
-                       "WORKPACK_INSTALLED_EXE", "tests/installed-app.spec.ts", "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"]:
+                       "WORKPACK_INSTALLED_EXE", "tests/installed-app.spec.ts", "InstallLocation", "-not (Test-Path $root)", "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"]:
             with self.subTest(needle=needle):
                 self.assertIn(needle, text)
         self.assertTrue(SMOKE.read_bytes().startswith(b"\xef\xbb\xbf"), "Windows PowerShell 5.1 需要 BOM 才能按 UTF-8 读取中文")

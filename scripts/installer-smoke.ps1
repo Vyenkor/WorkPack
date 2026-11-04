@@ -38,6 +38,8 @@ function Uninstall-WorkPack {
   $deadline = (Get-Date).AddSeconds(120)
   while ((Test-Path $exe) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
   while ((Get-UninstallEntry) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+  # 空上级目录在卸载器最后一步才删除。
+  while ((Test-Path $root) -and -not (Get-ChildItem $root -Force) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 1 }
 }
 
 if (Test-Path $root) { Remove-Item $root -Recurse -Force }
@@ -53,6 +55,7 @@ Assert-True (Test-Path $startMenuLink) '已创建开始菜单快捷方式'
 $entry = Get-UninstallEntry
 Assert-True ($null -ne $entry) '已登记到“应用和功能”'
 Assert-True ($entry.UninstallString -like "*$installDir*") '卸载命令指向安装目录'
+Assert-True ($entry.InstallLocation -eq $installDir) '卸载登记中记录了安装位置'
 
 Write-Host '== 启动已安装的程序 =='
 $env:WORKPACK_INSTALLED_EXE = $exe
@@ -66,6 +69,7 @@ Assert-True (-not (Test-Path $exe)) '卸载后程序文件已删除'
 Assert-True (-not (Test-Path $desktopLink)) '卸载后桌面快捷方式已删除'
 Assert-True (-not (Test-Path $startMenuLink)) '卸载后开始菜单快捷方式已删除'
 Assert-True ($null -eq (Get-UninstallEntry)) '卸载后已从“应用和功能”移除'
+Assert-True (-not (Test-Path $root)) '卸载后安装程序建出的空上级目录已删除'
 
 Write-Host '== 不创建桌面快捷方式 =='
 Install-WorkPack '--no-desktop-shortcut'
@@ -74,6 +78,15 @@ Assert-True (-not (Test-Path $desktopLink)) '未创建桌面快捷方式'
 Assert-True (Test-Path $startMenuLink) '仍创建开始菜单快捷方式'
 Uninstall-WorkPack
 Assert-True (-not (Test-Path $exe)) '卸载后程序文件已删除'
+
+Write-Host '== 上级目录里还有别的文件时保留 =='
+New-Item -ItemType Directory -Path $root -Force | Out-Null
+$keep = Join-Path $root '用户文件.txt'
+Set-Content -Path $keep -Value 'keep'
+Install-WorkPack ''
+Uninstall-WorkPack
+Assert-True (-not (Test-Path $exe)) '卸载后程序文件已删除'
+Assert-True (Test-Path $keep) '上级目录不为空时不删除，其中的文件仍在'
 
 Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host '安装包检查全部通过'

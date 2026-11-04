@@ -128,7 +128,7 @@ npm run dist        # 生成 NSIS 安装包 WorkPack-<版本>-Setup.exe
 - 选择安装目录；
 - 在“附加任务”页决定是否创建桌面快捷方式（默认勾选）。开始菜单快捷方式总会创建。
 
-安装后可以在 Windows 设置的“应用”中，或运行安装目录里的 `Uninstall WorkPack.exe` 卸载。卸载会删除程序文件和快捷方式，但保留应用数据目录（数据库和流程的模板原件）以及所有项目文件夹，重新安装后数据仍在。
+安装后可以在 Windows 设置的“应用”中，或运行安装目录里的 `Uninstall WorkPack.exe` 卸载。卸载会删除程序文件和快捷方式，安装目录的上一级如果因此变空（例如自选的 `C:\测试 安装\WorkPack`）也会一并删除；但保留应用数据目录（数据库和流程的模板原件）以及所有项目文件夹，重新安装后数据仍在。
 
 批量部署时可以静默安装：`WorkPack-<版本>-Setup.exe /S /currentuser /D=C:\路径\WorkPack`。`/D=` 必须放在最后，路径不加引号；加上 `--no-desktop-shortcut` 不创建桌面快捷方式。静默卸载：`"Uninstall WorkPack.exe" /S /currentuser`。
 

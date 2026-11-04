@@ -49,6 +49,22 @@ class InstallerConfigTest(unittest.TestCase):
         self.assertIn('RMDir "$0"', uninstall)
         self.assertNotIn("RMDir /r", uninstall)
 
+    def test_optional_workspace_cleanup_is_narrow_and_skips_silent_uninstall(self):
+        text = INCLUDE.read_text(encoding="utf-8-sig")
+        self.assertIn("!macro customUnWelcomePage", text)
+        self.assertIn("UninstPage custom un.WorkPackDataPageCreate un.WorkPackDataPageLeave", text)
+        self.assertIn("删除工作空间记录（默认不删除）", text)
+        cleanup = text.split("Function un.onUninstSuccess", 1)[1].split("${GetParent}", 1)[0]
+        self.assertIn("${IfNot} ${Silent}", cleanup)
+        self.assertIn('$WorkPackDeleteWorkspaceData == "1"', cleanup)
+        self.assertIn("${isUpdated}", cleanup)
+        self.assertIn('Delete "$APPDATA\\WorkPack\\workpack-v3.sqlite"', cleanup)
+        self.assertIn('Delete "$APPDATA\\WorkPack\\workpack.sqlite"', cleanup)
+        self.assertIn('Delete "$APPDATA\\WorkPack\\storage.json"', cleanup)
+        self.assertNotIn('RMDir /r', cleanup)
+        self.assertNotIn('templates', cleanup.lower())
+        self.assertNotIn('$INSTDIR', cleanup)
+
     def test_package_only_ships_what_the_installed_app_needs(self):
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(package["dependencies"]), ["better-sqlite3", "zod"],

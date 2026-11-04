@@ -31,13 +31,17 @@ function Install-WorkPack([string]$extra) {
   Assert-True ($process.ExitCode -eq 0) "安装程序退出码为 0（参数：$arguments）"
 }
 
-function Uninstall-WorkPack {
+function Uninstall-WorkPack([switch]$ExpectParentRemoved) {
   $process = Start-Process -FilePath $uninstaller -ArgumentList '/S /currentuser' -Wait -PassThru
   Assert-True ($process.ExitCode -eq 0) '卸载程序退出码为 0'
   # 卸载器会复制到临时目录后再运行，这里等它真正删完。
   $deadline = (Get-Date).AddSeconds(120)
-  while ((Test-Path $exe) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
   while ((Get-UninstallEntry) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+  while ((Test-Path $installDir) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 2 }
+  # 空上级目录在卸载器最后一步才删除，预期会删时一直等到它消失。
+  if ($ExpectParentRemoved) {
+    while ((Test-Path $root) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 1 }
+  }
 }
 
 if (Test-Path $root) { Remove-Item $root -Recurse -Force }
@@ -53,6 +57,7 @@ Assert-True (Test-Path $startMenuLink) '已创建开始菜单快捷方式'
 $entry = Get-UninstallEntry
 Assert-True ($null -ne $entry) '已登记到“应用和功能”'
 Assert-True ($entry.UninstallString -like "*$installDir*") '卸载命令指向安装目录'
+Assert-True ($entry.InstallLocation -eq $installDir) '卸载登记中记录了安装位置'
 
 Write-Host '== 启动已安装的程序 =='
 $env:WORKPACK_INSTALLED_EXE = $exe
@@ -61,19 +66,30 @@ if ($LASTEXITCODE -ne 0) { throw '安装包检查失败：已安装的程序未�
 Remove-Item Env:WORKPACK_INSTALLED_EXE
 
 Write-Host '== 卸载 =='
-Uninstall-WorkPack
+Uninstall-WorkPack -ExpectParentRemoved
 Assert-True (-not (Test-Path $exe)) '卸载后程序文件已删除'
 Assert-True (-not (Test-Path $desktopLink)) '卸载后桌面快捷方式已删除'
 Assert-True (-not (Test-Path $startMenuLink)) '卸载后开始菜单快捷方式已删除'
 Assert-True ($null -eq (Get-UninstallEntry)) '卸载后已从“应用和功能”移除'
+Assert-True (-not (Test-Path $root)) '卸载后安装程序建出的空上级目录已删除'
 
 Write-Host '== 不创建桌面快捷方式 =='
 Install-WorkPack '--no-desktop-shortcut'
 Assert-True (Test-Path $exe) '程序已安装'
 Assert-True (-not (Test-Path $desktopLink)) '未创建桌面快捷方式'
 Assert-True (Test-Path $startMenuLink) '仍创建开始菜单快捷方式'
+Uninstall-WorkPack -ExpectParentRemoved
+Assert-True (-not (Test-Path $exe)) '卸载后程序文件已删除'
+Assert-True (-not (Test-Path $root)) '卸载后安装程序建出的空上级目录已删除'
+
+Write-Host '== 上级目录里还有别的文件时保留 =='
+New-Item -ItemType Directory -Path $root -Force | Out-Null
+$keep = Join-Path $root '用户文件.txt'
+Set-Content -Path $keep -Value 'keep'
+Install-WorkPack ''
 Uninstall-WorkPack
 Assert-True (-not (Test-Path $exe)) '卸载后程序文件已删除'
+Assert-True (Test-Path $keep) '上级目录不为空时不删除，其中的文件仍在'
 
 Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host '安装包检查全部通过'

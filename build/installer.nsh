@@ -41,6 +41,8 @@
   !macroend
 
   !macro customInstall
+    ; electron-builder 只把安装位置写在自己的注册表项里，这里补到卸载登记，供“应用”和其他工具读取。
+    WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" InstallLocation "$INSTDIR"
     ${If} $WorkPackDesktopShortcut == "0"
       WinShell::UninstShortcut "$newDesktopLink"
       Delete "$newDesktopLink"
@@ -48,3 +50,24 @@
     ${EndIf}
   !macroend
 !endif
+
+; 卸载完成后，如果安装目录的上一级已经空了（例如自选的 C:\测试 安装\WorkPack），一并删除。
+; RMDir 不带 /r，只删空目录；升级时不删，系统共用的程序目录也不删。
+; 放在 customHeader 里，是因为本文件被引入时 LogicLib 和 isUpdated 还没有定义。
+!macro customHeader
+  !ifdef BUILD_UNINSTALLER
+    Function un.onUninstSuccess
+      ${If} ${isUpdated}
+        Return
+      ${EndIf}
+      ${GetParent} "$INSTDIR" $0
+      ${If} $0 == ""
+      ${OrIf} $0 == "$LOCALAPPDATA\Programs"
+      ${OrIf} $0 == "$PROGRAMFILES"
+      ${OrIf} $0 == "$PROGRAMFILES64"
+        Return
+      ${EndIf}
+      RMDir "$0"
+    FunctionEnd
+  !endif
+!macroend

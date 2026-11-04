@@ -531,7 +531,7 @@ onBeforeUnmount(() => {
         <button type="button" :class="{ active: view === 'pending' }" @click="go('pending')"><NavIcon class="nav-icon" name="pending" />待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
         <button type="button" :class="{ active: view === 'templates' }" @click="go('templates')"><NavIcon class="nav-icon" name="templates" />文件库</button>
       </nav>
-      <div class="sidebar-bottom"><div v-if="workspaceMenu" class="workspace-popover" role="menu"><button type="button" role="menuitem" @click="go('settings')"><UiIcon name="settings" />设置</button></div><button type="button" class="workspace-switch" :aria-expanded="workspaceMenu" @click="workspaceMenu = !workspaceMenu" @keydown.esc="workspaceMenu = false"><span class="workspace-avatar">W</span><span>我的工作空间</span><UiIcon name="chevron-down" /></button></div>
+      <div class="sidebar-bottom"><div v-if="workspaceMenu" class="workspace-popover"><button type="button" @click="go('settings')"><UiIcon name="settings" />设置</button></div><button type="button" class="workspace-switch" :aria-expanded="workspaceMenu" @click="workspaceMenu = !workspaceMenu" @keydown.esc="workspaceMenu = false"><span class="workspace-avatar">W</span><span>我的工作空间</span><UiIcon name="chevron-down" /></button></div>
     </aside>
 
     <section class="content-shell" :aria-hidden="drawerOpen ? 'true' : undefined">

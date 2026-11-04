@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish Windows installer
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          check-latest: true
+          cache: npm
+
+      - name: Check tag matches package.json version
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ('${{ github.ref_name }}' -ne "v$version") { throw "标签 ${{ github.ref_name }} 与 package.json 版本 v$version 不一致" }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build installer
+        run: npm run dist
+
+      - name: Install, launch and uninstall
+        run: ./scripts/installer-smoke.ps1 -Installer (Get-Item release/WorkPack-*-Setup.exe).FullName
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create '${{ github.ref_name }}' (Get-Item release/WorkPack-*-Setup.exe).FullName --title 'WorkPack ${{ github.ref_name }}' --generate-notes --verify-tag

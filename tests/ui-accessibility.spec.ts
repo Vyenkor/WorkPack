@@ -278,15 +278,13 @@ test('prepared status needs an attachment and other steps toggle by click', asyn
 
 test('navigation keeps a single active item and the create button stays enabled', async ({}, testInfo) => {
   const nav = page.getByRole('navigation', { name: '主导航' })
-  const shot = path.join('/opt/cursor/artifacts/screenshots')
-  fs.mkdirSync(shot, { recursive: true })
   async function expectOnly(label: string) {
     await expect(nav.locator('button.active')).toHaveCount(1)
     await expect(nav.locator('button.active')).toHaveText(new RegExp(`^${label}`))
   }
   async function snap(name: string) {
     await page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== 'running'))
-    await page.screenshot({ path: path.join(shot, name) })
+    await page.screenshot({ path: testInfo.outputPath(name) })
   }
   async function resize(width: number) {
     await application.evaluate(({ BrowserWindow }, next) => BrowserWindow.getAllWindows()[0].setSize(next, 800), width)

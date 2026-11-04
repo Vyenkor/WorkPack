@@ -17,7 +17,7 @@ test('navigation and file library follow the desktop layout', async () => {
       await expect(icon).toHaveCSS('width', '20px')
     }
     await nav.getByRole('button', { name: '文件库' }).click()
-    await expect(page.getByRole('heading', { name: '文件库' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '文件库', exact: true })).toBeVisible()
     await page.getByRole('button', { name: '添加文件模板' }).click()
     await expect(page.locator('.modal-card')).toBeVisible()
     await expect(page.getByRole('textbox', { name: '文件名称' })).toBeFocused()

@@ -52,6 +52,8 @@ Install-WorkPack ''
 Assert-True (Test-Path $exe) "程序安装到自定义目录 $installDir"
 Assert-True (Test-Path $uninstaller) '安装目录中有卸载程序'
 Assert-True (Test-Path (Join-Path $installDir 'resources\app.asar.unpacked\node_modules\better-sqlite3\build\Release\better_sqlite3.node')) 'better-sqlite3 原生模块已解包'
+node scripts/check-installer-asar.cjs (Join-Path $installDir 'resources\app.asar')
+if ($LASTEXITCODE -ne 0) { throw '安装包检查失败：运行文件仍含旧版入口' }
 Assert-True (Test-Path $desktopLink) '已创建桌面快捷方式'
 Assert-True (Test-Path $startMenuLink) '已创建开始菜单快捷方式'
 $entry = Get-UninstallEntry

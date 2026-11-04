@@ -61,9 +61,11 @@ function workflowFolder(value: string) {
 export class WorkPackService {
   db: Database.Database
   templateRoot: string
-  constructor(readonly dataDirectory: string, readonly copyFile = fs.copyFileSync, readonly libraryMode = false) {
+  projectRoot?: string
+  constructor(readonly dataDirectory: string, readonly copyFile = fs.copyFileSync, readonly libraryMode = false, locations: { templateRoot?: string; projectRoot?: string } = {}) {
     fs.mkdirSync(dataDirectory, { recursive: true })
-    this.templateRoot = path.join(dataDirectory, 'templates')
+    this.templateRoot = locations.templateRoot ?? path.join(dataDirectory, 'templates')
+    this.projectRoot = locations.projectRoot
     fs.mkdirSync(this.templateRoot, { recursive: true })
     this.db = new Database(path.join(dataDirectory, libraryMode ? 'workpack-v3.sqlite' : 'workpack.sqlite'))
     this.db.pragma('foreign_keys = ON')
@@ -294,8 +296,9 @@ export class WorkPackService {
     const data = projectSchema.parse(input), projectName = safeName(data.name)
     for (const value of data.templateIds) this.get('templates', value)
     if (!data.id) {
-      if (!parent) throw new Error('请先选择项目上级文件夹')
-      const root = path.join(directory(parent), projectName), projectId = randomUUID()
+      const projectParent = parent ?? this.projectRoot
+      if (!projectParent) throw new Error('请先选择项目上级文件夹')
+      const root = path.join(directory(projectParent), projectName), projectId = randomUUID()
       this.atomic((files, dirs) => {
         fs.mkdirSync(root); dirs.push(root)
         const marker = path.join(root, '.workpack-project.json')

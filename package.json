@@ -13,8 +13,8 @@
     "postinstall": "electron-builder install-app-deps",
     "test": "node scripts/test.cjs",
     "test:e2e": "npm run build && playwright test",
-    "pack": "npm run build && electron-builder --win --dir",
-    "dist": "npm run build && electron-builder --win nsis"
+    "pack": "npm run build && electron-builder --win --dir --publish never",
+    "dist": "npm run build && electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "better-sqlite3": "^12.0.0",
@@ -39,7 +39,8 @@
     "appId": "com.workpack.desktop",
     "productName": "WorkPack",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "out/**/*",
@@ -57,14 +58,23 @@
           ]
         }
       ],
-      "signAndEditExecutable": false
+      "icon": "build/icon.ico",
+      "signExecutable": false
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WorkPack",
+      "uninstallDisplayName": "WorkPack",
       "deleteAppDataOnUninstall": false,
-      "shortcutName": "WorkPack"
+      "installerLanguages": [
+        "zh_CN"
+      ],
+      "language": "2052",
+      "include": "build/installer.nsh"
     },
     "artifactName": "WorkPack-${version}-Setup.${ext}"
   }

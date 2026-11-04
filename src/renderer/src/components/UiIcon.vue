@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ name: 'project' | 'clock' | 'event' | 'workflow' | 'back' | 'check' | 'plus' | 'search' | 'file' | 'info' | 'warning' | 'error' | 'close' | 'settings' | 'chevron-down' }>()
+defineProps<{ name: 'project' | 'clock' | 'event' | 'back' | 'check' | 'plus' | 'search' | 'file' | 'info' | 'warning' | 'error' | 'close' | 'settings' | 'chevron-down' }>()
 </script>
 
 <template>
@@ -15,12 +15,6 @@ defineProps<{ name: 'project' | 'clock' | 'event' | 'workflow' | 'back' | 'check
     <template v-else-if="name === 'event'">
       <rect x="4" y="5" width="16" height="15" rx="2" />
       <path d="M8 3.5v3M16 3.5v3M4 9.5h16M8 14h3M8 17h6" />
-    </template>
-    <template v-else-if="name === 'workflow'">
-      <rect x="3.5" y="4" width="5" height="5" rx="1.25" />
-      <rect x="15.5" y="4" width="5" height="5" rx="1.25" />
-      <rect x="15.5" y="15" width="5" height="5" rx="1.25" />
-      <path d="M8.5 6.5h7M6 9v8.5h9.5" />
     </template>
     <template v-else-if="name === 'back'">
       <path d="m14.5 5.5-6.5 6.5 6.5 6.5" />

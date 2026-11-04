@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -11,10 +10,10 @@ describe('file library and event checklists', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-library-'))
     const data = path.join(root, 'data'), projects = path.join(root, 'projects')
     fs.mkdirSync(projects)
-    const previous = new WorkPackService(data)
-    previous.close()
+    fs.mkdirSync(data)
+    fs.writeFileSync(path.join(data, 'workpack.sqlite'), 'old business data')
     const oldBytes = fs.readFileSync(path.join(data, 'workpack.sqlite'))
-    const service = new WorkPackService(data, undefined, true)
+    const service = new WorkPackService(data, undefined, { projectRoot: projects })
     try {
       expect(service.snapshot().templates).toEqual([])
       service.saveLibraryCategory({ name: '发货前准备' })
@@ -25,8 +24,8 @@ describe('file library and event checklists', () => {
       expect(files.map(file => file.purpose)).toEqual(['核对货物', '确认收货'])
       const source = path.join(root, '发货清单.docx')
       fs.writeFileSync(source, 'template')
-      service.importTemplates(files[0].id, [source])
-      const projectId = service.saveProject({ name: '项目甲', customer: '客户', contact: '', owner: '张三', note: '', templateIds: [] }, projects)
+      service.importLibraryFile(files[0].id, [source])
+      const projectId = service.saveProject({ name: '项目甲', customer: '客户', contact: '', owner: '张三', note: '', })
       const eventId = service.createLibraryEvent({ projectId, templateIds: files.map(file => file.id), name: '第一批发货', date: '2026-11-04', owner: '张三' })
       const event = service.snapshot().projects[0].events[0]
       expect(event.id).toBe(eventId)

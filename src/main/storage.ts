@@ -28,7 +28,7 @@ export class StorageManager {
     this.service = this.open(this.locations)
   }
   private open(locations: StorageLocations) {
-    return new WorkPackService(locations.workspace, undefined, true, { templateRoot: locations.template, projectRoot: locations.project })
+    return new WorkPackService(locations.workspace, undefined, { templateRoot: locations.template, projectRoot: locations.project })
   }
   private write(locations: StorageLocations) {
     const temp = `${this.configPath}.${randomUUID()}.tmp`

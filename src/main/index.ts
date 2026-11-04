@@ -1,7 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { WorkPackService } from './service'
 import { StorageManager, type StorageKind } from './storage'
@@ -9,7 +8,6 @@ import { StorageManager, type StorageKind } from './storage'
 let service: WorkPackService
 let storage: StorageManager
 let window: BrowserWindow
-const directoryGrants = new Map<string, string>()
 const stringId = z.string().uuid()
 // The test instance uses an isolated local database and never touches production data.
 if (process.env.WORKPACK_TEST_DATA) app.setPath('userData', path.resolve(process.env.WORKPACK_TEST_DATA))
@@ -43,35 +41,18 @@ function registerIPC() {
   const open = async (file: string) => { const error = await shell.openPath(file); if (error) throw new Error(`无法打开：${error}`) }
   handle('snapshot', () => service.snapshot())
   handle('savePendingView', value => service.savePendingView(value))
-  handle('chooseDirectory', async () => {
-    const folder = await selectFolder()
-    if (!folder) return null
-    if (directoryGrants.size > 50) directoryGrants.clear()
-    const token = randomUUID(); directoryGrants.set(token, folder)
-    return { token, path: folder }
-  })
-  handle('saveProject', input => {
-    const grant = z.object({ directoryToken: z.string().uuid().optional() }).parse(input)
-    const projectId = service.saveProject(input, grant.directoryToken ? directoryGrants.get(grant.directoryToken) : undefined)
-    if (grant.directoryToken) directoryGrants.delete(grant.directoryToken)
-    return projectId
-  })
+  handle('saveProject', input => service.saveProject(input))
   handle('deleteProject', value => { stringId.parse(value); service.deleteProject(value) })
   handle('relocateProject', async value => { stringId.parse(value); const folder = await selectFolder(); if (!folder) return false; service.relocateProject(value, folder); return true })
   handle('openProject', value => open(service.projectPath(stringId.parse(value))))
-  handle('saveTemplate', value => service.saveTemplate(value))
-  handle('deleteTemplate', value => service.deleteTemplate(stringId.parse(value)))
-  handle('importTemplates', async value => { stringId.parse(value); const files = await selectFiles(); if (!files.length) return false; service.importTemplates(value, files); return true })
+  handle('deleteLibraryFile', value => service.deleteLibraryFile(stringId.parse(value)))
+  handle('importLibraryFile', async value => { stringId.parse(value); const files = await selectFiles(false); if (!files.length) return false; service.importLibraryFile(value, files); return true })
   handle('removeTemplateAsset', value => service.removeTemplateAsset(stringId.parse(value)))
   handle('exportTemplates', async value => { z.array(stringId).min(1).parse(value); const folder = await selectFolder(); return folder ? service.exportTemplates(value, folder) : 0 })
-  handle('createEvent', value => service.createEvent(value))
   handle('updateEvent', value => service.updateEvent(value))
   handle('deleteEvent', value => { stringId.parse(value); service.deleteEvent(value) })
-  handle('completeItem', value => { stringId.parse(value); service.completeItem(value) })
-  handle('completeEvent', value => { stringId.parse(value); service.completeEvent(value) })
   handle('saveItem', value => service.saveItem(value))
   handle('deleteItem', value => service.deleteItem(stringId.parse(value)))
-  handle('setStatus', value => service.setStatus(value))
   handle('importAttachments', async value => { stringId.parse(value); const files = await selectFiles(); if (!files.length) return false; service.importAttachments(value, files); return true })
   handle('openAttachment', value => open(service.attachmentPath(stringId.parse(value))))
   handle('relocateAttachment', async value => { stringId.parse(value); const files = await selectFiles(false); if (!files.length) return false; service.relocateAttachment(value, files[0]); return true })

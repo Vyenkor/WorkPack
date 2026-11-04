@@ -189,6 +189,7 @@ export class WorkPackService {
     }}) as Project[]
     for (const project of projects) for (const event of project.events) for (const item of event.items) {
       if (!item.attachments.some(a => a.exists) && item.states.prepared === 'done') item.states.prepared = 'pending'
+      if (!item.attachments.some(a => a.exists)) for (const task of item.tasks ?? []) if (task.name === '准备文件') task.done = false
     }
     return { projects, templates: templates.map(template => ({ id: template.id, name: template.name, purpose: template.purpose, categoryId: template.categoryId, rules: template.rules, assets: template.assets })), categories: this.libraryMode ? this.all('library_categories') as {id:string;name:string}[] : undefined, dataDirectory: this.dataDirectory, pendingView: this.reconcilePendingView() }
   }
@@ -527,6 +528,7 @@ export class WorkPackService {
         states.prepared = 'pending'
         this.db.prepare('UPDATE items SET states=? WHERE id=?').run(JSON.stringify(states), item.id)
       }
+      if (this.libraryMode && !remaining) this.db.prepare("UPDATE document_tasks SET done=0 WHERE item_id=? AND name='准备文件'").run(item.id)
     })()
   }
   saveLibraryCategory(input: unknown) {

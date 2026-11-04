@@ -111,7 +111,7 @@ class InstallerConfigTest(unittest.TestCase):
         self.assertIn("scripts/check-installer-asar.cjs", text)
         scanner = (ROOT / "scripts" / "check-installer-asar.cjs").read_text(encoding="utf-8")
         self.assertIn("listPackage(archive)", scanner)
-        self.assertIn("extractFile(archive, file)", scanner)
+        self.assertIn("extractFile(archive, path.normalize(file))", scanner)
         self.assertIn("workpack.sqlite", scanner)
 
 

@@ -91,6 +91,8 @@ src/
 tests/                    # Vitest 服务测试与 Python 检查
 demo/                     # 早期静态网页原型，可直接用浏览器打开，数据不持久化
 scripts/test.cjs          # 用 Electron 自带的 Node 运行 Vitest（匹配 better-sqlite3 原生模块）
+scripts/installer-smoke.ps1  # 在 Windows 上安装、启动、卸载安装包的检查脚本
+build/                    # 安装包资源：程序图标 icon.ico 和安装向导脚本 installer.nsh
 docs/assets/              # 深色主题下垫了浅底的侧栏标志、界面截图，以及可作仓库社交预览的 social-preview.png
 DESIGN.md                 # 界面设计规范（设计 token 与交互规则），修改界面前先阅读
 产品设计文档_MVP.md
@@ -116,6 +118,22 @@ npm run pack        # 生成免安装目录到 release/
 npm run dist        # 生成 NSIS 安装包 WorkPack-<版本>-Setup.exe
 ```
 
+打包必须在 Windows 上进行。在 Linux 或 macOS 上交叉打包时，安装包里会带上当前系统版本的 better-sqlite3 原生模块，装到 Windows 上无法打开数据库。
+
+## 安装与卸载
+
+`WorkPack-<版本>-Setup.exe` 是中文安装向导，依次可以：
+
+- 选择只为当前用户安装（默认，不需要管理员权限），或为这台电脑的所有用户安装；
+- 选择安装目录；
+- 在“附加任务”页决定是否创建桌面快捷方式（默认勾选）。开始菜单快捷方式总会创建。
+
+安装后可以在 Windows 设置的“应用”中，或运行安装目录里的 `Uninstall WorkPack.exe` 卸载。卸载会删除程序文件和快捷方式，但保留应用数据目录（数据库和流程的模板原件）以及所有项目文件夹，重新安装后数据仍在。
+
+批量部署时可以静默安装：`WorkPack-<版本>-Setup.exe /S /currentuser /D=C:\路径\WorkPack`。`/D=` 必须放在最后，路径不加引号；加上 `--no-desktop-shortcut` 不创建桌面快捷方式。静默卸载：`"Uninstall WorkPack.exe" /S /currentuser`。
+
+安装程序和程序图标的资源在 `build/`：`build/icon.ico` 是程序图标，`build/installer.nsh` 加入了“附加任务”页。
+
 设置环境变量 `WORKPACK_TEST_DATA=<目录>` 可以让应用使用独立的数据目录，避免影响日常数据。
 
 ## 测试
@@ -136,9 +154,21 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 
 ## 持续集成
 
-推送到 `main` 以及所有拉取请求都会运行 [`.github/workflows/ci.yml`](.github/workflows/ci.yml)。流水线使用 Ubuntu 和 Node.js 26（当前 Active LTS）：先安装编译原生模块所需的工具链（C++ 编译器、Python 3、`libatomic1`），再依次执行 `npm ci`、`npm run typecheck` 和 `npm test`。`npm ci` 会触发 `postinstall`，为当前 Electron 版本重新编译 better-sqlite3。
+推送到 `main` 以及所有拉取请求都会运行 [`.github/workflows/ci.yml`](.github/workflows/ci.yml)，包含两个任务，都使用 Node.js 26（当前 Active LTS）：
 
-`npm run test:e2e` 不在该流水线中，需要在本地单独运行。
+- **Ubuntu**：先安装编译原生模块所需的工具链（C++ 编译器、Python 3、`libatomic1`），再依次执行 `npm ci`、`npm run typecheck` 和 `npm test`。`npm ci` 会触发 `postinstall`，为当前 Electron 版本重新编译 better-sqlite3。
+- **Windows**：执行 `npm ci`、`npm run typecheck`、`npm test` 和 `npm run test:e2e`，再用 `npm run dist` 打出安装包，然后运行 [`scripts/installer-smoke.ps1`](scripts/installer-smoke.ps1)：静默安装到带空格和中文的目录，检查快捷方式、卸载程序和“应用和功能”登记，用 [`tests/installed-app.spec.ts`](tests/installed-app.spec.ts) 启动已安装的程序建项目、重启并确认数据还在，最后静默卸载并确认清理干净。安装包会作为构建产物 `WorkPack-Setup` 上传，可以在该次运行的页面下载试装。
+
+`tests/installed-app.spec.ts` 只在设置了 `WORKPACK_INSTALLED_EXE` 时运行，本地执行 `npm run test:e2e` 会跳过它。
+
+## 发布
+
+发布由 [`.github/workflows/release.yml`](.github/workflows/release.yml) 完成：
+
+1. 修改 `package.json` 里的 `version`（例如 `0.1.0`），合入 `main`。
+2. 在该提交上打同版本的标签并推送：`git tag v0.1.0 && git push origin v0.1.0`。
+
+流水线会检查标签和 `package.json` 版本一致，在 Windows 上测试、打包并跑一遍安装包检查，全部通过后创建 GitHub Release，附上 `WorkPack-<版本>-Setup.exe`。安装包没有代码签名，首次运行时 Windows SmartScreen 可能提示“已保护你的电脑”，需要点“更多信息”再点“仍要运行”。
 
 ## 首版范围
 

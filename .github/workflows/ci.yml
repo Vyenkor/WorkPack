@@ -41,3 +41,46 @@ jobs:
 
       - name: Test
         run: npm test
+
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          check-latest: true
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: End-to-end test
+        run: npm run test:e2e
+
+      # 必须在 Windows 上打包：在 Linux 上交叉打包会把 Linux 版 better-sqlite3 原生模块装进安装包。
+      - name: Build installer
+        run: npm run dist
+
+      - name: Install, launch and uninstall
+        run: ./scripts/installer-smoke.ps1 -Installer (Get-Item release/WorkPack-*-Setup.exe).FullName
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: WorkPack-Setup
+          path: release/WorkPack-*-Setup.exe
+          if-no-files-found: error

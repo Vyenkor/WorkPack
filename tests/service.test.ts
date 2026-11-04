@@ -1,614 +1,74 @@
-import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import Database from 'better-sqlite3'
-import { afterEach, describe, expect, it } from 'vitest'
-import { WorkPackService } from '../src/main/service'
-import { defaultPendingFilter, defaultPendingViewState, PENDING_VIEW_PREFERENCE_KEY, progress, steps } from '../src/shared/model'
+import { describe, expect, it } from 'vitest'
+import { WorkPackService, safeName } from '../src/main/service'
 
-const temporaryDirectories: string[] = []
-function tempDirectory() {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-test-'))
-  temporaryDirectories.push(directory)
-  return directory
-}
-function inputForProject(templateId: string) {
-  return { name: '测试项目', customer: '测试客户', contact: '13800000000', owner: '测试负责人', note: '用于自动化验证', templateIds: [templateId] }
-}
-function storedType(service: WorkPackService, table: 'templates' | 'events', id: string) {
-  return (service.db.prepare(`SELECT type FROM ${table} WHERE id=?`).get(id) as { type: string }).type
+function fixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-service-'))
+  const projects = path.join(root, 'projects')
+  fs.mkdirSync(projects)
+  const service = new WorkPackService(path.join(root, 'data'), undefined, { projectRoot: projects })
+  return { root, projects, service, close: () => { service.close(); fs.rmSync(root, { recursive: true, force: true }) } }
 }
 
-afterEach(() => {
-  while (temporaryDirectories.length) {
-    const directory = temporaryDirectories.pop()
-    if (directory) fs.rmSync(directory, { recursive: true, force: true })
-  }
-})
-
-describe('WorkPackService', () => {
-  it('seeds templates, creates project folders, and snapshots event rules', () => {
-    const root = tempDirectory()
-    const data = path.join(root, 'data')
-    const parent = path.join(root, 'projects')
-    fs.mkdirSync(parent)
-    const service = new WorkPackService(data)
-
+describe('current service and disk boundaries', () => {
+  it('starts with an empty library and preserves the retired database file', () => {
+    const f = fixture()
     try {
-      const template = service.snapshot().templates.find(item => item.name === '发货资料模板')!
-      expect(template).not.toHaveProperty('type')
-      const source = path.join(root, '发货清单模板.docx')
-      fs.writeFileSync(source, 'template')
-      service.importTemplates(template.id, [source])
-      service.saveProject(inputForProject(template.id), parent)
-
-      let project = service.snapshot().projects[0]
-      expect(project.folder).toBe(path.join(parent, '测试项目'))
-      expect(project.folderExists).toBe(true)
-      expect(fs.existsSync(path.join(project.folder, '模板文件', '发货', '发货清单模板.docx'))).toBe(true)
-
-      service.createEvent({ projectId: project.id, templateId: template.id, name: '首批发货', date: '2026-09-23', owner: '测试负责人' })
-      project = service.snapshot().projects[0]
-      const event = project.events[0]
-      expect(event).not.toHaveProperty('type')
-      expect(event.items.map(item => item.name)).toEqual(template.rules.map(rule => rule.name))
-      expect(event.items[0].attachments).toHaveLength(1)
-      expect(event.items[0].attachments[0].exists).toBe(true)
-      expect(event.items[0].states.prepared).toBe('done')
-
-      const changedRules = template.rules.map((rule, index) => index === 0 ? { ...rule, name: '修改后的模板文件' } : rule)
-      service.saveTemplate({ id: template.id, name: template.name, rules: changedRules })
-      expect(service.snapshot().projects[0].events[0].items[0].name).not.toBe('修改后的模板文件')
-    } finally { service.close() }
+      const old = path.join(f.root, 'data', 'workpack.sqlite')
+      fs.writeFileSync(old, 'old workspace')
+      expect(f.service.snapshot().templates).toEqual([])
+      expect(fs.readFileSync(old, 'utf8')).toBe('old workspace')
+      expect(fs.existsSync(path.join(f.root, 'data', 'workpack-v3.sqlite'))).toBe(true)
+    } finally { f.close() }
   })
-
-  it('supports user-defined workflow names and stores files under that workflow', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
+  it('rejects reserved names and cannot mark preparation done without a file', () => {
+    const f = fixture()
     try {
-      const base = service.snapshot().templates[0]
-      const customName = '售后流程'
-      service.saveTemplate({ name: customName, rules: [{ ...base.rules[0], name: '维修记录' }] })
-      const custom = service.snapshot().templates.find(template => template.name === customName)!
-      const source = path.join(root, '维修记录模板.docx')
-      fs.writeFileSync(source, 'template')
-      service.importTemplates(custom.id, [source])
-
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(custom.id), parent)
-      const project = service.snapshot().projects[0]
-      service.createEvent({ projectId: project.id, templateId: custom.id, name: '售后事项', date: '2026-09-23', owner: '测试负责人' })
-
-      expect(service.snapshot().projects[0].events[0].templateId).toBe(custom.id)
-      expect(fs.existsSync(path.join(project.folder, '售后流程', '2026-09-23_' + service.snapshot().projects[0].events[0].id))).toBe(true)
-    } finally { service.close() }
+      expect(() => safeName('CON')).toThrow()
+      expect(() => safeName('../outside')).toThrow()
+      f.service.saveLibraryFile({ name: '借用单', purpose: '', categoryId: null })
+      const template = f.service.snapshot().templates[0]
+      const project = f.service.saveProject({ name: '安全项目', customer: '客户', contact: '', owner: '经办', note: '' })
+      f.service.createLibraryEvent({ projectId: project, templateIds: [template.id], name: '借用设备', date: '2026-11-04', owner: '经办' })
+      const item = f.service.snapshot().projects[0].events[0].items[0]
+      expect(() => f.service.setDocumentTaskDone({ id: item.tasks[0].id, done: true })).toThrow('请先添加文件')
+      expect(() => f.service.deleteDocumentTask(item.tasks[0].id)).toThrow('默认待办')
+      const source = path.join(f.root, '借用单.docx')
+      fs.writeFileSync(source, 'content')
+      f.service.importAttachments(item.id, [source])
+      f.service.setDocumentTaskDone({ id: item.tasks[0].id, done: true })
+      expect(f.service.snapshot().projects[0].events[0].items[0].tasks[0].done).toBe(true)
+      const attachment = f.service.snapshot().projects[0].events[0].items[0].attachments[0]
+      f.service.removeAttachment(attachment.id)
+      expect(f.service.snapshot().projects[0].events[0].items[0].tasks[0].done).toBe(false)
+    } finally { f.close() }
   })
-
-  it('marks prepared files done on import and returns them to pending after removal', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
+  it('backs up WAL changes and rejects live database overwrites', () => {
+    const f = fixture()
     try {
-      const template = service.snapshot().templates.find(item => item.name === '发货资料模板')!
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(template.id), parent)
-      let project = service.snapshot().projects[0]
-      service.createEvent({ projectId: project.id, templateId: template.id, name: '附件测试', date: '2026-09-23', owner: '测试负责人' })
-      project = service.snapshot().projects[0]
-      const item = project.events[0].items[0]
-      const attachment = path.join(root, '签收单.pdf')
-      fs.writeFileSync(attachment, 'attachment')
-
-      service.importAttachments(item.id, [attachment])
-      let current = service.snapshot().projects[0].events[0].items[0]
-      expect(current.states.prepared).toBe('done')
-      expect(current.attachments).toHaveLength(1)
-      expect(current.attachments[0].exists).toBe(true)
-
-      service.removeAttachment(current.attachments[0].id)
-      current = service.snapshot().projects[0].events[0].items[0]
-      expect(current.states.prepared).toBe('pending')
-      expect(current.attachments).toHaveLength(0)
-    } finally { service.close() }
+      f.service.saveLibraryFile({ name: '签收表', purpose: '确认收货', categoryId: null })
+      const backup = path.join(f.root, 'backup.sqlite')
+      expect(() => f.service.backupDatabase(f.service.db.name)).toThrow('不能覆盖')
+      f.service.backupDatabase(backup)
+      expect(fs.statSync(backup).size).toBeGreaterThan(0)
+      const image = new Database(backup, { readonly: true })
+      try { expect((image.prepare('SELECT name FROM templates').get() as { name: string }).name).toBe('签收表') }
+      finally { image.close() }
+    } finally { f.close() }
   })
-
-  it('detects a moved project directory and can relocate it by its marker', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
+  it('never exports an asset path that escapes the template directory', () => {
+    const f = fixture()
     try {
-      const template = service.snapshot().templates.find(item => item.name === '培训资料模板')!
-      const parent = path.join(root, 'projects')
-      const movedParent = path.join(root, 'moved')
-      fs.mkdirSync(parent)
-      fs.mkdirSync(movedParent)
-      service.saveProject(inputForProject(template.id), parent)
-      const original = service.snapshot().projects[0]
-      const moved = path.join(movedParent, '测试项目')
-      fs.renameSync(original.folder, moved)
-      expect(service.snapshot().projects[0].folderExists).toBe(false)
-
-      service.relocateProject(original.id, moved)
-      expect(service.snapshot().projects[0].folderExists).toBe(true)
-      expect(service.snapshot().projects[0].folder).toBe(moved)
-    } finally { service.close() }
-  })
-
-  it('uses only applicable steps in item progress requirements', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const template = service.snapshot().templates[0]
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(template.id), parent)
-      const project = service.snapshot().projects[0]
-      service.createEvent({ projectId: project.id, templateId: template.id, name: '状态测试', date: '2026-09-23', owner: '测试负责人' })
-      const item = service.snapshot().projects[0].events[0].items[0]
-      service.setStatus({ id: item.id, step: 'signed', status: 'na' })
-      const current = service.snapshot().projects[0].events[0].items[0]
-      expect(current.required).toEqual(steps.filter(step => step !== 'signed'))
-      expect(current.states.signed).toBe('na')
-      service.completeEvent(service.snapshot().projects[0].events[0].id)
-      const completed = service.snapshot().projects[0].events[0].items[0]
-      expect(completed.states.prepared).toBe('pending')
-      expect(completed.states.filled).toBe('done')
-      expect(progress([{ ...current, states: { prepared: 'done', filled: 'done', signed: 'done', archived: 'done' }, attachments: [] }]).percent).toBeLessThan(100)
-    } finally { service.close() }
-  })
-
-  it('returns the saved project id so same-name projects stay distinguishable', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const template = service.snapshot().templates[0]
-      const firstParent = path.join(root, 'first'), secondParent = path.join(root, 'second')
-      fs.mkdirSync(firstParent)
-      fs.mkdirSync(secondParent)
-      const firstId = service.saveProject(inputForProject(template.id), firstParent)
-      const secondId = service.saveProject(inputForProject(template.id), secondParent)
-
-      expect(firstId).not.toBe(secondId)
-      const projects = service.snapshot().projects
-      expect(projects.find(project => project.id === firstId)!.folder).toBe(path.join(firstParent, '测试项目'))
-      expect(projects.find(project => project.id === secondId)!.folder).toBe(path.join(secondParent, '测试项目'))
-
-      const edited = service.saveProject({ ...inputForProject(template.id), id: secondId, name: '重命名项目' })
-      expect(edited).toBe(secondId)
-      expect(service.snapshot().projects.find(project => project.id === secondId)!.folder).toBe(path.join(secondParent, '重命名项目'))
-    } finally { service.close() }
-  })
-
-  it('rejects marking a file prepared until it has an available attachment', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const template = service.snapshot().templates[0]
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(template.id), parent)
-      const project = service.snapshot().projects[0]
-      service.createEvent({ projectId: project.id, templateId: template.id, name: '准备状态测试', date: '2026-09-23', owner: '测试负责人' })
-      const item = service.snapshot().projects[0].events[0].items[0]
-
-      expect(() => service.setStatus({ id: item.id, step: 'prepared', status: 'done' })).toThrow('请先上传文件')
-      expect(service.snapshot().projects[0].events[0].items[0].states.prepared).toBe('pending')
-
-      const attachment = path.join(root, '发货清单.pdf')
-      fs.writeFileSync(attachment, 'attachment')
-      service.importAttachments(item.id, [attachment])
-      const uploaded = service.snapshot().projects[0].events[0].items[0]
-      service.setStatus({ id: item.id, step: 'prepared', status: 'pending' })
-      service.setStatus({ id: item.id, step: 'prepared', status: 'done' })
-      expect(service.snapshot().projects[0].events[0].items[0].states.prepared).toBe('done')
-
-      fs.unlinkSync(path.join(project.folder, uploaded.attachments[0].path))
-      expect(service.snapshot().projects[0].events[0].items[0].states.prepared).toBe('pending')
-      expect(() => service.setStatus({ id: item.id, step: 'prepared', status: 'done' })).toThrow('请先上传文件')
-    } finally { service.close() }
-  })
-
-  it('updates event details and moves generated work copies with the date', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const template = service.snapshot().templates.find(item => item.name === '发货资料模板')!
-      const source = path.join(root, '客户签收单模板.docx')
-      fs.writeFileSync(source, 'template')
-      service.importTemplates(template.id, [source])
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(template.id), parent)
-      const project = service.snapshot().projects[0]
-      const eventId = service.createEvent({ projectId: project.id, templateId: template.id, name: '待修改事项', date: '2026-09-23', owner: '测试负责人' })
-      const event = service.snapshot().projects[0].events[0]
-      expect(event.items.some(item => item.attachments.length)).toBe(true)
-
-      service.updateEvent({ id: eventId, projectId: project.id, templateId: template.id, name: '已修改事项', date: '2026-09-24', owner: '新经办人' })
-      let current = service.snapshot().projects[0].events[0]
-      expect(current.name).toBe('已修改事项')
-      expect(current.date).toBe('2026-09-24')
-      expect(current.owner).toBe('新经办人')
-      const attachmentItem = current.items.find(item => item.attachments.length)!
-      expect(attachmentItem.attachments[0].path).toContain('2026-09-24_')
-      expect(attachmentItem.attachments[0].exists).toBe(true)
-
-      service.deleteEvent(eventId)
-      expect(service.snapshot().projects[0].events).toHaveLength(0)
-    } finally { service.close() }
-  })
-
-  it('deletes the event folder with its work copies and keeps other project files', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const template = service.snapshot().templates.find(item => item.name === '发货资料模板')!
-      const source = path.join(root, '客户签收单模板.docx')
-      fs.writeFileSync(source, 'template')
-      service.importTemplates(template.id, [source])
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(template.id), parent)
-      const project = service.snapshot().projects[0]
-      const keepId = service.createEvent({ projectId: project.id, templateId: template.id, name: '保留事项', date: '2026-09-22', owner: '测试负责人' })
-      const eventId = service.createEvent({ projectId: project.id, templateId: template.id, name: '待删除事项', date: '2026-09-23', owner: '测试负责人' })
-      const workflowDir = path.join(project.folder, '发货')
-      const eventDir = path.join(workflowDir, `2026-09-23_${eventId}`)
-      const keepDir = path.join(workflowDir, `2026-09-22_${keepId}`)
-      expect(fs.existsSync(eventDir)).toBe(true)
-
-      service.deleteEvent(eventId)
-      expect(service.snapshot().projects[0].events.map(event => event.id)).toEqual([keepId])
-      expect(fs.existsSync(eventDir)).toBe(false)
-      expect(fs.existsSync(keepDir)).toBe(true)
-      expect(fs.existsSync(path.join(project.folder, '模板文件'))).toBe(true)
-
-      service.deleteEvent(keepId)
-      expect(fs.existsSync(workflowDir)).toBe(false)
-      expect(fs.existsSync(path.join(project.folder, '.workpack-project.json'))).toBe(true)
-    } finally { service.close() }
-  })
-
-  it('still deletes event records when the project folder is missing', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const template = service.snapshot().templates[0]
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(template.id), parent)
-      const project = service.snapshot().projects[0]
-      const eventId = service.createEvent({ projectId: project.id, templateId: template.id, name: '待删除事项', date: '2026-09-23', owner: '测试负责人' })
-      fs.rmSync(project.folder, { recursive: true, force: true })
-
-      service.deleteEvent(eventId)
-      expect(service.snapshot().projects[0].events).toHaveLength(0)
-    } finally { service.close() }
-  })
-
-  it('deletes project records while preserving the project folder and files', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const template = service.snapshot().templates[0]
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(template.id), parent)
-      const project = service.snapshot().projects[0]
-      const marker = path.join(project.folder, '现场资料.txt')
-      fs.writeFileSync(marker, 'keep')
-      service.createEvent({ projectId: project.id, templateId: template.id, name: '待删除事项', date: '2026-09-23', owner: '测试负责人' })
-
-      service.deleteProject(project.id)
-
-      expect(service.snapshot().projects).toHaveLength(0)
-      expect(fs.existsSync(project.folder)).toBe(true)
-      expect(fs.readFileSync(marker, 'utf8')).toBe('keep')
-    } finally { service.close() }
-  })
-
-  it('keeps historical workflow folders and stores later events under the renamed workflow', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const base = service.snapshot().templates[0]
-      service.saveTemplate({ name: '售后流程', rules: [{ ...base.rules[0], name: '维修记录' }] })
-      const custom = service.snapshot().templates.find(template => template.name === '售后流程')!
-      const source = path.join(root, '维修记录模板.docx')
-      fs.writeFileSync(source, 'template')
-      service.importTemplates(custom.id, [source])
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(custom.id), parent)
-      let project = service.snapshot().projects[0]
-      service.createEvent({ projectId: project.id, templateId: custom.id, name: '旧事项', date: '2026-09-23', owner: '测试负责人' })
-      project = service.snapshot().projects[0]
-      const historical = project.events[0]
-      const historicalDir = path.join(project.folder, '售后流程', `2026-09-23_${historical.id}`)
-      expect(fs.existsSync(historicalDir)).toBe(true)
-      expect(historical.items[0].attachments[0].exists).toBe(true)
-
-      service.saveTemplate({ id: custom.id, name: '维修流程', rules: custom.rules })
-      expect(service.snapshot().templates.find(template => template.id === custom.id)?.name).toBe('维修流程')
-      service.createEvent({ projectId: project.id, templateId: custom.id, name: '新事项', date: '2026-09-24', owner: '测试负责人' })
-      project = service.snapshot().projects[0]
-      const created = project.events.find(event => event.name === '新事项')!
-      expect(fs.existsSync(path.join(project.folder, '维修流程', `2026-09-24_${created.id}`))).toBe(true)
-      expect(fs.existsSync(path.join(project.folder, '售后流程', `2026-09-24_${created.id}`))).toBe(false)
-      const kept = project.events.find(event => event.id === historical.id)!
-      expect(fs.existsSync(historicalDir)).toBe(true)
-      expect(kept.items[0].attachments[0].exists).toBe(true)
-
-      const builtin = service.snapshot().templates.find(template => template.name === '发货资料模板')!
-      const shippingSource = path.join(root, '发货清单模板.docx')
-      fs.writeFileSync(shippingSource, 'shipping')
-      service.importTemplates(builtin.id, [shippingSource])
-      service.saveProject({ ...inputForProject(custom.id), id: project.id, templateIds: [custom.id, builtin.id] })
-      service.saveTemplate({ id: builtin.id, name: '出库流程', rules: builtin.rules })
-      service.createEvent({ projectId: project.id, templateId: builtin.id, name: '仍在发货目录', date: '2026-09-25', owner: '测试负责人' })
-      const builtinEvent = service.snapshot().projects[0].events.find(event => event.name === '仍在发货目录')!
-      expect(fs.existsSync(path.join(project.folder, '发货', `2026-09-25_${builtinEvent.id}`))).toBe(true)
-    } finally { service.close() }
-  })
-
-  it('stores a custom workflow named shipping outside the built-in shipping folder', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const base = service.snapshot().templates[0]
-      service.saveTemplate({ name: 'shipping', rules: [{ ...base.rules[0], name: '运单' }] })
-      const custom = service.snapshot().templates.find(template => template.name === 'shipping')!
-      expect(storedType(service, 'templates', custom.id)).toBe('custom:shipping')
-      const source = path.join(root, '运单模板.docx')
-      fs.writeFileSync(source, 'template')
-      service.importTemplates(custom.id, [source])
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(custom.id), parent)
-      let project = service.snapshot().projects[0]
-      service.createEvent({ projectId: project.id, templateId: custom.id, name: '旧事项', date: '2026-09-23', owner: '测试负责人' })
-      project = service.snapshot().projects[0]
-      const historical = project.events[0]
-      const historicalDir = path.join(project.folder, 'shipping', `2026-09-23_${historical.id}`)
-      expect(storedType(service, 'events', historical.id)).toBe('custom:shipping')
-      expect(fs.existsSync(historicalDir)).toBe(true)
-      expect(historical.items[0].attachments[0].exists).toBe(true)
-      expect(fs.existsSync(path.join(project.folder, '发货'))).toBe(false)
-
-      service.saveTemplate({ id: custom.id, name: '海外物流', rules: custom.rules })
-      expect(storedType(service, 'templates', custom.id)).toBe('custom:海外物流')
-      service.createEvent({ projectId: project.id, templateId: custom.id, name: '新事项', date: '2026-09-24', owner: '测试负责人' })
-      project = service.snapshot().projects[0]
-      const created = project.events.find(event => event.name === '新事项')!
-      expect(storedType(service, 'events', created.id)).toBe('custom:海外物流')
-      expect(storedType(service, 'events', historical.id)).toBe('custom:shipping')
-      expect(fs.existsSync(path.join(project.folder, '海外物流', `2026-09-24_${created.id}`))).toBe(true)
-      expect(fs.existsSync(path.join(project.folder, 'shipping', `2026-09-24_${created.id}`))).toBe(false)
-      const kept = project.events.find(event => event.id === historical.id)!
-      expect(fs.existsSync(historicalDir)).toBe(true)
-      expect(kept.items[0].attachments[0].exists).toBe(true)
-      expect(fs.existsSync(path.join(project.folder, '发货'))).toBe(false)
-    } finally { service.close() }
-  })
-
-  it('keeps the built-in shipping key when its display name changes', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const builtin = service.snapshot().templates.find(template => template.name === '发货资料模板')!
-      expect(storedType(service, 'templates', builtin.id)).toBe('shipping')
-      const source = path.join(root, '发货清单模板.docx')
-      fs.writeFileSync(source, 'shipping')
-      service.importTemplates(builtin.id, [source])
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(builtin.id), parent)
-      const project = service.snapshot().projects[0]
-      service.saveTemplate({ id: builtin.id, name: '出库流程', rules: builtin.rules })
-      expect(storedType(service, 'templates', builtin.id)).toBe('shipping')
-      service.createEvent({ projectId: project.id, templateId: builtin.id, name: '仍在发货目录', date: '2026-09-25', owner: '测试负责人' })
-      const event = service.snapshot().projects[0].events[0]
-      expect(storedType(service, 'events', event.id)).toBe('shipping')
-      expect(fs.existsSync(path.join(project.folder, '发货', `2026-09-25_${event.id}`))).toBe(true)
-      expect(fs.existsSync(path.join(project.folder, '出库流程'))).toBe(false)
-      expect(fs.existsSync(path.join(project.folder, 'custom:shipping'))).toBe(false)
-    } finally { service.close() }
-  })
-
-  it('reads a legacy custom workflow type and stores new events in that folder', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const base = service.snapshot().templates[0]
-      const templateId = randomUUID()
-      service.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(templateId, '售后流程', '售后流程', JSON.stringify([{ ...base.rules[0], name: '维修记录' }]))
-      const source = path.join(root, '维修记录模板.docx')
-      fs.writeFileSync(source, 'template')
-      service.importTemplates(templateId, [source])
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      service.saveProject(inputForProject(templateId), parent)
-      const project = service.snapshot().projects[0]
-      service.createEvent({ projectId: project.id, templateId, name: '旧格式事项', date: '2026-09-23', owner: '测试负责人' })
-      const event = service.snapshot().projects[0].events[0]
-      expect(storedType(service, 'templates', templateId)).toBe('售后流程')
-      expect(storedType(service, 'events', event.id)).toBe('售后流程')
-      expect(fs.existsSync(path.join(project.folder, '售后流程', `2026-09-23_${event.id}`))).toBe(true)
-      expect(event.items[0].attachments[0].exists).toBe(true)
-      expect(fs.existsSync(path.join(project.folder, '发货', `2026-09-23_${event.id}`))).toBe(false)
-    } finally { service.close() }
-  })
-
-  it('rejects saving a template that has already been deleted', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const base = service.snapshot().templates[0]
-      const before = service.snapshot().templates.length
-      service.saveTemplate({ name: '临时流程', rules: [{ ...base.rules[0], name: '临时文件' }] })
-      const created = service.snapshot().templates.find(template => template.name === '临时流程')!
-      service.deleteTemplate(created.id)
-      expect(service.snapshot().templates).toHaveLength(before)
-
-      expect(() => service.saveTemplate({ id: created.id, name: '临时流程', rules: created.rules })).toThrow('记录不存在，请刷新后重试')
-      expect(service.snapshot().templates.map(template => template.id)).not.toContain(created.id)
-      expect(service.snapshot().templates).toHaveLength(before)
-    } finally { service.close() }
-  })
-})
-
-describe('pending view preferences', () => {
-  function storedPendingView(service: WorkPackService) {
-    return service.db.prepare('SELECT value FROM preferences WHERE key=?').get(PENDING_VIEW_PREFERENCE_KEY) as { value: string } | undefined
-  }
-
-  function preferenceInFile(file: string) {
-    let db: Database.Database | undefined
-    try {
-      db = new Database(file, { readonly: true, fileMustExist: true })
-      const table = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='preferences'").get()
-      if (!table) return null
-      const row = db.prepare('SELECT value FROM preferences WHERE key=?').get(PENDING_VIEW_PREFERENCE_KEY) as { value: string } | undefined
-      return row?.value ?? null
-    } catch { return null }
-    finally { db?.close() }
-  }
-
-  it('loses a just-saved pending view when only the main database file is copied while it is open', () => {
-    const data = path.join(tempDirectory(), 'data')
-    const service = new WorkPackService(data)
-    try {
-      // A preference write is smaller than the default checkpoint threshold, so it can sit in the WAL. Pin that state.
-      service.db.pragma('wal_autocheckpoint = 0')
-      const saved = service.savePendingView({ filter: { ...defaultPendingFilter(), keyword: '仅在wal' }, groupBy: 'none' })
-      expect(service.db.open).toBe(true)
-      expect(service.snapshot().pendingView).toEqual(saved)
-      const naive = path.join(tempDirectory(), 'naive.sqlite')
-      fs.copyFileSync(path.join(data, 'workpack.sqlite'), naive)
-      expect(preferenceInFile(naive) ?? '').not.toContain('仅在wal')
-      expect(service.snapshot().pendingView.filter.keyword).toBe('仅在wal')
-    } finally { service.close() }
-  })
-
-  it('writes a consistent database backup while the connection stays open', () => {
-    const data = path.join(tempDirectory(), 'data')
-    const service = new WorkPackService(data)
-    try {
-      service.db.pragma('wal_autocheckpoint = 0')
-      const templateId = service.snapshot().templates[0].id
-      const parent = path.join(path.dirname(data), 'projects')
-      fs.mkdirSync(parent)
-      const projectId = service.saveProject({ ...inputForProject(templateId), name: '筛选甲' }, parent)
-      const saved = service.savePendingView({
-        filter: { ...defaultPendingFilter(), keyword: '签收', projectId, customer: '测试客户', templateId, owner: '经办甲', status: 'open', gap: 'unfilled' },
-        groupBy: 'owner'
-      })
-      expect(service.db.pragma('user_version', { simple: true })).toBe(2)
-      expect(() => service.backupDatabase(path.join(data, 'workpack.sqlite'))).toThrow('不能覆盖正在使用的数据库文件')
-      const naive = path.join(tempDirectory(), 'naive.sqlite')
-      fs.copyFileSync(path.join(data, 'workpack.sqlite'), naive)
-      expect(preferenceInFile(naive) ?? '').not.toContain('签收')
-
-      const destination = path.join(tempDirectory(), 'backup.sqlite')
-      service.backupDatabase(destination)
-      expect(service.db.open).toBe(true)
-      expect(service.snapshot().pendingView).toEqual(saved)
-      expect(preferenceInFile(destination)).toContain('签收')
-
-      const restoredDir = path.join(tempDirectory(), 'restored')
-      fs.mkdirSync(restoredDir)
-      fs.copyFileSync(destination, path.join(restoredDir, 'workpack.sqlite'))
-      const restored = new WorkPackService(restoredDir)
-      try {
-        expect(restored.snapshot().pendingView).toEqual(saved)
-        expect(restored.snapshot().projects.map(project => project.id)).toEqual([projectId])
-      } finally { restored.close() }
-    } finally { service.close() }
-  })
-
-  it('rewrites corrupt values and unknown project or workflow ids back to a usable view', () => {
-    const service = new WorkPackService(path.join(tempDirectory(), 'data'))
-    try {
-      const templateId = service.snapshot().templates[0].id
-      service.db.prepare('INSERT INTO preferences (key, value) VALUES (?, ?)').run(PENDING_VIEW_PREFERENCE_KEY, '{')
-      expect(service.snapshot().pendingView).toEqual(defaultPendingViewState())
-      expect(JSON.parse(storedPendingView(service)!.value)).toEqual(defaultPendingViewState())
-
-      const stale = {
-        filter: { ...defaultPendingFilter(), keyword: '签收', projectId: randomUUID(), templateId: randomUUID(), customer: '客户甲', status: 'done' as const, gap: 'unsigned' as const },
-        groupBy: 'none' as const
-      }
-      service.db.prepare('UPDATE preferences SET value=? WHERE key=?').run(JSON.stringify(stale), PENDING_VIEW_PREFERENCE_KEY)
-      const healed = service.snapshot().pendingView
-      expect(healed.filter).toMatchObject({ projectId: '', templateId: '', keyword: '签收', customer: '客户甲', status: 'done', gap: 'unsigned' })
-      expect(healed.groupBy).toBe('none')
-      expect(JSON.parse(storedPendingView(service)!.value).filter.projectId).toBe('')
-
-      const dropped = service.savePendingView({ filter: { ...defaultPendingFilter(), projectId: randomUUID(), templateId, keyword: '留下' }, groupBy: 'team' })
-      expect(dropped.filter.projectId).toBe('')
-      expect(dropped.filter.templateId).toBe(templateId)
-      expect(dropped.filter.keyword).toBe('留下')
-      expect(dropped.groupBy).toBe('project')
-    } finally { service.close() }
-  })
-
-  it('clears a deleted project or workflow id and keeps the other pending filters', () => {
-    const root = tempDirectory()
-    const service = new WorkPackService(path.join(root, 'data'))
-    try {
-      const template = service.snapshot().templates[0]
-      const parent = path.join(root, 'projects')
-      fs.mkdirSync(parent)
-      const projectId = service.saveProject(inputForProject(template.id), parent)
-      service.saveTemplate({ name: '临时流程', rules: [{ ...template.rules[0], id: randomUUID(), name: '临时文件' }] })
-      const extraId = service.snapshot().templates.find(item => item.name === '临时流程')!.id
-      service.savePendingView({
-        filter: { ...defaultPendingFilter(), projectId, templateId: extraId, keyword: '签收', owner: '经办甲' },
-        groupBy: 'none'
-      })
-
-      service.deleteTemplate(extraId)
-      let view = service.snapshot().pendingView
-      expect(view.filter.templateId).toBe('')
-      expect(view.filter.projectId).toBe(projectId)
-      expect(view.filter.keyword).toBe('签收')
-      expect(view.groupBy).toBe('none')
-
-      service.deleteProject(projectId)
-      view = service.snapshot().pendingView
-      expect(view.filter.projectId).toBe('')
-      expect(view.filter.keyword).toBe('签收')
-      expect(view.filter.owner).toBe('经办甲')
-      expect(view.groupBy).toBe('none')
-      expect(JSON.parse(storedPendingView(service)!.value).filter.projectId).toBe('')
-    } finally { service.close() }
-  })
-
-  it('upgrades a version 1 database without reseeding templates', () => {
-    const data = path.join(tempDirectory(), 'data')
-    const first = new WorkPackService(data)
-    const names = first.snapshot().templates.map(template => template.name)
-    first.db.exec('DROP TABLE preferences')
-    first.db.pragma('user_version = 1')
-    first.db.pragma('wal_checkpoint(TRUNCATE)')
-    first.close()
-
-    const service = new WorkPackService(data)
-    try {
-      expect(service.db.pragma('user_version', { simple: true })).toBe(2)
-      expect(service.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='preferences'").get()).toEqual({ name: 'preferences' })
-      expect(service.snapshot().templates.map(template => template.name)).toEqual(names)
-      expect(service.snapshot().pendingView).toEqual(defaultPendingViewState())
-      expect(storedPendingView(service)).toBeUndefined()
-    } finally { service.close() }
-  })
-
-  it('refuses a database written by a newer app', () => {
-    const data = path.join(tempDirectory(), 'data')
-    const first = new WorkPackService(data)
-    first.db.pragma('user_version = 3')
-    first.close()
-    expect(() => new WorkPackService(data)).toThrow('数据来自更新版本，请使用新版 WorkPack 打开')
+      f.service.saveLibraryFile({ name: '发货单', purpose: '', categoryId: null })
+      const template = f.service.snapshot().templates[0]
+      fs.writeFileSync(path.join(f.root, 'outside.txt'), 'private content')
+      f.service.db.prepare('INSERT INTO assets VALUES (?, ?, ?, ?)').run('d69dc626-b91b-4bc7-95d8-fbe39674ebca', template.id, 'outside.txt', '../outside.txt')
+      expect(f.service.snapshot().templates[0].assets[0].exists).toBe(false)
+      expect(() => f.service.exportTemplates(['d69dc626-b91b-4bc7-95d8-fbe39674ebca'], f.root)).toThrow('超出项目目录')
+      expect(fs.readFileSync(path.join(f.root, 'outside.txt'), 'utf8')).toBe('private content')
+    } finally { f.close() }
   })
 })

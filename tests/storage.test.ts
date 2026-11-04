@@ -17,7 +17,7 @@ describe('storage settings', () => {
       const file = manager.service.snapshot().templates[0]
       const source = path.join(root, '借用单.docx')
       fs.writeFileSync(source, 'template content')
-      manager.service.importTemplates(file.id, [source])
+      manager.service.importLibraryFile(file.id, [source])
       manager.change('project', nextProjects)
       const projectId = manager.service.saveProject({ name: '项目乙', customer: '客户', owner: '李四', contact: '', note: '', templateIds: [] })
       expect(manager.service.projectPath(projectId)).toBe(path.join(nextProjects, '项目乙'))
@@ -203,7 +203,7 @@ describe('storage settings', () => {
       const file = manager.service.snapshot().templates[0]
       const outside = path.join(root, 'outside.docx')
       fs.writeFileSync(outside, 'template content')
-      manager.service.importTemplates(file.id, [outside])
+      manager.service.importLibraryFile(file.id, [outside])
       const stored = path.join(system, 'templates', file.id, 'outside.docx')
       fs.rmSync(stored)
       fs.symlinkSync(outside, stored)

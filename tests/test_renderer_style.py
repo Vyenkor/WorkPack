@@ -26,9 +26,8 @@ class RendererStyleTest(unittest.TestCase):
         self.assertIn("outline: 3px solid var(--color-focus-ring)", STYLE)
         self.assertIn("border-color: var(--color-control-border)", STYLE)
         self.assertRegex(STYLE, r"\.template-icon, \.event-type-icon\s*\{[^}]*--color-primary")
-        for status in ("done", "pending", "na"):
-            with self.subTest(status=status):
-                self.assertRegex(STYLE, rf"\.status-toggle\.{status}\s*\{{[^}}]*--color-status-{status}[^}}]*--color-status-{status}-soft")
+        self.assertRegex(STYLE, r"\.document-task input:checked\s*\{[^}]*--color-primary")
+        self.assertRegex(STYLE, r"\.document-task input:focus-visible\s*\{[^}]*--color-primary")
 
     def test_panels_do_not_cast_shadows_or_move_on_hover(self):
         self.assertNotRegex(STYLE, r"\.panel\s*\{[^}]*box-shadow")
@@ -58,10 +57,10 @@ class RendererStyleTest(unittest.TestCase):
             ".event-actions",
             ".event-title",
             ".checklist-heading",
-            ".checklist th",
-            ".checklist td",
+            ".document-card",
+            ".document-tasks",
             ".tags",
-            ".attachment-list",
+            ".document-attachments",
             ".inline-actions",
         ]
         for selector in selectors:

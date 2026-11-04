@@ -67,10 +67,6 @@
         Delete "$APPDATA\WorkPack\workpack-v3.sqlite-wal"
         Delete "$APPDATA\WorkPack\workpack-v3.sqlite-shm"
         Delete "$APPDATA\WorkPack\workpack-v3.sqlite-journal"
-        Delete "$APPDATA\WorkPack\workpack.sqlite"
-        Delete "$APPDATA\WorkPack\workpack.sqlite-wal"
-        Delete "$APPDATA\WorkPack\workpack.sqlite-shm"
-        Delete "$APPDATA\WorkPack\workpack.sqlite-journal"
         Delete "$APPDATA\WorkPack\storage.json"
         RMDir "$APPDATA\WorkPack"
       ${EndIf}

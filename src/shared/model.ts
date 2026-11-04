@@ -4,12 +4,14 @@ export type Status = 'pending' | 'done' | 'na'
 export const stepLabels: Record<Step, string> = { prepared: '准备', filled: '填写', signed: '签字', archived: '归档' }
 export interface Rule { id: string; name: string; note: string; required: Step[]; assetId?: string }
 export interface Asset { id: string; name: string; path: string; exists: boolean }
-export interface Template { id: string; name: string; rules: Rule[]; assets: Asset[] }
+export interface Template { id: string; name: string; rules: Rule[]; assets: Asset[]; purpose?: string; categoryId?: string | null }
+export interface LibraryCategory { id: string; name: string }
+export interface DocumentTask { id: string; itemId: string; name: string; done: boolean; position: number }
 export interface Attachment extends Asset { itemId: string; createdAt: string }
-export interface Item extends Rule { eventId: string; states: Record<Step, Status>; attachments: Attachment[] }
-export interface BusinessEvent { id: string; projectId: string; templateId: string; name: string; date: string; owner: string; items: Item[] }
+export interface Item extends Rule { eventId: string; states: Record<Step, Status>; attachments: Attachment[]; tasks?: DocumentTask[] }
+export interface BusinessEvent { id: string; projectId: string; templateId: string; templateIds?: string[]; name: string; date: string; owner: string; items: Item[] }
 export interface Project { id: string; name: string; customer: string; contact: string; owner: string; note: string; folder: string; templateIds: string[]; folderExists: boolean; events: BusinessEvent[] }
-export interface Snapshot { projects: Project[]; templates: Template[]; dataDirectory: string; pendingView: PendingViewState }
+export interface Snapshot { projects: Project[]; templates: Template[]; categories?: LibraryCategory[]; dataDirectory: string; pendingView: PendingViewState }
 export interface ProjectInput { id?: string; name: string; customer: string; contact: string; owner: string; note: string; templateIds: string[]; directoryToken?: string }
 export interface EventInput { projectId: string; templateId: string; name: string; date: string; owner: string }
 export interface EventUpdateInput extends EventInput { id: string }
@@ -40,15 +42,25 @@ export interface WorkPackAPI {
   openAttachment(id: string): Promise<void>
   relocateAttachment(id: string): Promise<boolean>
   removeAttachment(id: string): Promise<void>
+  saveLibraryCategory(input: { id?: string; name: string }): Promise<void>
+  deleteLibraryCategory(id: string): Promise<void>
+  saveLibraryFile(input: { id?: string; name: string; purpose: string; categoryId?: string | null }): Promise<void>
+  createLibraryEvent(input: { projectId: string; templateIds: string[]; name: string; date: string; owner: string }): Promise<string>
+  saveDocumentTask(input: { id?: string; itemId: string; name: string }): Promise<void>
+  setDocumentTaskDone(input: { id: string; done: boolean }): Promise<void>
+  deleteDocumentTask(id: string): Promise<void>
 }
 export function progress(items: Item[]) {
   let total = 0
   let done = 0
-  for (const item of items) for (const step of steps) {
+  for (const item of items) {
+    if (item.tasks) { for (const task of item.tasks) { total++; if (task.done && (task.name !== '准备文件' || item.attachments.some(a => a.exists))) done++ } continue }
+    for (const step of steps) {
     if (item.states[step] === 'na') continue
     total++
     const ready = step !== 'prepared' || item.attachments.some(attachment => attachment.exists)
     if (item.states[step] === 'done' && ready) done++
+  }
   }
   return { done, total, percent: total ? Math.round(done / total * 100) : items.length ? 100 : 0 }
 }
@@ -74,6 +86,7 @@ export function matchesCompletionFilter(percent: number, hasWork: boolean, statu
 const gapStep: Record<Exclude<PendingGapFilter, 'all' | 'unprepared'>, Step> = { unfilled: 'filled', unsigned: 'signed', unarchived: 'archived' }
 const unpreparedLabels = new Set(['未上传', '待准备', '附件失效'])
 export function gaps(item: Item): string[] {
+  if (item.tasks) return [...item.tasks.filter(task => !task.done || (task.name === '准备文件' && !item.attachments.some(a => a.exists))).map(task => task.name === '准备文件' ? '待准备文件' : `待${task.name}`), ...item.attachments.some(a => !a.exists) ? ['附件失效'] : []]
   const result: string[] = []
   if (item.states.prepared !== 'na' && !item.attachments.some(a => a.exists)) result.push('未上传')
   for (const step of steps) if (item.states[step] === 'pending') result.push(`待${stepLabels[step]}`)
@@ -83,7 +96,7 @@ export function gaps(item: Item): string[] {
 export function itemMatchesGap(item: Item, gap: PendingGapFilter) {
   if (gap === 'all') return true
   const labels = gaps(item)
-  if (gap === 'unprepared') return labels.some(label => unpreparedLabels.has(label))
+  if (gap === 'unprepared') return labels.some(label => unpreparedLabels.has(label) || label === '待准备文件')
   return labels.includes(`待${stepLabels[gapStep[gap]]}`)
 }
 export function cachedProjectPercent(projectId: string, cache: Map<string, number>, compute: () => number) {

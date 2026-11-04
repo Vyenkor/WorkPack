@@ -2671,3 +2671,27 @@ option::checkmark {
     animation: none;
   }
 }
+
+/* 文件库与事项待办沿用现有面板、按钮和状态色。 */
+.library-group { margin-top: 28px; }
+.library-group > .section-heading { margin-bottom: 14px; }
+.template-card-head p { color: var(--color-ink-muted); font-size: 13px; line-height: 1.6; margin: 5px 0 0; overflow-wrap: anywhere; }
+.document-list { display: grid; gap: 14px; }
+.document-card { padding: 18px; border: 1px solid var(--color-hairline); background: var(--color-surface); border-radius: 8px; }
+.document-card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.document-card-heading h4 { margin: 0; font-size: 15px; font-weight: 600; color: var(--color-ink); }
+.document-card-heading p { margin: 4px 0 0; color: var(--color-ink-muted); overflow-wrap: anywhere; }
+.document-attachments { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--color-hairline); }
+.document-attachment { display: flex; align-items: center; gap: 8px; max-width: 100%; }
+.document-attachment .link { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-tasks { display: grid; gap: 8px; padding: 13px 0; }
+.document-task { display: flex; align-items: center; gap: 9px; min-height: 32px; color: var(--color-ink); }
+.document-task input { appearance: none; width: 19px; height: 19px; flex: none; border: 1.5px solid var(--color-control-border); border-radius: 5px; background: var(--color-surface); cursor: pointer; }
+.document-task input:checked { background: var(--color-primary); border-color: var(--color-primary); }
+.document-task input:checked::after { content: '✓'; display: block; color: white; line-height: 16px; font-size: 14px; text-align: center; }
+.document-task input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.document-task input:disabled { cursor: not-allowed; opacity: .55; }
+.document-task span { flex: 1; }
+.document-task input:checked + span { color: var(--color-status-done); }
+.task-remove { border: 0; background: transparent; color: var(--color-ink-muted); font-size: 20px; cursor: pointer; padding: 0 6px; }
+.task-remove:hover { color: var(--color-danger); }

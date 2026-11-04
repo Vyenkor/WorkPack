@@ -84,7 +84,7 @@ class InstallerConfigTest(unittest.TestCase):
     def test_smoke_script_covers_install_launch_and_uninstall(self):
         text = SMOKE.read_text(encoding="utf-8-sig")
         for needle in ["/S /currentuser", "/D=$installDir", "Uninstall WorkPack.exe", "better_sqlite3.node", "--no-desktop-shortcut",
-                       "WORKPACK_INSTALLED_EXE", "tests/installed-app.spec.ts", "InstallLocation", "-not (Test-Path $root)", "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"]:
+                       "WORKPACK_INSTALLED_EXE", "tests/installed-app.spec.ts", "InstallLocation", "-not (Test-Path $root)", "Uninstall-WorkPack -ExpectParentRemoved", "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall"]:
             with self.subTest(needle=needle):
                 self.assertIn(needle, text)
         self.assertTrue(SMOKE.read_bytes().startswith(b"\xef\xbb\xbf"), "Windows PowerShell 5.1 需要 BOM 才能按 UTF-8 读取中文")

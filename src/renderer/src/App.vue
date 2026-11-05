@@ -17,6 +17,7 @@ import {
   type PendingGroupBy,
   type PendingViewState,
   type BusinessEvent,
+  type Item,
   type Project,
   type Snapshot,
   type StorageLocations,

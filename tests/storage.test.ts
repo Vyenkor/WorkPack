@@ -47,13 +47,16 @@ describe('storage settings', () => {
     const { root, manager } = temporary()
     try {
       expect(() => manager.change('project', path.parse(root).root)).toThrow('磁盘根目录')
-      expect(() => manager.change('template', '/usr')).toThrow('系统目录')
+      expect(() => manager.change('template', systemDirectory())).toThrow('系统目录')
       expect(() => manager.change('project', os.homedir())).toThrow('用户主目录')
       expect(() => manager.change('workspace', os.tmpdir())).toThrow('临时目录')
       const locked = path.join(root, 'locked')
       fs.mkdirSync(locked)
       fs.chmodSync(locked, 0o555)
-      expect(() => manager.change('project', locked)).toThrow('没有写入权限')
+      try {
+        // NTFS keeps the owner writable when chmod does not change the ACL.
+        if (!directoryWritable(locked)) expect(() => manager.change('project', locked)).toThrow('没有写入权限')
+      } finally { try { fs.chmodSync(locked, 0o755) } catch { /* Cleanup removes the directory either way. */ } }
       const synced = path.join(root, 'OneDrive', '工作空间')
       fs.mkdirSync(synced, { recursive: true })
       expect(() => manager.change('workspace', synced)).toThrow('OneDrive')
@@ -230,4 +233,11 @@ function cleanup(manager: StorageManager, root: string) {
 }
 function workspaceResidue(directory: string) {
   return fs.readdirSync(directory).filter(name => name.includes('workpack-v3.sqlite'))
+}
+function systemDirectory() {
+  if (process.platform !== 'win32') return '/usr'
+  return process.env.SystemRoot || 'C:\\Windows'
+}
+function directoryWritable(directory: string) {
+  try { fs.accessSync(directory, fs.constants.W_OK); return true } catch { return false }
 }

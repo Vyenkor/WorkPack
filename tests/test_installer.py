@@ -12,6 +12,12 @@ SMOKE = ROOT / "scripts" / "installer-smoke.ps1"
 
 
 class InstallerConfigTest(unittest.TestCase):
+    def test_release_version_matches_lockfile(self):
+        package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+        lock = json.loads((ROOT / "package-lock.json").read_text(encoding="utf-8"))
+        self.assertEqual(package["version"], lock["version"])
+        self.assertEqual(package["version"], lock["packages"][""]["version"])
+
     def test_assisted_installer_lets_users_choose_the_directory(self):
         nsis = BUILD["nsis"]
         self.assertIs(nsis["oneClick"], False)

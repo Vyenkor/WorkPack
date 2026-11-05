@@ -78,6 +78,9 @@ export class WorkPackService {
       CREATE TABLE IF NOT EXISTS event_templates (event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE, template_id TEXT NOT NULL, PRIMARY KEY(event_id, template_id));
       CREATE TABLE IF NOT EXISTS document_tasks (id TEXT PRIMARY KEY, item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE, name TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL);`)
     this.ensureItemTemplateLink()
+    this.db.transaction(() => {
+      for (const event of this.all('events')) this.reconcileEventTemplates(event.id)
+    })()
   }
   /** Items created before the file link existed are matched once by name within the matter. */
   private ensureItemTemplateLink() {
@@ -388,19 +391,24 @@ export class WorkPackService {
       })()
     }
   }
-  private releaseItemTemplate(item: Row) {
-    if (!item.template_id) return
-    this.db.prepare('DELETE FROM event_templates WHERE event_id=? AND template_id=?').run(item.event_id, item.template_id)
-    const event = this.get('events', item.event_id)
-    if (event.template_id !== item.template_id) return
-    const next = this.db.prepare('SELECT template_id FROM event_templates WHERE event_id=? ORDER BY rowid LIMIT 1').get(item.event_id) as { template_id: string } | undefined
-    this.db.prepare('UPDATE events SET template_id=? WHERE id=?').run(next?.template_id ?? '', item.event_id)
+  private reconcileEventTemplates(eventId: string) {
+    // A renamed legacy item may have no recoverable template ID. Keep ambiguous
+    // references until those items are removed; never guess a link from row order.
+    this.db.prepare(`DELETE FROM event_templates WHERE event_id=?
+      AND NOT EXISTS (SELECT 1 FROM items WHERE event_id=event_templates.event_id AND template_id IS NULL)
+      AND NOT EXISTS (SELECT 1 FROM items WHERE event_id=event_templates.event_id AND template_id=event_templates.template_id)`).run(eventId)
+    this.db.prepare(`UPDATE events SET template_id=COALESCE(
+      (SELECT template_id FROM event_templates WHERE event_id=events.id ORDER BY rowid LIMIT 1), '')
+      WHERE id=? AND NOT EXISTS (SELECT 1 FROM event_templates WHERE event_id=events.id AND template_id=events.template_id)`).run(eventId)
   }
   deleteItem(value: string) {
     const item = this.get('items', value)
     this.db.transaction(() => {
-      this.releaseItemTemplate(item)
       this.db.prepare('DELETE FROM items WHERE id=?').run(value)
+      if (item.template_id) this.db.prepare(`DELETE FROM event_templates WHERE event_id=? AND template_id=?
+        AND NOT EXISTS (SELECT 1 FROM items WHERE event_id=? AND template_id=?)`)
+        .run(item.event_id, item.template_id, item.event_id, item.template_id)
+      this.reconcileEventTemplates(item.event_id)
     })()
   }
   importAttachments(value: string, sources: string[]) {

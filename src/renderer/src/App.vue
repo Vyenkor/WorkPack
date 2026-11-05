@@ -348,7 +348,7 @@ async function saveProject() {
 function resetEventForm(project: Project, event?: BusinessEvent) { Object.assign(eventForm, event ? { id: event.id, projectId: project.id, templateIds: [...event.templateIds], name: event.name, date: event.date, owner: event.owner } : { id: '', projectId: project.id, templateIds: [], name: '', date: new Date().toISOString().slice(0, 10), owner: project.owner }) }
 function openEventModal(project = activeProject.value, event?: BusinessEvent) { if (!project) return; clearToast(); resetEventForm(project, event); modal.value = 'event'; markModalClean() }
 async function saveEvent() {
-  if (!eventForm.name.trim() || !eventForm.templateIds.length || !eventForm.owner.trim()) { showToast('请填写事项名称、选择文件并填写经办人', 'error'); return }
+  if (!eventForm.name.trim() || (!eventForm.id && !eventForm.templateIds.length) || !eventForm.owner.trim()) { showToast('请填写事项名称、选择文件并填写经办人', 'error'); return }
   const saved = eventForm.id
     ? await run(() => window.workpack.updateEvent({ id: eventForm.id, projectId: eventForm.projectId, name: eventForm.name, date: eventForm.date, owner: eventForm.owner }), '已保存')
     : await run(() => window.workpack.createLibraryEvent({ projectId: eventForm.projectId, templateIds: [...eventForm.templateIds], name: eventForm.name, date: eventForm.date, owner: eventForm.owner }), '已保存')

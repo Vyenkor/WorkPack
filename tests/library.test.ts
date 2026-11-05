@@ -98,3 +98,64 @@ describe('file library and event checklists', () => {
     } finally { service.close(); fs.rmSync(root, { recursive: true, force: true }) }
   })
 })
+
+describe('legacy template reference cleanup', () => {
+  it.each(['renamed item', 'renamed template', 'duplicate names', 'already upgraded'])(
+    'releases unresolved references after deleting %s without releasing another matter', scenario => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-links-'))
+      const projects = path.join(root, 'projects'), data = path.join(root, 'data')
+      fs.mkdirSync(projects)
+      let service = new WorkPackService(data, undefined, { projectRoot: projects })
+      try {
+        service.saveLibraryFile({ name: '发货单', purpose: '' })
+        service.saveLibraryFile({ name: scenario === 'duplicate names' ? '发货单' : '签收单', purpose: '' })
+        const files = service.snapshot().templates
+        const projectId = service.saveProject({ name: '项目', customer: '客户', owner: '经办', contact: '', note: '' })
+        const input = { projectId, templateIds: files.map(file => file.id), name: '发货', date: '2026-11-05', owner: '经办' }
+        const eventId = service.createLibraryEvent(input)
+        const first = service.snapshot().projects[0].events[0]
+        if (scenario === 'renamed template') service.saveLibraryFile({ id: files[0].id, name: '新版发货单', purpose: '' })
+        if (scenario === 'renamed item' || scenario === 'already upgraded') service.saveItem({ id: first.items[0].id, eventId, name: '第一批发货单', note: '' })
+        service.db.exec('ALTER TABLE items DROP COLUMN template_id')
+        service.close()
+        service = new WorkPackService(data, undefined, { projectRoot: projects })
+        if (scenario === 'already upgraded') {
+          service.close()
+          service = new WorkPackService(data, undefined, { projectRoot: projects })
+        }
+        expect(service.snapshot().projects[0].events[0].items[0].templateId).toBeNull()
+        const otherId = service.createLibraryEvent({ ...input, name: '另一个事项', templateIds: [files[0].id] })
+        expect(() => service.deleteLibraryFile(files[0].id)).toThrow('文件已被事项使用')
+        service.deleteItem(first.items[0].id)
+        if (scenario !== 'duplicate names') expect(service.snapshot().projects[0].events.find(event => event.id === eventId)!.templateIds).toEqual([files[1].id])
+        expect(() => service.deleteLibraryFile(files[1].id)).toThrow('文件已被事项使用')
+        service.deleteItem(first.items[1].id)
+        const empty = service.snapshot().projects[0].events.find(event => event.id === eventId)!
+        expect(empty.templateIds).toEqual([])
+        expect(empty.templateId).toBe('')
+        service.deleteLibraryFile(files[1].id)
+        expect(() => service.deleteLibraryFile(files[0].id)).toThrow('文件已被事项使用')
+        service.deleteItem(service.snapshot().projects[0].events.find(event => event.id === otherId)!.items[0].id)
+        service.deleteLibraryFile(files[0].id)
+      } finally { service.close(); fs.rmSync(root, { recursive: true, force: true }) }
+    })
+
+  it('repairs references already left behind in an empty matter on startup', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-links-'))
+    const projects = path.join(root, 'projects'), data = path.join(root, 'data')
+    fs.mkdirSync(projects)
+    let service = new WorkPackService(data, undefined, { projectRoot: projects })
+    try {
+      service.saveLibraryFile({ name: '发货单', purpose: '' })
+      const file = service.snapshot().templates[0]
+      const projectId = service.saveProject({ name: '项目', customer: '客户', owner: '经办', contact: '', note: '' })
+      service.createLibraryEvent({ projectId, templateIds: [file.id], name: '发货', date: '2026-11-05', owner: '经办' })
+      service.db.exec('DELETE FROM items') // Reproduce residue left by the previous build.
+      service.close()
+      service = new WorkPackService(data, undefined, { projectRoot: projects })
+      expect(service.snapshot().projects[0].events[0].templateIds).toEqual([])
+      service.deleteLibraryFile(file.id)
+      expect(service.snapshot().templates).toEqual([])
+    } finally { service.close(); fs.rmSync(root, { recursive: true, force: true }) }
+  })
+})

@@ -1,20 +1,20 @@
 
 Running 12 tests using 1 worker
 
-(node:13161) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:15137) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
   ✓   1 tests/event-drawer.spec.ts:54:5 › event drawer shows an independent checklist and keeps the project page (1.4s)
-  ✓   2 tests/event-drawer.spec.ts:78:5 › a matter remains editable after its last template item is removed (1.7s)
+  ✓   2 tests/event-drawer.spec.ts:78:5 › a matter remains editable after its last template item is removed (1.8s)
   -   3 tests/installed-app.spec.ts:30:5 › 安装后的程序能建库、在中文路径下建项目，重启后数据仍在
   ✓   4 tests/pending-filters.spec.ts:7:5 › pending filters match the custom checklist model (1.3s)
-  ✓   5 tests/ui-accessibility.spec.ts:7:5 › navigation, workspace menu, and storage settings follow the desktop layout (870ms)
-  ✓   6 tests/ui-redesign.spec.ts:46:5 › approved empty pages, six dialogs and minimum desktop window (3.3s)
-  ✓   7 tests/ui-redesign.spec.ts:102:5 › library menus, categories, attachments and actual completion tabs remain functional (2.5s)
-  ✓   8 tests/ui-redesign.spec.ts:148:5 › unsafe markup stays text, cancellation preserves data, and long content stays reachable (1.9s)
-  ✓   9 tests/ui-redesign.spec.ts:185:5 › all pages and dialogs fit supported window sizes with real content (6.4s)
-  ✓  10 tests/ui-redesign.spec.ts:228:5 › missing files, cancelled pickers, category changes and relocation retain records (2.3s)
-  ✓  11 tests/ui-redesign.spec.ts:265:5 › legacy multi-file menus stay open while scrolling and keep keyboard focus (1.1s)
-  ✓  12 tests/ui-redesign.spec.ts:298:5 › saving locks the form, prevents duplicate submissions, and preserves failed edits (767ms)
+  ✓   5 tests/ui-accessibility.spec.ts:7:5 › navigation, workspace menu, and storage settings follow the desktop layout (759ms)
+  ✓   6 tests/ui-redesign.spec.ts:46:5 › approved empty pages, six dialogs and minimum desktop window (3.5s)
+  ✓   7 tests/ui-redesign.spec.ts:102:5 › library menus, categories, attachments and actual completion tabs remain functional (2.7s)
+  ✓   8 tests/ui-redesign.spec.ts:161:5 › unsafe markup stays text, cancellation preserves data, and long content stays reachable (1.8s)
+  ✓   9 tests/ui-redesign.spec.ts:198:5 › all pages and dialogs fit supported window sizes with real content (6.6s)
+  ✓  10 tests/ui-redesign.spec.ts:241:5 › missing files, cancelled pickers, category changes and relocation retain records (2.5s)
+  ✓  11 tests/ui-redesign.spec.ts:278:5 › legacy multi-file menus stay open while scrolling and keep keyboard focus (1.2s)
+  ✓  12 tests/ui-redesign.spec.ts:314:5 › saving locks the form, prevents duplicate submissions, and preserves failed edits (752ms)
 
   1 skipped
-  11 passed (24.0s)
+  11 passed (25.2s)

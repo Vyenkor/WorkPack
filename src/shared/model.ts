@@ -81,7 +81,7 @@ export type PendingGroupBy = 'project' | 'owner' | 'none'
 export interface PendingGroup<T> { key: string; label: string; rows: T[] }
 export interface PendingViewState { filter: PendingFilterQuery; groupBy: PendingGroupBy }
 export const PENDING_VIEW_PREFERENCE_KEY = 'pending.view'
-export function defaultPendingFilter(): PendingFilterQuery { return { keyword: '', projectId: '', customer: '', owner: '', status: 'all' } }
+export function defaultPendingFilter(): PendingFilterQuery { return { keyword: '', projectId: '', customer: '', owner: '', status: 'open' } }
 export function defaultPendingViewState(): PendingViewState { return { filter: defaultPendingFilter(), groupBy: 'project' } }
 function storedString(value: unknown) { return typeof value === 'string' ? value : '' }
 export function parsePendingViewState(raw: unknown): PendingViewState {
@@ -94,7 +94,7 @@ export function parsePendingViewState(raw: unknown): PendingViewState {
   return {
     filter: {
       keyword: storedString(filter.keyword), projectId: storedString(filter.projectId), customer: storedString(filter.customer), owner: storedString(filter.owner),
-      status: filter.status === 'open' || filter.status === 'done' ? filter.status : 'all'
+      status: filter.status === 'all' || filter.status === 'open' || filter.status === 'done' ? filter.status : fallback.filter.status
     },
     groupBy: record.groupBy === 'owner' || record.groupBy === 'none' ? record.groupBy : 'project'
   }

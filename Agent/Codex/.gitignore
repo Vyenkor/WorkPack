@@ -6,3 +6,6 @@
 /warm_style.txt
 /capture.cjs
 /home-render.png
+
+# Generated screenshots are retained as GitHub Actions artifacts.
+/evidence/**/*.png

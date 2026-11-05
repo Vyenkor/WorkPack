@@ -4,7 +4,7 @@
 
 ## 完成内容
 
-工作台、项目列表、项目详情、待处理、文件库、存储设置、事项抽屉及六类表单已按暖色精简设计完成。标题采用本机宋体，保留统一圆角、细线、陶土色操作和必要错误信息；不恢复被删除的副标题。实际截图保存在 [evidence/final](evidence/final/01-home.png)。
+工作台、项目列表、项目详情、待处理、文件库、存储设置、事项抽屉及六类表单已按暖色精简设计完成。标题采用本机宋体，保留统一圆角、细线、陶土色操作和必要错误信息；不恢复被删除的副标题。展示图见 [工作台](../../docs/assets/workbench.png)，批量运行截图保存为 CI 的 `WorkPack-UI-evidence` 产物。
 
 - 菜单使用 `relatedTarget` 判断焦点去向，修复删除、导入点击丢失；长菜单滚动和视口边缘定位可用，Esc、编辑后以及触发按钮滚出视口时返回原控件（[补充回归](evidence/final/menu-scroll.txt)）。
 - 路径复制通过经 IPC 来源校验和长度校验的桌面写入接口完成，没有开放浏览器剪贴板权限或读取接口。
@@ -19,8 +19,8 @@
 | 检查 | 结果 |
 | --- | --- |
 | 类型检查、生产构建 | 通过 |
-| Vitest | 21 项通过 |
-| Python | 76 项通过 |
+| Vitest | 23 项通过 |
+| Python | 77 项通过 |
 | Electron / Playwright | 11 项通过；安装后应用测试在本机跳过，交由 Windows CI 执行 |
 | 三种窗口 | 1600×1000、1280×800、1050×700；全部主页面、抽屉、六类表单无横向页面溢出 |
 | npm audit | 0 漏洞（包括开发依赖） |
@@ -32,19 +32,17 @@
 
 ## 页面截图
 
-| 页面 | 1600×1000 | 1280×800 | 1050×700 |
-| --- | --- | --- | --- |
-| 工作台 | [查看](evidence/final/1600-工作台.png) | [查看](evidence/final/1280-工作台.png) | [查看](evidence/final/1050-工作台.png) |
-| 项目列表 | [查看](evidence/final/1600-项目.png) | [查看](evidence/final/1280-项目.png) | [查看](evidence/final/1050-项目.png) |
-| 项目详情 | [查看](evidence/final/1600-project.png) | [查看](evidence/final/1280-project.png) | [查看](evidence/final/1050-project.png) |
-| 待处理 | [查看](evidence/final/1600-待处理.png) | [查看](evidence/final/1280-待处理.png) | [查看](evidence/final/1050-待处理.png) |
-| 文件库 | [查看](evidence/final/1600-文件库.png) | [查看](evidence/final/1280-文件库.png) | [查看](evidence/final/1050-文件库.png) |
-| 设置 | [查看](evidence/final/1600-settings.png) | [查看](evidence/final/1280-settings.png) | [查看](evidence/final/1050-settings.png) |
-| 抽屉 | [查看](evidence/final/1600-drawer.png) | [查看](evidence/final/1280-drawer.png) | [查看](evidence/final/1050-drawer.png) |
+完整截图由 [CI 工作流](https://github.com/Vyenkor/WorkPack/actions/workflows/ci.yml?query=branch%3Acodex%2Fwarm-ui-reproduction) 的 `WorkPack-UI-evidence` 产物提供，包含 1600×1000、1280×800、1050×700 的主页面、六类弹窗、抽屉以及长文本和菜单回归。运行 CI 可重新生成。
 
-六类弹窗截图以 `1600-modal-*`、`1280-modal-*`、`1050-modal-*` 命名。另有 [首次工作台](evidence/final/01-home.png)、[模板操作菜单](evidence/final/library-menu.png)、[完成后的文件清单](evidence/final/drawer-completed.png)、[长文本抽屉](evidence/final/long-drawer.png)、[长菜单](evidence/final/legacy-scroll-menu.png)。
+[28cf18d 验收截图归档](https://github.com/Vyenkor/WorkPack/actions/runs/41961291714/artifacts/13385378278) 保留上一轮视觉对照；最新筛选行为以 PR 最新 CI 产物为准。仓库删除批量验收 PNG，仅保留 docs/assets 下的少量展示图及测试文本。已确认的 UI精简版 设计源图保留作为实现依据。
 
-截图来自实际 Electron 运行，使用隔离测试数据。另存 Windows CI 的 [工作台](evidence/final/windows-home.png)、[文件清单](evidence/final/windows-drawer.png)、[最小窗口表单](evidence/final/windows-minimum-project-modal.png)，完整 Windows 截图随 PR 的 WorkPack-UI-evidence 产物保存。设计图保留在 UI精简版；日期、路径、系统字体和原生日期输入显示会因平台而异。装饰插图采用带纹理的本地 SVG，不声称与生成参考图逐像素相同。
+截图来自实际 Electron 运行，使用隔离测试数据。日期、路径、系统字体和原生日期输入显示会因平台而异。装饰插图采用带纹理的本地 SVG，不声称与生成参考图逐像素相同。
+
+## P3 复核处理
+
+- 待处理默认及清除后的状态改为未完成，角标仍只统计缺口；用户显式保存的全部或已完成筛选继续保留。
+- `matchesCompletionFilter` 仍在 App.vue 的项目列表筛选中调用，不是死代码；保留该函数并补测空项目、进行中和已完成状态。
+- 移除 75 张批量验收大图（约 5.2 MiB）并修正链接，不重写已有 Git 历史；完整截图继续由 CI 上传。
 
 ## 自审与依赖修复
 

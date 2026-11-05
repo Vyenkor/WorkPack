@@ -32,19 +32,19 @@ colors:
 
 typography:
   page-title:
-    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontFamily: "Noto Serif SC, Noto Serif CJK SC, Source Han Serif SC, Songti SC, SimSun, serif"
     fontSize: 48px
     fontWeight: 600
     lineHeight: 1.35
     letterSpacing: 0
   section-title:
-    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontFamily: "Noto Serif SC, Noto Serif CJK SC, Source Han Serif SC, Songti SC, SimSun, serif"
     fontSize: 28px
     fontWeight: 600
     lineHeight: 1.4
     letterSpacing: 0
   card-title:
-    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontFamily: "Noto Serif SC, Noto Serif CJK SC, Source Han Serif SC, Songti SC, SimSun, serif"
     fontSize: 20px
     fontWeight: 600
     lineHeight: 1.45
@@ -276,7 +276,7 @@ components:
 
 ## Typography
 
-中文界面正文使用 Microsoft YaHei UI、Microsoft YaHei、PingFang SC、Segoe UI。页面及区块标题使用本机宋体家族，数字可使用标题字体；控件保持无衬线。可读文字不得小于 12px。不使用中文负字间距。
+中文界面正文使用 Microsoft YaHei UI、Microsoft YaHei、PingFang SC、Segoe UI。页面及区块标题使用本机宋体家族（含 Noto Serif CJK SC 回退），数字可使用标题字体；控件保持无衬线。可读文字不得小于 12px。不使用中文负字间距。
 
 标题 48px、区块 28px、正文 16px、辅助元数据 14px；1050–1180px 窗口收为标题 40px、区块 24px、正文 14px。路径为等宽字，设置中允许换行显示完整路径，项目辅助栏使用缩略路径并提供完整 title 与复制操作。
 

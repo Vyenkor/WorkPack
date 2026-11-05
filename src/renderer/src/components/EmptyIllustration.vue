@@ -1,8 +1,19 @@
 <script setup lang="ts">
+import { useId } from 'vue'
+const textureId = useId()
 defineProps<{ kind: 'folder' | 'checklist' | 'inbox' }>()
 </script>
 <template>
-  <svg class="empty-illustration" :class="kind" viewBox="0 0 320 200" fill="none" aria-hidden="true" focusable="false">
+  <svg class="empty-illustration" :class="kind" :style="{ '--illustration-texture': `url(#${textureId})` }" viewBox="0 0 320 200" fill="none" aria-hidden="true" focusable="false">
+    <defs>
+      <filter :id="textureId" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency=".65" numOctaves="3" seed="7" result="noise" />
+        <feColorMatrix in="noise" type="saturate" values="0" />
+        <feComponentTransfer><feFuncA type="linear" slope=".16" /></feComponentTransfer>
+        <feComposite in2="SourceGraphic" operator="in" result="grain" />
+        <feBlend in="SourceGraphic" in2="grain" mode="multiply" />
+      </filter>
+    </defs>
     <ellipse cx="163" cy="178" rx="132" ry="10" class="illustration-shadow" />
     <g stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
       <template v-if="kind === 'folder'">

@@ -25,7 +25,7 @@ class RendererStyleTest(unittest.TestCase):
     def test_focus_and_status_styles_use_readable_design_colors(self):
         self.assertIn("outline: 3px solid var(--color-focus-ring)", STYLE)
         self.assertIn("border: 1px solid var(--color-control-border)", STYLE)
-        self.assertRegex(STYLE, r"\.template-icon, \.event-type-icon\s*\{[^}]*--color-primary")
+        self.assertRegex(STYLE, r"\.library-asset\s*\{[^}]*--color-primary")
         self.assertRegex(STYLE, r"\.document-task input:checked\s*\{[^}]*--color-primary")
         self.assertRegex(STYLE, r"\.document-task input:focus-visible\s*\{[^}]*--color-primary")
 
@@ -58,7 +58,6 @@ class RendererStyleTest(unittest.TestCase):
             ".event-detail",
             ".event-detail-heading",
             ".event-progress-large",
-            ".event-progress-large > span",
             ".event-actions",
             ".event-title",
             ".checklist-heading",

@@ -66,20 +66,13 @@ export function gaps(item: Item): string[] {
     ...item.attachments.some(file => !file.exists) ? ['附件失效'] : []
   ]
 }
-export function cachedProjectPercent(projectId: string, cache: Map<string, number>, compute: () => number) {
-  const cached = cache.get(projectId)
-  if (cached !== undefined) return cached
-  const percent = compute()
-  cache.set(projectId, percent)
-  return percent
-}
-export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery, projectPercent: number | (() => number)) {
+export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery) {
   if (query.projectId && row.project.id !== query.projectId) return false
   if (query.customer.trim() && row.project.customer.trim() !== query.customer.trim()) return false
   if (query.owner.trim() && row.event.owner.trim() !== query.owner.trim()) return false
   if (query.status !== 'all') {
-    const percent = typeof projectPercent === 'function' ? projectPercent() : projectPercent
-    if (!matchesCompletionFilter(percent, row.project.events.length > 0, query.status)) return false
+    const complete = gaps(row.item).length === 0
+    if (query.status === 'done' ? !complete : complete) return false
   }
   const keyword = query.keyword.trim().toLowerCase()
   return !keyword || [row.project.name, row.project.customer, row.project.owner, row.event.name, row.event.owner, row.item.name].some(value => value.toLowerCase().includes(keyword))

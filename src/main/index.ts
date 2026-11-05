@@ -90,7 +90,7 @@ if (!hasInstanceLock) {
     service = storage.service
     window = new BrowserWindow({
       title: 'WorkPack · 项目资料管理', width: 1440, height: 960, minWidth: 1050, minHeight: 700,
-      backgroundColor: '#f5f7f6', show: false,
+      backgroundColor: '#faf9f5', show: false,
       webPreferences: { preload: path.join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true }
     })
     window.removeMenu()

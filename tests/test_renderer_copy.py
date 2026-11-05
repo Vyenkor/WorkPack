@@ -24,7 +24,7 @@ class RendererCopyTest(unittest.TestCase):
         self.assertNotIn('流程已删除', APP)
         self.assertNotIn('v-model="pendingFilter.gap"', APP)
         self.assertIn("matchesPendingQuery", APP)
-        self.assertIn("pendingFilter.status === 'done' ? !row.gaps.length", APP)
+        self.assertIn("matchesPendingQuery(row, pendingFilter)", APP)
         self.assertIn("clearPendingFilters", APP)
         self.assertIn("pending-filters", APP)
 

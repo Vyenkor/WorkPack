@@ -43,7 +43,7 @@ function reposition(event: Event) {
   if (!open.value || !panel.value || !trigger.value) return
   if (event.type === 'scroll' && panel.value.contains(event.target as Node)) return
   const box = trigger.value.getBoundingClientRect()
-  if (box.bottom < 0 || box.top > innerHeight) { close(); return }
+  if (box.bottom < 0 || box.top > innerHeight) { close(panel.value.contains(document.activeElement)); return }
   const height = panel.value.getBoundingClientRect().height
   position.value = {
     top: `${box.bottom + height + 14 <= innerHeight ? box.bottom + 6 : Math.max(8, box.top - height - 6)}px`,

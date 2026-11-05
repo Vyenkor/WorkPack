@@ -14,14 +14,14 @@
 
 | 层次 | 技术 | 用途 |
 | --- | --- | --- |
-| 界面 | Vue 3、TypeScript、Vite、Element Plus | 实现项目、模板、业务事项、文件清单和筛选页面 |
+| 界面 | Vue 3、TypeScript、Vite、自有组件 | 实现项目、模板、业务事项、文件清单和筛选页面 |
 | Windows 桌面应用 | Electron、electron-vite | 提供桌面窗口、系统文件夹选择、应用生命周期及本地能力 |
 | 本地数据 | SQLite、better-sqlite3 | 保存项目资料、模板规则、事项、清单状态和附件索引 |
 | 文件操作 | Node.js 文件系统 API | 在用户授权的目录中创建文件夹、复制模板和附件、打开文件 |
 | Windows 安装包 | electron-builder、NSIS | 生成可安装的 Windows 安装程序 |
 | 自动化验证 | Vitest、临时 SQLite 数据库和临时文件夹 | 检查业务规则、数据持久化和文件操作 |
 
-Vue 官方支持通过 Vite 创建 TypeScript 项目；Element Plus 提供 Vue 3 组件，适合表格、表单和筛选等管理界面。桌面开发可采用 electron-vite 组织主进程、预加载脚本和 Vue 界面。Electron 官方文档介绍了应用打包与 Windows 分发方式。[Vue 与 TypeScript](https://vuejs.org/guide/typescript/overview) [Element Plus 快速开始](https://element-plus.org/en-US/guide/quickstart) [electron-vite 快速开始](https://electron-vite.org/guide/) [Electron 分发说明](https://www.electronjs.org/docs/latest/tutorial/distribution-overview)
+Vue 官方支持通过 Vite 创建 TypeScript 项目；界面采用自有组件和 DESIGN.md 中的设计 token，统一表格、表单、菜单及筛选。桌面开发可采用 electron-vite 组织主进程、预加载脚本和 Vue 界面。Electron 官方文档介绍了应用打包与 Windows 分发方式。[Vue 与 TypeScript](https://vuejs.org/guide/typescript/overview) [electron-vite 快速开始](https://electron-vite.org/guide/) [Electron 分发说明](https://www.electronjs.org/docs/latest/tutorial/distribution-overview)
 
 SQLite 是本地桌面应用的嵌入式数据库。better-sqlite3 可从 Node.js 访问 SQLite；由于它包含原生模块，构建安装包时要验证 Electron 版本、Windows 架构和原生模块的打包配置。[SQLite 适用场景](https://www.sqlite.org/whentouse.html) [better-sqlite3 项目说明](https://github.com/WiseLibs/better-sqlite3) [better-sqlite3 安装问题说明](https://github.com/WiseLibs/better-sqlite3/blob/master/docs/troubleshooting.md)
 

@@ -15,7 +15,7 @@ class TechnicalPlanTest(unittest.TestCase):
             "Vue 3",
             "TypeScript",
             "Vite",
-            "Element Plus",
+            "自有组件",
             "Electron",
             "SQLite",
             "better-sqlite3",

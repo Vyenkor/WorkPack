@@ -60,6 +60,20 @@
       ${If} ${isUpdated}
         Return
       ${EndIf}
+      ; 仅清理默认 userData 中的记录。模板目录、项目目录和自选数据库目录均不递归删除。
+      ${IfNot} ${Silent}
+      ${AndIf} $WorkPackDeleteWorkspaceData == "1"
+        Delete "$APPDATA\WorkPack\workpack-v3.sqlite"
+        Delete "$APPDATA\WorkPack\workpack-v3.sqlite-wal"
+        Delete "$APPDATA\WorkPack\workpack-v3.sqlite-shm"
+        Delete "$APPDATA\WorkPack\workpack-v3.sqlite-journal"
+        Delete "$APPDATA\WorkPack\workpack.sqlite"
+        Delete "$APPDATA\WorkPack\workpack.sqlite-wal"
+        Delete "$APPDATA\WorkPack\workpack.sqlite-shm"
+        Delete "$APPDATA\WorkPack\workpack.sqlite-journal"
+        Delete "$APPDATA\WorkPack\storage.json"
+        RMDir "$APPDATA\WorkPack"
+      ${EndIf}
       ${GetParent} "$INSTDIR" $0
       ${If} $0 == ""
       ${OrIf} $0 == "$LOCALAPPDATA\Programs"
@@ -69,5 +83,43 @@
       ${EndIf}
       RMDir "$0"
     FunctionEnd
+  Function un.WorkPackDataPageCreate
+    ${If} ${isUpdated}
+      Abort
+    ${EndIf}
+    !insertmacro MUI_HEADER_TEXT "工作空间数据" "卸载 WorkPack 时可以选择清理本机工作空间记录。"
+    nsDialogs::Create 1018
+    Pop $0
+    ${If} $0 == error
+      Abort
+    ${EndIf}
+    ${NSD_CreateCheckbox} 0 0 100% 16u "删除工作空间记录（默认不删除）"
+    Pop $WorkPackDeleteWorkspaceDataCheckbox
+    ${NSD_CreateLabel} 0 24u 100% 42u "仅删除 $APPDATA\WorkPack 中的工作空间数据库和设置。项目文件、模板文件和自选位置的数据保留。"
+    Pop $0
+    nsDialogs::Show
+  FunctionEnd
+
+  Function un.WorkPackDataPageLeave
+    ${NSD_GetState} $WorkPackDeleteWorkspaceDataCheckbox $0
+    ${If} $0 == ${BST_CHECKED}
+      StrCpy $WorkPackDeleteWorkspaceData "1"
+    ${Else}
+      StrCpy $WorkPackDeleteWorkspaceData "0"
+    ${EndIf}
+  FunctionEnd
   !endif
 !macroend
+
+!ifdef BUILD_UNINSTALLER
+  !include nsDialogs.nsh
+  Var WorkPackDeleteWorkspaceData
+  Var WorkPackDeleteWorkspaceDataCheckbox
+
+  !macro customUnWelcomePage
+    !insertmacro MUI_UNPAGE_WELCOME
+    UninstPage custom un.WorkPackDataPageCreate un.WorkPackDataPageLeave
+  !macroend
+
+
+!endif

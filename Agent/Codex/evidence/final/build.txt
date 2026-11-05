@@ -1,0 +1,29 @@
+
+> workpack@0.2.0 build
+> npm run typecheck && electron-vite build
+
+
+> workpack@0.2.0 typecheck
+> vue-tsc --noEmit
+
+vite v7.3.7 building ssr environment for production...
+transforming...
+✓ 4 modules transformed.
+rendering chunks...
+out/main/index.js  53.24 kB
+✓ built in 194ms
+vite v7.3.7 building ssr environment for production...
+transforming...
+✓ 1 modules transformed.
+rendering chunks...
+out/preload/index.js  1.95 kB
+✓ built in 40ms
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 22 modules transformed.
+rendering chunks...
+../../out/renderer/index.html                           0.62 kB
+../../out/renderer/assets/workpack-logo-sJ1vC5qw.png   35.07 kB
+../../out/renderer/assets/index-CF1vK4Bc.css           35.01 kB
+../../out/renderer/assets/index-DCHEFLtc.js           358.75 kB
+✓ built in 901ms

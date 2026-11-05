@@ -9,7 +9,7 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
   const application = await _electron.launch({ executablePath: electronExecutable, args: ['.'], env: { ...process.env, WORKPACK_TEST_DATA: path.join(root, 'data') } })
   try {
     const page = await application.firstWindow()
-    await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
     const nav = page.getByRole('navigation', { name: '主导航' })
     await expect(nav.locator('button')).toHaveCount(4)
     for (const icon of await nav.locator('svg.nav-icon').all()) {
@@ -32,7 +32,7 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
     await page.getByRole('button', { name: '添加文件模板' }).click()
     await expect(page.locator('.modal-card')).toBeVisible()
     await expect(page.getByRole('textbox', { name: '文件名称' })).toBeFocused()
-    await expect(page.locator('.modal-card')).toHaveCSS('border-top-left-radius', '13px')
+    await expect(page.locator('.modal-card')).toHaveCSS('border-top-left-radius', '12px')
     await page.keyboard.press('Escape')
     await expect(page.locator('.modal-card')).toHaveCount(0)
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1050, 700))

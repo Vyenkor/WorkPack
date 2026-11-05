@@ -12,7 +12,7 @@ test.beforeEach(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-ui-'))
   application = await _electron.launch({ executablePath: electronExecutable, args: ['.'], env: { ...process.env, WORKPACK_TEST_DATA: path.join(root, 'data') } })
   page = await application.firstWindow()
-  await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
 })
 test.afterEach(async () => {
   await application?.close()
@@ -27,7 +27,7 @@ async function createEvent() {
   }, projects)
   await page.getByRole('button', { name: '我的工作空间' }).click()
   await page.getByRole('button', { name: '设置', exact: true }).click()
-  await page.locator('.storage-row').first().getByRole('button', { name: '选择文件夹' }).click()
+  await page.locator('.storage-row').first().getByRole('button', { name: '更改位置' }).click()
   await expect(page.locator('.storage-row').first()).toContainText(projects)
 
   const nav = page.getByRole('navigation', { name: '主导航' })
@@ -36,7 +36,7 @@ async function createEvent() {
   await page.getByRole('textbox', { name: '文件名称' }).fill('发货清单')
   await page.getByRole('textbox', { name: '用途说明' }).fill('核对货物')
   await page.locator('.modal-card button[type="submit"]').click()
-  await expect(page.locator('.template-card')).toHaveCount(1)
+  await expect(page.locator('.library-table tbody tr')).toHaveCount(1)
 
   await nav.getByRole('button', { name: '项目', exact: true }).click()
   await page.getByRole('button', { name: '新建项目' }).first().click()
@@ -83,7 +83,8 @@ test('a matter remains editable after its last template item is removed', async 
   await page.locator('.modal-card button[type="submit"]').click()
   await expect(drawer.locator('.document-card')).toHaveCount(2)
   page.on('dialog', dialog => dialog.accept())
-  await drawer.locator('.document-card').first().getByRole('button', { name: '删除', exact: true }).click()
+  await drawer.locator('.document-card').first().getByRole('button', { name: /操作$/ }).click()
+  await drawer.getByRole('button', { name: '删除文件项', exact: true }).click()
   await expect(drawer.locator('.document-card')).toHaveCount(1)
   for (const title of ['保留手动文件', '空事项']) {
     await drawer.locator('.event-actions').getByRole('button', { name: '编辑', exact: true }).click()
@@ -95,7 +96,8 @@ test('a matter remains editable after its last template item is removed', async 
     await expect(drawer.locator('#event-drawer-title')).toHaveText(title)
     await expect(drawer).toContainText('新经办人')
     if (title === '保留手动文件') {
-      await drawer.locator('.document-card').getByRole('button', { name: '删除', exact: true }).click()
+      await drawer.locator('.document-card').getByRole('button', { name: /操作$/ }).click()
+      await drawer.getByRole('button', { name: '删除文件项', exact: true }).click()
       await expect(drawer.locator('.document-card')).toHaveCount(0)
     }
   }

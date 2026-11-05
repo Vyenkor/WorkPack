@@ -1,0 +1,18 @@
+
+> workpack@0.2.0 test
+> node scripts/test.cjs
+
+
+ RUN  v5.1.0 E:/张路瑶/Workspace/WorkPack
+
+
+ Test Files  4 passed (4)
+      Tests  20 passed (20)
+   Start at  10:43:06
+   Duration  1.87s (tests 68%, import 28%, worker 2%, transform 1%)
+
+..............................sss.........................................
+----------------------------------------------------------------------
+Ran 74 tests in 5.327s
+
+OK (skipped=3)

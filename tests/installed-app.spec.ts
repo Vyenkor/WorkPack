@@ -23,7 +23,7 @@ test.afterEach(() => {
 async function launch(dataDir: string): Promise<[ElectronApplication, Page]> {
   const application = await _electron.launch({ executablePath: installedExe!, env: { ...process.env, WORKPACK_TEST_DATA: dataDir } })
   const page = await application.firstWindow()
-  await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
   return [application, page]
 }
 
@@ -39,7 +39,7 @@ test('安装后的程序能建库、在中文路径下建项目，重启后数�
   }, parent)
   await page.getByRole('button', { name: '我的工作空间' }).click()
   await page.getByRole('button', { name: '设置', exact: true }).click()
-  await page.locator('.storage-row').first().getByRole('button', { name: '选择文件夹' }).click()
+  await page.locator('.storage-row').first().getByRole('button', { name: '更改位置' }).click()
   await page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name: '项目', exact: true }).click()
   await page.getByRole('button', { name: '新建项目' }).first().click()
   await page.getByRole('textbox', { name: '项目名称' }).fill('安装 冒烟项目')

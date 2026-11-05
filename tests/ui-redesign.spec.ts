@@ -1,0 +1,158 @@
+import { _electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+
+let app: ElectronApplication
+let page: Page
+let root: string
+let pickerPath: string
+const errors: string[] = []
+test.beforeEach(async () => {
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-redesign-'))
+  app = await _electron.launch({ executablePath: require('electron'), args: ['.'], env: { ...process.env, WORKPACK_TEST_DATA: path.join(root, 'data') } })
+  page = await app.firstWindow()
+  errors.length = 0
+  page.on('pageerror', error => errors.push(error.message))
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1600, 1000))
+  await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
+  pickerPath = path.join(root, 'projects'); fs.mkdirSync(pickerPath)
+})
+test.afterEach(async () => {
+  await app?.close()
+  const resolved = path.resolve(root)
+  if (resolved.startsWith(path.resolve(os.tmpdir()) + path.sep) && path.basename(resolved).startsWith('workpack-redesign-')) fs.rmSync(resolved, { recursive: true, force: true })
+  expect(errors).toEqual([])
+})
+function nav(name: string) { return page.getByRole('navigation', { name: '主导航' }).getByRole('button', { name, exact: true }) }
+async function pick(file: string) {
+  await app.evaluate(({ dialog }, file) => { Object.defineProperty(dialog, 'showOpenDialog', { configurable: true, value: async () => ({ canceled: false, filePaths: [file] }) }) }, file)
+}
+async function settings() { await page.getByRole('button', { name: '我的工作空间' }).click(); await page.getByRole('button', { name: '设置', exact: true }).click() }
+async function submit() { await page.locator('.modal-card button[type="submit"]').click(); await expect(page.locator('.modal-card')).toHaveCount(0) }
+async function addTemplate() {
+  await nav('文件库').click(); await page.getByRole('button', { name: '添加文件模板' }).click()
+  await page.getByRole('textbox', { name: '文件名称' }).fill('签收单'); await submit()
+}
+async function addProject() {
+  await settings(); await pick(pickerPath)
+  await page.locator('.storage-row').first().getByRole('button', { name: '更改位置' }).click()
+  await nav('项目').click(); await page.getByRole('button', { name: '新建项目' }).click()
+  await page.getByRole('textbox', { name: '项目名称' }).fill('山职陶瓷展会')
+  await page.getByRole('textbox', { name: '客户名称' }).fill('山东职业学院')
+  await page.getByRole('textbox', { name: '负责人' }).fill('张路瑶'); await submit()
+}
+
+test('approved empty pages, six dialogs and minimum desktop window', async ({}, info) => {
+  await page.screenshot({ path: info.outputPath('01-home.png'), scale: 'css' })
+  const shell = await page.evaluate(() => ({ color: getComputedStyle(document.body).color, background: getComputedStyle(document.querySelector('.app-shell')!).backgroundColor, left: document.querySelector('.sidebar')!.getBoundingClientRect().left, radius: getComputedStyle(document.querySelector('.sidebar')!).borderRadius }))
+  expect(shell).toMatchObject({ background: 'rgb(250, 249, 245)', left: 0, radius: '0px' })
+  await page.keyboard.press('Control+k'); await expect(page.getByRole('searchbox', { name: '搜索项目或客户' })).toBeFocused()
+  await nav('待处理').click(); await expect(page.getByRole('heading', { name: '暂无事项' })).toBeVisible()
+  await page.screenshot({ path: info.outputPath('02-pending.png'), scale: 'css' })
+  await nav('文件库').click(); await page.screenshot({ path: info.outputPath('03-library-empty.png'), scale: 'css' })
+  await page.getByRole('button', { name: '新建分类' }).click()
+  await expect(page.getByRole('textbox', { name: '分类名称' })).toBeFocused()
+  await page.screenshot({ path: info.outputPath('modal-category.png'), scale: 'css' })
+  await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: '新建分类' })).toBeFocused()
+  await page.getByRole('button', { name: '添加文件模板' }).click()
+  await page.screenshot({ path: info.outputPath('modal-template.png'), scale: 'css' })
+  await page.getByRole('textbox', { name: '文件名称' }).fill('签收单'); await submit()
+  await nav('项目').click(); await page.screenshot({ path: info.outputPath('04-projects-empty.png'), scale: 'css' })
+  await page.getByRole('button', { name: '新建项目' }).click()
+  await page.screenshot({ path: info.outputPath('modal-project.png'), scale: 'css' })
+  await page.keyboard.press('Shift+Tab'); await expect(page.getByRole('button', { name: '关闭弹窗' })).toBeFocused()
+  await page.keyboard.press('Shift+Tab'); await expect(page.locator('.modal-card button[type="submit"]')).toBeFocused()
+  await page.keyboard.press('Escape')
+  await addProject(); await page.screenshot({ path: info.outputPath('05-project.png'), scale: 'css' })
+  await page.getByRole('button', { name: '复制项目路径' }).click()
+  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toContain('山职陶瓷展会')
+  await page.getByRole('button', { name: '新建事项' }).click()
+  await page.screenshot({ path: info.outputPath('modal-event.png'), scale: 'css' })
+  await page.getByRole('textbox', { name: '事项名称' }).fill('第一批交付')
+  await page.locator('.template-check input').first().check(); await submit()
+  const drawer = page.locator('.event-drawer')
+  await expect(drawer).toBeVisible()
+  await expect(page.locator('.sidebar')).toHaveAttribute('inert', '')
+  await drawer.getByRole('button', { name: '添加文件项', exact: true }).click()
+  await page.screenshot({ path: info.outputPath('modal-item.png'), scale: 'css' }); await page.keyboard.press('Escape')
+  await drawer.getByRole('button', { name: '添加待办' }).click()
+  await page.screenshot({ path: info.outputPath('modal-task.png'), scale: 'css' }); await page.keyboard.press('Escape')
+  await page.screenshot({ path: info.outputPath('06-drawer.png'), scale: 'css' }); await page.keyboard.press('Escape')
+  await nav('项目').click(); await page.screenshot({ path: info.outputPath('07-projects.png'), scale: 'css' })
+  await settings(); await page.screenshot({ path: info.outputPath('08-settings.png'), scale: 'css' })
+  await page.getByText('查看迁移说明', { exact: true }).click(); await expect(page.locator('.migration-notice details')).toHaveAttribute('open', '')
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1050, 700))
+  for (const name of ['工作台', '项目', '待处理', '文件库']) {
+    await nav(name).click()
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)
+    expect(overflow, name).toBe(false)
+    await page.screenshot({ path: info.outputPath(`minimum-${name}.png`), scale: 'css' })
+  }
+})
+
+test('library menus, categories, attachments and actual completion tabs remain functional', async ({}, info) => {
+  await addTemplate()
+  await page.getByRole('button', { name: '新建分类' }).click()
+  await page.getByRole('textbox', { name: '分类名称' }).fill('交付'); await submit()
+  await page.locator('.library-table .title-button').click()
+  await page.getByRole('combobox', { name: '分类' }).selectOption({ label: '交付' }); await submit()
+  await page.getByRole('button', { name: '签收单操作' }).click()
+  await expect(page.getByRole('button', { name: '编辑模板' })).toBeFocused()
+  await page.keyboard.press('ArrowDown'); await expect(page.getByRole('button', { name: '导入模板' })).toBeFocused()
+  await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: '签收单操作' })).toBeFocused()
+  const fixture = path.join(root, '货物签收单.txt'); fs.writeFileSync(fixture, '测试附件')
+  await pick(fixture); await page.getByRole('button', { name: '签收单操作' }).click(); await page.getByRole('button', { name: '导入模板' }).click()
+  await expect(page.locator('.library-table')).toContainText('可用')
+  const exportFolder = path.join(root, 'export'); fs.mkdirSync(exportFolder); await pick(exportFolder)
+  await page.getByRole('button', { name: '导出', exact: true }).click()
+  await expect.poll(() => fs.readdirSync(exportFolder).length).toBeGreaterThan(0)
+  await page.getByRole('button', { name: '签收单操作' }).click(); await page.screenshot({ path: info.outputPath('library-menu.png'), scale: 'css' }); await page.keyboard.press('Escape')
+  await page.getByRole('searchbox', { name: '搜索文件模板' }).fill('不存在')
+  await expect(page.locator('.library-table tbody tr')).toHaveCount(0)
+  await page.getByRole('button', { name: '清除筛选' }).click(); await expect(page.locator('.library-table tbody tr')).toHaveCount(1)
+  await page.getByRole('button', { name: '未分类 0', exact: true }).click(); await expect(page.locator('.library-table tbody tr')).toHaveCount(0)
+  await page.getByRole('button', { name: '交付 1', exact: true }).click(); await expect(page.locator('.library-table tbody tr')).toHaveCount(1)
+  await addProject(); await page.getByRole('button', { name: '新建事项' }).click()
+  await page.getByRole('textbox', { name: '事项名称' }).fill('第一批交付'); await page.locator('.template-check input').check(); await submit()
+  const drawer = page.locator('.event-drawer')
+  await expect(drawer.locator('.document-attachment')).toContainText(['货物签收单.txt', '1 个附件'])
+  const prepared = drawer.locator('.document-task input').first()
+  await prepared.check()
+  await drawer.getByRole('button', { name: '添加待办' }).click(); await page.getByRole('textbox', { name: '待办名称' }).fill('归档'); await submit()
+  await drawer.locator('.document-task input').nth(1).check()
+  await page.keyboard.press('Escape'); await nav('待处理').click()
+  await page.getByRole('group', { name: '完成状态', exact: true }).getByRole('button', { name: '已完成' }).click()
+  await expect(page.locator('.pending-row')).toHaveCount(1)
+  await page.screenshot({ path: info.outputPath('pending-completed.png'), scale: 'css' })
+  await page.getByRole('group', { name: '完成状态', exact: true }).getByRole('button', { name: '未完成' }).click(); await expect(page.locator('.pending-row')).toHaveCount(0)
+  await page.getByRole('button', { name: '清除', exact: true }).click(); await expect(page.locator('.pending-row')).toHaveCount(1)
+  await page.locator('.pending-row').click()
+  await drawer.locator('.document-task input').nth(1).uncheck(); await page.keyboard.press('Escape')
+  await expect(page.locator('.pending-row')).toBeFocused()
+  await page.getByRole('group', { name: '完成状态', exact: true }).getByRole('button', { name: '未完成' }).click(); await expect(page.locator('.pending-row')).toHaveCount(1)
+  await expect(page.locator('.pending-row')).toContainText('待归档')
+  await page.reload(); await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
+  await nav('待处理').click(); await expect(page.getByRole('group', { name: '完成状态', exact: true }).getByRole('button', { name: '未完成' })).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('unsafe markup stays text, cancellation preserves data, and long content stays reachable', async ({}, info) => {
+  await addTemplate(); await addProject()
+  await page.getByRole('button', { name: '编辑项目', exact: true }).click()
+  await page.getByRole('textbox', { name: '项目名称' }).fill('很长的项目名称'.repeat(10))
+  await page.getByRole('textbox', { name: '项目备注' }).fill('<img src=x onerror="window.hacked=1">')
+  await submit()
+  expect(await page.evaluate(() => (window as unknown as { hacked?: number }).hacked)).toBeUndefined()
+  await expect(page.locator('.project-note')).toHaveText('<img src=x onerror="window.hacked=1">')
+  await page.getByRole('button', { name: '编辑项目', exact: true }).click()
+  await page.getByRole('textbox', { name: '负责人' }).fill('未保存')
+  page.once('dialog', dialog => dialog.dismiss()); await page.keyboard.press('Escape'); await expect(page.locator('.modal-card')).toBeVisible()
+  page.once('dialog', dialog => dialog.accept()); await page.keyboard.press('Escape'); await expect(page.locator('.modal-card')).toHaveCount(0)
+  await expect(page.locator('.project-metadata')).not.toContainText('未保存')
+  await page.getByRole('button', { name: '项目操作', exact: true }).click()
+  page.once('dialog', dialog => dialog.dismiss()); await page.getByRole('button', { name: '删除项目', exact: true }).click()
+  await expect(page.locator('.project-detail')).toBeVisible()
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1050, 700))
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: info.outputPath('long-project.png'), scale: 'css' })
+})

@@ -11,13 +11,13 @@ test('pending filters match the custom checklist model', async () => {
   const application = await _electron.launch({ executablePath: electronExecutable, args: ['.'], env: { ...process.env, WORKPACK_TEST_DATA: path.join(root, 'data') } })
   try {
     const page = await application.firstWindow()
-    await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
     await application.evaluate(({ dialog }, folder) => {
       Object.defineProperty(dialog, 'showOpenDialog', { configurable: true, value: async () => ({ canceled: false, filePaths: [folder] }) })
     }, projects)
     await page.getByRole('button', { name: '我的工作空间' }).click()
     await page.getByRole('button', { name: '设置', exact: true }).click()
-    await page.locator('.storage-row').first().getByRole('button', { name: '选择文件夹' }).click()
+    await page.locator('.storage-row').first().getByRole('button', { name: '更改位置' }).click()
     const nav = page.getByRole('navigation', { name: '主导航' })
     await nav.getByRole('button', { name: '文件库' }).click()
     await page.getByRole('button', { name: '添加文件模板' }).click()
@@ -34,6 +34,7 @@ test('pending filters match the custom checklist model', async () => {
     await page.getByRole('textbox', { name: '经办人' }).fill('经办甲')
     await page.locator('.template-check input').first().check()
     await page.locator('.modal-card button[type="submit"]').click()
+    await page.keyboard.press('Escape')
     await nav.getByRole('button', { name: /待处理/ }).click()
     await expect(page.locator('.pending-row')).toHaveCount(1)
     await page.getByRole('searchbox', { name: '搜索待处理' }).fill('不匹配')
@@ -43,7 +44,7 @@ test('pending filters match the custom checklist model', async () => {
     await page.getByRole('combobox', { name: '客户' }).selectOption({ label: '客户甲' })
     await page.getByRole('combobox', { name: '经办人' }).selectOption({ label: '经办甲' })
     await expect(page.locator('.pending-row')).toHaveCount(1)
-    await page.getByRole('combobox', { name: '完成状态' }).selectOption({ label: '已完成' })
+    await page.getByRole('group', { name: '完成状态', exact: true }).getByRole('button', { name: '已完成' }).click()
     await expect(page.locator('.pending-row')).toHaveCount(0)
     await expect(page.getByRole('combobox', { name: '缺口' })).toHaveCount(0)
   } finally { await application.close(); fs.rmSync(root, { recursive: true, force: true }) }

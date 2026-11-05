@@ -18,13 +18,13 @@ class RendererCopyTest(unittest.TestCase):
         self.assertNotIn('适用流程', APP)
 
     def test_pending_page_filters_cover_relevant_dimensions(self):
-        for label in ("全部项目", "全部客户", "全部经办人", "事项经办人", "全部完成状态", "没有符合条件的待处理项"):
+        for label in ("全部项目", "全部客户", "全部经办人", "事项经办人", "完成状态", "没有符合条件的待处理项"):
             self.assertIn(label, APP)
         self.assertNotIn('aria-label="流程"', APP)
         self.assertNotIn('流程已删除', APP)
         self.assertNotIn('v-model="pendingFilter.gap"', APP)
         self.assertIn("matchesPendingQuery", APP)
-        self.assertIn("cachedProjectPercent", APP)
+        self.assertIn("pendingFilter.status === 'done' ? !row.gaps.length", APP)
         self.assertIn("clearPendingFilters", APP)
         self.assertIn("pending-filters", APP)
 
@@ -54,6 +54,23 @@ class RendererCopyTest(unittest.TestCase):
     def test_removes_redundant_page_and_card_copy(self):
         redundant = [
             "按项目查看事项与文件状态。",
+            "项目、待办与文件，都在这里。",
+            "将客户、文件与待办集中管理",
+            "新的待办会显示在这里",
+            "创建项目后，可以在这里快速访问",
+            "可以随时关联到项目",
+            "把项目拆分为具体事项",
+            "开始整理项目工作",
+            "项目相关文件集中保存在这里",
+            "集中查看各项目中需要跟进的事项",
+            "项目中的待办会汇总在这里",
+            "统一管理可复用模板，在事项中按需选用",
+            "管理工作空间的存储位置",
+            "保存项目文件夹及相关资料",
+            "保存文件库中的模板文件",
+            "保存工作空间的数据文件",
+            'class="eyebrow"',
+            "暂无说明",
             "进入事项可编辑清单、状态及附件。",
             "用于发货环节的资料归集和完成跟踪。",
             "创建一次发货、收货或培训事项，开始生成文件清单。",
@@ -68,10 +85,10 @@ class RendererCopyTest(unittest.TestCase):
         self.assertIn("-shm", APP)
 
     def test_keeps_operational_copy_and_short_actions(self):
-        self.assertIn('每份文件都有独立的待办清单。', APP)
-        self.assertIn('新文件默认包含“准备文件”待办。', APP)
-        self.assertIn('>编辑</button>', CHECKLIST)
-        self.assertIn('>删除</button>', CHECKLIST)
+        self.assertNotIn('每份文件都有独立的待办清单。', APP)
+        self.assertNotIn('新文件默认包含“准备文件”待办。', APP)
+        self.assertIn('编辑</button>', CHECKLIST)
+        self.assertIn('>删除文件项</button>', CHECKLIST)
 
 
 if __name__ == "__main__":

@@ -97,9 +97,9 @@ class DesignMdTest(unittest.TestCase):
                 with self.subTest(indicator=indicator, background=background):
                     self.assertGreaterEqual(contrast(COLORS[indicator], COLORS[background]), 3)
 
-    def test_palette_is_neutral_with_a_cool_accent(self):
-        self.assertEqual(COLORS["primary"], "#3d5674")
-        self.assertEqual(COLORS["canvas"], "#eaecf0")
+    def test_palette_matches_approved_warm_reference(self):
+        self.assertEqual(COLORS["primary"], "#ac4526")
+        self.assertEqual(COLORS["canvas"], "#faf9f5")
         self.assertNotEqual(COLORS["primary"], COLORS["status-done"])
         colors = CONTENT.split("## Colors\n", 1)[1].split("\n## Typography\n", 1)[0]
         for phrase in ("Accent", "status-done", "primary-soft", "surface-hover"):
@@ -107,10 +107,10 @@ class DesignMdTest(unittest.TestCase):
                 self.assertIn(phrase, colors)
         self.assertNotEqual(COLORS["primary"][:3], COLORS["status-done"][:3])
 
-    def test_shell_surfaces_float_on_the_canvas(self):
-        self.assertEqual(TOKENS["rounded"]["shell"], "16px")
+    def test_shell_is_flush_and_has_no_floating_gutters(self):
+        self.assertEqual(TOKENS["rounded"]["shell"], "0px")
         layout = CONTENT.split("### 一级布局\n", 1)[1].split("\n### ", 1)[0]
-        for phrase in ("Level 0", "Level 1", "rounded.shell", "spacing.md", "spacing.xs", "不加阴影", "Level 2"):
+        for phrase in ("Level 0", "Level 1", "rounded.shell",  "不加阴影", "Level 2"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, layout)
 
@@ -139,9 +139,9 @@ class DesignMdTest(unittest.TestCase):
         rows = layout.split("### 行高与垂直密度\n", 1)[1].split("\n### ", 1)[0]
         priority = layout.split("### 主次信息\n", 1)[1].split("\n### ", 1)[0]
 
-        self.assertRegex(structure, r"1400\s*px")
-        self.assertRegex(structure, r"spacing\.xl")
-        for marker in ("1180", "1050", "240", "216"):
+        self.assertRegex(structure, r"1440\s*px")
+        self.assertRegex(structure, r"spacing\.xxl")
+        for marker in ("1180", "1050", "272", "216"):
             with self.subTest(marker=marker):
                 self.assertIn(marker, structure)
         self.assertRegex(spacing, r"4\s*px")
@@ -152,14 +152,13 @@ class DesignMdTest(unittest.TestCase):
         for control in ("页面标题", "搜索", "筛选", "排序", "主要操作"):
             with self.subTest(control=control):
                 self.assertIn(control, toolbar)
-        self.assertRegex(toolbar, r"36\s*[–-]\s*44\s*px")
+        self.assertIn("44px", toolbar)
         self.assertIn("换行", toolbar)
-        self.assertRegex(rows, r"32\s*[–-]\s*40\s*px")
-        self.assertRegex(rows, r"45\s*px")
+        self.assertIn("88px", rows)
+        self.assertIn("100px", rows)
         self.assertIn("裁切", rows)
         self.assertIn("Badge", rows)
         self.assertIn("垂直空间", rows)
-        self.assertRegex(rows, r"28\s*[–-]\s*36\s*px")
         self.assertIn("卡片套卡片", layout)
         for term in ("文件名称", "状态", "修改时间", "类型", "大小", "辅助信息"):
             with self.subTest(term=term):
@@ -177,7 +176,7 @@ class DesignMdTest(unittest.TestCase):
     def test_parser_matches_front_matter_shape(self):
         self.assertEqual(TOKENS["name"], "WorkPack")
         self.assertEqual(TOKENS["components"]["button-primary"]["backgroundColor"], "{colors.primary}")
-        self.assertEqual(TOKENS["typography"]["body"]["fontSize"], "14px")
+        self.assertEqual(TOKENS["typography"]["body"]["fontSize"], "16px")
 
     def test_parser_rejects_unsupported_yaml(self):
         for snippet in ["colors:\n  - primary\n", "description: |\n  text\n", "colors: [a, b]\n"]:

@@ -1,10 +1,15 @@
 <script setup lang="ts">
-defineProps<{ name: 'project' | 'clock' | 'event' | 'back' | 'check' | 'plus' | 'search' | 'file' | 'info' | 'warning' | 'error' | 'close' | 'settings' | 'chevron-down' }>()
+defineProps<{ name: 'project' | 'clock' | 'event' | 'back' | 'check' | 'plus' | 'search' | 'file' | 'info' | 'warning' | 'error' | 'close' | 'settings' | 'chevron-down' | 'more' | 'copy' | 'edit' | 'arrow' | 'upload' }>()
 </script>
 
 <template>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-    <template v-if="name === 'project'">
+    <template v-if="name === 'more'"><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></template>
+    <template v-else-if="name === 'copy'"><rect x="4" y="7" width="12" height="14" rx="2" /><path d="M8 7V3h12v14h-4" /></template>
+    <template v-else-if="name === 'edit'"><path d="m15 4 5 5-11 11-6 1 1-6zM13 6l5 5" /></template>
+    <template v-else-if="name === 'arrow'"><path d="M4 12h16m-6-6 6 6-6 6" /></template>
+    <template v-else-if="name === 'upload'"><path d="M12 16V3m-5 5 5-5 5 5M4 14v6h16v-6" /></template>
+    <template v-else-if="name === 'project'">
       <path d="M3.5 7a2 2 0 0 1 2-2h4.2l1.8 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />
       <path d="M3.5 10h17" />
     </template>

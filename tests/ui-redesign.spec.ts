@@ -163,6 +163,8 @@ test('unsafe markup stays text, cancellation preserves data, and long content st
   await expect(page.locator('.project-detail')).toBeVisible()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1050, 700))
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  expect(await page.locator('.breadcrumb').evaluate(element => element.getBoundingClientRect().height)).toBeLessThan(48)
+  await expect(page.locator('.breadcrumb-current')).toHaveAttribute('title', '很长的项目名称'.repeat(10))
   await page.screenshot({ path: info.outputPath('long-project.png'), scale: 'css' })
   await page.getByRole('button', { name: '新建事项', exact: true }).click()
   await page.getByRole('textbox', { name: '事项名称' }).fill('长事项名称'.repeat(20))

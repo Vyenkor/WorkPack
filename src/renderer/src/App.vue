@@ -522,7 +522,7 @@ onBeforeUnmount(() => {
     </aside>
 
     <section class="content-shell" :aria-hidden="drawerOpen ? 'true' : undefined">
-      <header class="topbar" :inert="drawerOpen || Boolean(modal)"><div class="breadcrumb"><button v-if="view === 'project'" class="breadcrumb-link" @click="go('projects')">项目</button><UiIcon v-if="view === 'project'" name="back" class="breadcrumb-divider" />{{ currentBreadcrumb }}</div><div class="topbar-actions"><label class="global-search"><UiIcon name="search" class="search-icon" /><input ref="globalSearchInput" v-model="search" type="search" placeholder="搜索项目或客户" aria-label="搜索项目或客户" @keyup.enter="runGlobalSearch"><kbd>Ctrl K</kbd></label></div></header>
+      <header class="topbar" :inert="drawerOpen || Boolean(modal)"><div class="breadcrumb"><button v-if="view === 'project'" class="breadcrumb-link" @click="go('projects')">项目</button><UiIcon v-if="view === 'project'" name="back" class="breadcrumb-divider" /><span class="breadcrumb-current" :title="currentBreadcrumb">{{ currentBreadcrumb }}</span></div><div class="topbar-actions"><label class="global-search"><UiIcon name="search" class="search-icon" /><input ref="globalSearchInput" v-model="search" type="search" placeholder="搜索项目或客户" aria-label="搜索项目或客户" @keyup.enter="runGlobalSearch"><kbd>Ctrl K</kbd></label></div></header>
 
       <main class="view" :inert="drawerOpen || Boolean(modal)" tabindex="-1">
         <div v-if="loading" class="loading-state"><span class="spinner"></span><p>加载中…</p></div>

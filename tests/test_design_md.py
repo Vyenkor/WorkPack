@@ -120,8 +120,8 @@ class DesignMdTest(unittest.TestCase):
         self.assertIn("在侧边栏内水平居中，左右留白相等", CONTENT)
         self.assertNotIn("`.brand strong` 仍有负字距", CONTENT)
 
-    def test_workflow_identity_uses_one_shared_visual_treatment(self):
-        self.assertIn("流程统一使用同一图标和主色", CONTENT)
+    def test_library_identity_uses_one_shared_visual_treatment(self):
+        self.assertIn("模板文件统一使用文件图标和主色", CONTENT)
 
     def test_typography_uses_chinese_system_font(self):
         typography = CONTENT.split("## Typography\n", 1)[1].split("\n## Layout\n", 1)[0]

@@ -59,7 +59,8 @@ class InstallerConfigTest(unittest.TestCase):
         self.assertIn('$WorkPackDeleteWorkspaceData == "1"', cleanup)
         self.assertIn("${isUpdated}", cleanup)
         self.assertIn('Delete "$APPDATA\\WorkPack\\workpack-v3.sqlite"', cleanup)
-        self.assertIn('Delete "$APPDATA\\WorkPack\\workpack.sqlite"', cleanup)
+        self.assertNotIn('Delete "$APPDATA\\WorkPack\\workpack.sqlite"', cleanup)
+        self.assertNotIn('Delete "$APPDATA\\WorkPack\\workpack.sqlite-wal"', cleanup)
         self.assertIn('Delete "$APPDATA\\WorkPack\\storage.json"', cleanup)
         self.assertNotIn('RMDir /r', cleanup)
         self.assertNotIn('templates', cleanup.lower())
@@ -107,6 +108,11 @@ class InstallerConfigTest(unittest.TestCase):
         spec = (ROOT / "tests" / "installed-app.spec.ts").read_text(encoding="utf-8")
         self.assertIn("test.skip(!installedExe", spec)
         self.assertIn("app.isPackaged", spec)
+        self.assertIn("scripts/check-installer-asar.cjs", text)
+        scanner = (ROOT / "scripts" / "check-installer-asar.cjs").read_text(encoding="utf-8")
+        self.assertIn("listPackage(archive)", scanner)
+        self.assertIn("extractFile(archive, path.normalize(file))", scanner)
+        self.assertIn("workpack.sqlite", scanner)
 
 
 if __name__ == "__main__":

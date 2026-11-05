@@ -74,3 +74,29 @@ test('event drawer shows an independent checklist and keeps the project page', a
   await expect(drawer).toBeVisible()
   await expect(page.locator('.content-shell h1')).toHaveText('待处理')
 })
+
+test('a matter remains editable after its last template item is removed', async () => {
+  await createEvent()
+  const drawer = page.locator('.event-drawer')
+  await drawer.getByRole('button', { name: '添加文件项', exact: true }).click()
+  await page.getByRole('textbox', { name: '文件名称' }).fill('补充说明')
+  await page.locator('.modal-card button[type="submit"]').click()
+  await expect(drawer.locator('.document-card')).toHaveCount(2)
+  page.on('dialog', dialog => dialog.accept())
+  await drawer.locator('.document-card').first().getByRole('button', { name: '删除', exact: true }).click()
+  await expect(drawer.locator('.document-card')).toHaveCount(1)
+  for (const title of ['保留手动文件', '空事项']) {
+    await drawer.locator('.event-actions').getByRole('button', { name: '编辑', exact: true }).click()
+    await page.getByRole('textbox', { name: '事项名称' }).fill(title)
+    await page.getByRole('textbox', { name: '经办人' }).fill('新经办人')
+    await page.locator('.modal-card input[type="date"]').fill('2026-11-06')
+    await page.locator('.modal-card button[type="submit"]').click()
+    await expect(page.locator('.modal-card')).toHaveCount(0)
+    await expect(drawer.locator('#event-drawer-title')).toHaveText(title)
+    await expect(drawer).toContainText('新经办人')
+    if (title === '保留手动文件') {
+      await drawer.locator('.document-card').getByRole('button', { name: '删除', exact: true }).click()
+      await expect(drawer.locator('.document-card')).toHaveCount(0)
+    }
+  }
+})

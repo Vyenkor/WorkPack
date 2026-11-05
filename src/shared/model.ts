@@ -1,45 +1,33 @@
-export const steps = ['prepared', 'filled', 'signed', 'archived'] as const
-export type Step = typeof steps[number]
-export type Status = 'pending' | 'done' | 'na'
-export const stepLabels: Record<Step, string> = { prepared: '准备', filled: '填写', signed: '签字', archived: '归档' }
-export interface Rule { id: string; name: string; note: string; required: Step[]; assetId?: string }
 export interface Asset { id: string; name: string; path: string; exists: boolean }
-export interface Template { id: string; name: string; rules: Rule[]; assets: Asset[]; purpose?: string; categoryId?: string | null }
+export interface Template { id: string; name: string; purpose: string; categoryId: string | null; assets: Asset[] }
 export interface LibraryCategory { id: string; name: string }
 export interface DocumentTask { id: string; itemId: string; name: string; done: boolean; position: number }
 export interface Attachment extends Asset { itemId: string; createdAt: string }
-export interface Item extends Rule { eventId: string; states: Record<Step, Status>; attachments: Attachment[]; tasks?: DocumentTask[]; templateId?: string | null }
-export interface BusinessEvent { id: string; projectId: string; templateId: string; templateIds?: string[]; name: string; date: string; owner: string; items: Item[] }
-export interface Project { id: string; name: string; customer: string; contact: string; owner: string; note: string; folder: string; templateIds: string[]; folderExists: boolean; events: BusinessEvent[] }
-export interface Snapshot { projects: Project[]; templates: Template[]; categories?: LibraryCategory[]; dataDirectory: string; pendingView: PendingViewState }
+export interface Item { id: string; eventId: string; name: string; note: string; attachments: Attachment[]; tasks: DocumentTask[]; templateId: string | null }
+export interface BusinessEvent { id: string; projectId: string; templateId: string; templateIds: string[]; name: string; date: string; owner: string; items: Item[] }
+export interface Project { id: string; name: string; customer: string; contact: string; owner: string; note: string; folder: string; folderExists: boolean; events: BusinessEvent[] }
+export interface Snapshot { projects: Project[]; templates: Template[]; categories: LibraryCategory[]; pendingView: PendingViewState }
 export interface StorageLocations { project: string; template: string; workspace: string }
 export interface StorageChangeResult { locations: StorageLocations; warning?: string }
-export interface ProjectInput { id?: string; name: string; customer: string; contact: string; owner: string; note: string; templateIds: string[]; directoryToken?: string }
-export interface EventInput { projectId: string; templateId: string; name: string; date: string; owner: string }
-export interface EventUpdateInput extends EventInput { id: string }
-export interface TemplateInput { id?: string; name: string; rules: Rule[] }
-export interface ItemInput { id?: string; eventId: string; name: string; note: string; required: Step[] }
+export interface ProjectInput { id?: string; name: string; customer: string; contact: string; owner: string; note: string }
+export interface EventInput { projectId: string; templateIds: string[]; name: string; date: string; owner: string }
+export interface EventUpdateInput { id: string; projectId: string; name: string; date: string; owner: string }
+export interface ItemInput { id?: string; eventId: string; name: string; note: string }
 export interface WorkPackAPI {
   snapshot(): Promise<Snapshot>
   savePendingView(input: PendingViewState): Promise<PendingViewState>
-  chooseDirectory(): Promise<{ token: string; path: string } | null>
   saveProject(input: ProjectInput): Promise<string>
   deleteProject(id: string): Promise<void>
   relocateProject(id: string): Promise<boolean>
   openProject(id: string): Promise<void>
-  saveTemplate(input: TemplateInput): Promise<void>
-  deleteTemplate(id: string): Promise<void>
-  importTemplates(id: string): Promise<boolean>
+  deleteLibraryFile(id: string): Promise<void>
+  importLibraryFile(id: string): Promise<boolean>
   removeTemplateAsset(id: string): Promise<void>
   exportTemplates(ids: string[]): Promise<number>
-  createEvent(input: EventInput): Promise<string>
   updateEvent(input: EventUpdateInput): Promise<void>
   deleteEvent(id: string): Promise<void>
-  completeItem(id: string): Promise<void>
-  completeEvent(id: string): Promise<void>
   saveItem(input: ItemInput): Promise<void>
   deleteItem(id: string): Promise<void>
-  setStatus(input: { id: string; step: Step; status: Status }): Promise<void>
   importAttachments(id: string): Promise<boolean>
   openAttachment(id: string): Promise<void>
   relocateAttachment(id: string): Promise<boolean>
@@ -47,7 +35,7 @@ export interface WorkPackAPI {
   saveLibraryCategory(input: { id?: string; name: string }): Promise<void>
   deleteLibraryCategory(id: string): Promise<void>
   saveLibraryFile(input: { id?: string; name: string; purpose: string; categoryId?: string | null }): Promise<void>
-  createLibraryEvent(input: { projectId: string; templateIds: string[]; name: string; date: string; owner: string }): Promise<string>
+  createLibraryEvent(input: EventInput): Promise<string>
   saveDocumentTask(input: { id?: string; itemId: string; name: string }): Promise<void>
   setDocumentTaskDone(input: { id: string; done: boolean }): Promise<void>
   deleteDocumentTask(id: string): Promise<void>
@@ -55,53 +43,27 @@ export interface WorkPackAPI {
   chooseStorageLocation(kind: keyof StorageLocations): Promise<StorageChangeResult | null>
 }
 export function progress(items: Item[]) {
-  let total = 0
-  let done = 0
-  for (const item of items) {
-    if (item.tasks) { for (const task of item.tasks) { total++; if (task.done && (task.name !== '准备文件' || item.attachments.some(a => a.exists))) done++ } continue }
-    for (const step of steps) {
-    if (item.states[step] === 'na') continue
+  let total = 0, done = 0
+  for (const item of items) for (const task of item.tasks) {
     total++
-    const ready = step !== 'prepared' || item.attachments.some(attachment => attachment.exists)
-    if (item.states[step] === 'done' && ready) done++
-  }
+    if (task.done && (task.position !== 0 || item.attachments.some(file => file.exists))) done++
   }
   return { done, total, percent: total ? Math.round(done / total * 100) : items.length ? 100 : 0 }
 }
-export function unfinished(items: Item[]): number {
-  return items.filter(item => gaps(item).length > 0).length
-}
+export function unfinished(items: Item[]): number { return items.filter(item => gaps(item).length > 0).length }
 export type CompletionFilter = 'all' | 'open' | 'done'
-export type PendingGapFilter = 'all' | 'unprepared' | 'unfilled' | 'unsigned' | 'unarchived'
-export interface PendingFilterQuery {
-  keyword: string
-  projectId: string
-  customer: string
-  templateId: string
-  owner: string
-  status: CompletionFilter
-  gap: PendingGapFilter
-}
+export interface PendingFilterQuery { keyword: string; projectId: string; customer: string; owner: string; status: CompletionFilter }
 export function matchesCompletionFilter(percent: number, hasWork: boolean, status: CompletionFilter) {
   if (status === 'all') return true
   const complete = percent === 100 && hasWork
   return status === 'done' ? complete : !complete
 }
-const gapStep: Record<Exclude<PendingGapFilter, 'all' | 'unprepared'>, Step> = { unfilled: 'filled', unsigned: 'signed', unarchived: 'archived' }
-const unpreparedLabels = new Set(['未上传', '待准备', '附件失效'])
 export function gaps(item: Item): string[] {
-  if (item.tasks) return [...item.tasks.filter(task => !task.done || (task.name === '准备文件' && !item.attachments.some(a => a.exists))).map(task => task.name === '准备文件' ? '待准备文件' : `待${task.name}`), ...item.attachments.some(a => !a.exists) ? ['附件失效'] : []]
-  const result: string[] = []
-  if (item.states.prepared !== 'na' && !item.attachments.some(a => a.exists)) result.push('未上传')
-  for (const step of steps) if (item.states[step] === 'pending') result.push(`待${stepLabels[step]}`)
-  if (item.attachments.some(a => !a.exists)) result.push('附件失效')
-  return result
-}
-export function itemMatchesGap(item: Item, gap: PendingGapFilter) {
-  if (gap === 'all') return true
-  const labels = gaps(item)
-  if (gap === 'unprepared') return labels.some(label => unpreparedLabels.has(label) || label === '待准备文件')
-  return labels.includes(`待${stepLabels[gapStep[gap]]}`)
+  const ready = item.attachments.some(file => file.exists)
+  return [
+    ...item.tasks.filter(task => !task.done || (task.position === 0 && !ready)).map(task => task.position === 0 ? '待准备文件' : `待${task.name}`),
+    ...item.attachments.some(file => !file.exists) ? ['附件失效'] : []
+  ]
 }
 export function cachedProjectPercent(projectId: string, cache: Map<string, number>, compute: () => number) {
   const cached = cache.get(projectId)
@@ -110,99 +72,54 @@ export function cachedProjectPercent(projectId: string, cache: Map<string, numbe
   cache.set(projectId, percent)
   return percent
 }
-/** Library rows match the checklist item's file. Older rows still match the event's file list. */
-export function pendingFileIds(row: { event: Pick<BusinessEvent, 'templateId' | 'templateIds'>; item: Pick<Item, 'templateId'> }): string[] {
-  if (row.item.templateId) return [row.item.templateId]
-  if (row.item.templateId === null) return []
-  if (row.event.templateIds?.length) return [...row.event.templateIds]
-  return row.event.templateId ? [row.event.templateId] : []
-}
-export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery, workflowName: string, projectPercent: number | (() => number)) {
-  const customer = query.customer.trim()
-  const owner = query.owner.trim()
+export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery, projectPercent: number | (() => number)) {
   if (query.projectId && row.project.id !== query.projectId) return false
-  if (customer && row.project.customer.trim() !== customer) return false
-  if (query.templateId && !pendingFileIds(row).includes(query.templateId)) return false
-  if (owner && row.event.owner.trim() !== owner) return false
+  if (query.customer.trim() && row.project.customer.trim() !== query.customer.trim()) return false
+  if (query.owner.trim() && row.event.owner.trim() !== query.owner.trim()) return false
   if (query.status !== 'all') {
     const percent = typeof projectPercent === 'function' ? projectPercent() : projectPercent
     if (!matchesCompletionFilter(percent, row.project.events.length > 0, query.status)) return false
   }
-  if (!itemMatchesGap(row.item, query.gap)) return false
   const keyword = query.keyword.trim().toLowerCase()
-  if (!keyword) return true
-  return [row.project.name, row.project.customer, row.project.owner, row.event.name, row.event.owner, row.item.name, workflowName].some(value => value.toLowerCase().includes(keyword))
+  return !keyword || [row.project.name, row.project.customer, row.project.owner, row.event.name, row.event.owner, row.item.name].some(value => value.toLowerCase().includes(keyword))
 }
 export type PendingGroupBy = 'project' | 'owner' | 'none'
 export interface PendingGroup<T> { key: string; label: string; rows: T[] }
 export interface PendingViewState { filter: PendingFilterQuery; groupBy: PendingGroupBy }
 export const PENDING_VIEW_PREFERENCE_KEY = 'pending.view'
-const pendingGroupModes: readonly PendingGroupBy[] = ['project', 'owner', 'none']
-const completionFilters: readonly CompletionFilter[] = ['all', 'open', 'done']
-const gapFilters: readonly PendingGapFilter[] = ['all', 'unprepared', 'unfilled', 'unsigned', 'unarchived']
-export function defaultPendingFilter(): PendingFilterQuery {
-  return { keyword: '', projectId: '', customer: '', templateId: '', owner: '', status: 'all', gap: 'all' }
-}
-export function defaultPendingViewState(): PendingViewState {
-  return { filter: defaultPendingFilter(), groupBy: 'project' }
-}
+export function defaultPendingFilter(): PendingFilterQuery { return { keyword: '', projectId: '', customer: '', owner: '', status: 'all' } }
+export function defaultPendingViewState(): PendingViewState { return { filter: defaultPendingFilter(), groupBy: 'project' } }
 function storedString(value: unknown) { return typeof value === 'string' ? value : '' }
-function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
-  return typeof value === 'string' && (allowed as readonly string[]).includes(value) ? value as T : fallback
-}
 export function parsePendingViewState(raw: unknown): PendingViewState {
   const fallback = defaultPendingViewState()
   let parsed: unknown = raw
-  if (typeof raw === 'string') {
-    if (!raw.trim()) return fallback
-    try { parsed = JSON.parse(raw) } catch { return fallback }
-  }
+  if (typeof raw === 'string') { try { parsed = JSON.parse(raw) } catch { return fallback } }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fallback
   const record = parsed as Record<string, unknown>
-  const filterSource = record.filter && typeof record.filter === 'object' && !Array.isArray(record.filter) ? record.filter as Record<string, unknown> : {}
+  const filter = record.filter && typeof record.filter === 'object' && !Array.isArray(record.filter) ? record.filter as Record<string, unknown> : {}
   return {
     filter: {
-      keyword: storedString(filterSource.keyword),
-      projectId: storedString(filterSource.projectId),
-      customer: storedString(filterSource.customer),
-      templateId: storedString(filterSource.templateId),
-      owner: storedString(filterSource.owner),
-      status: oneOf(filterSource.status, completionFilters, 'all'),
-      gap: oneOf(filterSource.gap, gapFilters, 'all')
+      keyword: storedString(filter.keyword), projectId: storedString(filter.projectId), customer: storedString(filter.customer), owner: storedString(filter.owner),
+      status: filter.status === 'open' || filter.status === 'done' ? filter.status : 'all'
     },
-    groupBy: oneOf(record.groupBy, pendingGroupModes, 'project')
+    groupBy: record.groupBy === 'owner' || record.groupBy === 'none' ? record.groupBy : 'project'
   }
 }
 export function serializePendingViewState(state: PendingViewState) { return JSON.stringify(parsePendingViewState(state)) }
-export function normalizePendingViewState(state: PendingViewState, existing: { projectIds: readonly string[]; templateIds: readonly string[] }): PendingViewState {
+export function normalizePendingViewState(state: PendingViewState, existing: { projectIds: readonly string[] }): PendingViewState {
   const parsed = parsePendingViewState(state)
-  const projects = new Set(existing.projectIds)
-  const templates = new Set(existing.templateIds)
-  return {
-    filter: {
-      ...parsed.filter,
-      projectId: projects.has(parsed.filter.projectId) ? parsed.filter.projectId : '',
-      templateId: templates.has(parsed.filter.templateId) ? parsed.filter.templateId : ''
-    },
-    groupBy: parsed.groupBy
-  }
+  return { ...parsed, filter: { ...parsed.filter, projectId: existing.projectIds.includes(parsed.filter.projectId) ? parsed.filter.projectId : '' } }
 }
 export function groupPendingRows<T extends { project: Pick<Project, 'id' | 'name'>; event: Pick<BusinessEvent, 'owner'> }>(rows: readonly T[], groupBy: PendingGroupBy): PendingGroup<T>[] {
   if (!rows.length) return []
   if (groupBy === 'none') return [{ key: '', label: '', rows: [...rows] }]
-  const groups: PendingGroup<T>[] = []
-  const index = new Map<string, PendingGroup<T>>()
+  const groups: PendingGroup<T>[] = [], index = new Map<string, PendingGroup<T>>()
   for (const row of rows) {
-    const byOwner = groupBy === 'owner'
-    const key = byOwner ? row.event.owner.trim() : row.project.id
+    const byOwner = groupBy === 'owner', key = byOwner ? row.event.owner.trim() : row.project.id
     const label = byOwner ? key || '未填写经办人' : row.project.name.trim() || '未命名项目'
     const existing = index.get(key)
     if (existing) existing.rows.push(row)
-    else {
-      const group = { key, label, rows: [row] }
-      index.set(key, group)
-      groups.push(group)
-    }
+    else { const group = { key, label, rows: [row] }; index.set(key, group); groups.push(group) }
   }
   return groups
 }

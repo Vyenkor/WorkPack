@@ -29,8 +29,8 @@ class ReadmeTest(unittest.TestCase):
         self.assertIn("'unittest', 'discover'", runner)
         self.assertIn("npm test` 会依次运行 Vitest 服务层测试和 `tests/test_*.py`", README)
 
-    def test_covers_purpose_data_and_workflow(self):
-        for topic in ["准备、填写、签字、归档", "workpack.sqlite", ".workpack-project.json", "WORKPACK_TEST_DATA", "python3 -m unittest"]:
+    def test_covers_library_tasks_and_storage(self):
+        for topic in ["文件库", "准备文件", "workpack-v3.sqlite", "设置 → 存储", ".workpack-project.json", "WORKPACK_TEST_DATA", "python3 -m unittest"]:
             with self.subTest(topic=topic):
                 self.assertIn(topic, README)
 
@@ -42,8 +42,7 @@ class ReadmeTest(unittest.TestCase):
         self.assertTrue((ROOT / "docs" / "assets" / "workpack-logo-on-light.png").is_file())
         for name in ("pending.png", "project-drawer.png", "checklist.png"):
             with self.subTest(name=name):
-                self.assertIn(f"docs/assets/{name}", README)
-                self.assertTrue((ROOT / "docs" / "assets" / name).is_file())
+                self.assertNotIn(f"docs/assets/{name}", README)
         self.assertIn("social-preview.png", README)
         self.assertTrue((ROOT / "docs" / "assets" / "social-preview.png").is_file())
         for name in ("logo.png", "logo-dark.png", "logo.svg", "logo-dark.svg"):

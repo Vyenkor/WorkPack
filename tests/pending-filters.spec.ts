@@ -15,6 +15,9 @@ test('pending filters match the custom checklist model', async () => {
     await application.evaluate(({ dialog }, folder) => {
       Object.defineProperty(dialog, 'showOpenDialog', { configurable: true, value: async () => ({ canceled: false, filePaths: [folder] }) })
     }, projects)
+    await page.getByRole('button', { name: '我的工作空间' }).click()
+    await page.getByRole('button', { name: '设置', exact: true }).click()
+    await page.locator('.storage-row').first().getByRole('button', { name: '选择文件夹' }).click()
     const nav = page.getByRole('navigation', { name: '主导航' })
     await nav.getByRole('button', { name: '文件库' }).click()
     await page.getByRole('button', { name: '添加文件模板' }).click()
@@ -25,7 +28,6 @@ test('pending filters match the custom checklist model', async () => {
     await page.getByRole('textbox', { name: '项目名称' }).fill('筛选甲')
     await page.getByRole('textbox', { name: '客户名称' }).fill('客户甲')
     await page.getByRole('textbox', { name: '负责人' }).fill('负责人甲')
-    await page.getByRole('button', { name: '选择文件夹' }).click()
     await page.locator('.modal-card button[type="submit"]').click()
     await page.getByRole('button', { name: '新建事项' }).first().click()
     await page.getByRole('textbox', { name: '事项名称' }).fill('第一批')

@@ -4,8 +4,10 @@ import { pathToFileURL } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { WorkPackService } from './service'
+import { StorageManager, type StorageKind } from './storage'
 
 let service: WorkPackService
+let storage: StorageManager
 let window: BrowserWindow
 const directoryGrants = new Map<string, string>()
 const stringId = z.string().uuid()
@@ -81,6 +83,14 @@ function registerIPC() {
   handle('saveDocumentTask', value => service.saveDocumentTask(value))
   handle('setDocumentTaskDone', value => service.setDocumentTaskDone(value))
   handle('deleteDocumentTask', value => service.deleteDocumentTask(stringId.parse(value)))
+  handle('storageLocations', () => ({ ...storage.locations }))
+  handle('chooseStorageLocation', async value => {
+    const kind = z.enum(['project', 'template', 'workspace']).parse(value) as StorageKind
+    const folder = await selectFolder()
+    if (!folder) return null
+    try { return storage.change(kind, folder) }
+    finally { service = storage.service }
+  })
 }
 
 const hasInstanceLock = app.requestSingleInstanceLock()
@@ -94,7 +104,8 @@ if (!hasInstanceLock) {
     window.focus()
   })
   app.whenReady().then(() => {
-    service = new WorkPackService(app.getPath('userData'), undefined, true)
+    storage = new StorageManager(app.getPath('userData'), path.join(app.getPath('documents'), 'WorkPack', '项目'))
+    service = storage.service
     window = new BrowserWindow({
       title: 'WorkPack · 项目资料管理', width: 1440, height: 960, minWidth: 1050, minHeight: 700,
       backgroundColor: '#f5f7f6', show: false,

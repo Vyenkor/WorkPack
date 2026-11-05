@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 const electronExecutable = require('electron') as string
 
-test('navigation and file library follow the desktop layout', async () => {
+test('navigation, workspace menu, and storage settings follow the desktop layout', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-accessibility-'))
   const application = await _electron.launch({ executablePath: electronExecutable, args: ['.'], env: { ...process.env, WORKPACK_TEST_DATA: path.join(root, 'data') } })
   try {
@@ -16,6 +16,14 @@ test('navigation and file library follow the desktop layout', async () => {
       await expect(icon).toHaveAttribute('aria-hidden', 'true')
       await expect(icon).toHaveCSS('width', '20px')
     }
+    const workspace = page.getByRole('button', { name: '我的工作空间' })
+    await workspace.click()
+    await expect(workspace).toHaveAttribute('aria-expanded', 'true')
+    await page.getByRole('button', { name: '设置', exact: true }).click()
+    await expect(page.getByRole('heading', { name: '设置' })).toBeVisible()
+    await expect(page.locator('.storage-row')).toHaveCount(3)
+    const popoverShadow = await page.locator('.workspace-popover').count()
+    expect(popoverShadow).toBe(0)
     await nav.getByRole('button', { name: '文件库' }).click()
     await expect(page.getByRole('heading', { name: '文件库', exact: true })).toBeVisible()
     await page.getByRole('button', { name: '添加文件模板' }).click()

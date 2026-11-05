@@ -37,6 +37,8 @@ const api: WorkPackAPI = {
   createLibraryEvent: input => call('createLibraryEvent', input),
   saveDocumentTask: input => call('saveDocumentTask', input),
   setDocumentTaskDone: input => call('setDocumentTaskDone', input),
-  deleteDocumentTask: id => call('deleteDocumentTask', id)
+  deleteDocumentTask: id => call('deleteDocumentTask', id),
+  storageLocations: () => call('storageLocations'),
+  chooseStorageLocation: kind => call('chooseStorageLocation', kind)
 }
 contextBridge.exposeInMainWorld('workpack', Object.freeze(api))

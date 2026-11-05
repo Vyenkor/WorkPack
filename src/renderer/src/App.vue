@@ -55,7 +55,7 @@ function categoryName(id: string | null) { return snapshot.value.categories.find
 function templateStatus(file: Template) { return !file.assets.length ? '未导入' : file.assets.every(asset => asset.exists) ? '可用' : '失效' }
 function shortPath(value: string) { const parts = value.split(/[\\/]/); return parts.length > 3 ? `…\\${parts.slice(-3).join('\\')}` : value }
 async function copyPath(value: string) {
-  try { await navigator.clipboard.writeText(value); showToast('路径已复制') }
+  try { await window.workpack.copyPath(value); showToast('路径已复制') }
   catch { showToast('无法复制路径，请重试', 'error') }
 }
 function searchShortcut(event: KeyboardEvent) {
@@ -494,7 +494,7 @@ onBeforeUnmount(() => {
       <nav class="nav" aria-label="主导航">
         <button type="button" :class="{ active: view === 'home' }" @click="go('home')"><NavIcon class="nav-icon" name="home" />工作台</button>
         <button type="button" :class="{ active: view === 'projects' || view === 'project' }" @click="go('projects')"><NavIcon class="nav-icon" name="projects" />项目</button>
-        <button type="button" :class="{ active: view === 'pending' }" @click="go('pending')"><NavIcon class="nav-icon" name="pending" />待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
+        <button type="button" aria-label="待处理" :class="{ active: view === 'pending' }" @click="go('pending')"><NavIcon class="nav-icon" name="pending" />待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
         <button type="button" :class="{ active: view === 'templates' }" @click="go('templates')"><NavIcon class="nav-icon" name="templates" />文件库</button>
       </nav>
       <div class="sidebar-bottom"><button type="button" class="workspace-switch" aria-controls="workspace-menu" :aria-expanded="workspaceMenu" @click="workspaceMenu = !workspaceMenu" @keydown.esc="workspaceMenu = false"><span class="workspace-avatar">W</span><span>我的工作空间</span><UiIcon name="chevron-down" /></button><div v-if="workspaceMenu" id="workspace-menu" class="workspace-popover" @keydown.esc="workspaceMenu = false"><section class="whats-new" aria-label="这次更新了什么"><h3>这次更新了什么</h3><ul><li>文件库可分类管理模板</li><li>事项文件可自定义待办</li><li>可分别设置三个存储位置</li><li>卸载时可选清理工作空间记录</li></ul></section><button type="button" @click="go('settings')"><UiIcon name="settings" />设置</button></div></div>

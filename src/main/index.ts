@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
@@ -40,6 +40,7 @@ function registerIPC() {
   }
   const open = async (file: string) => { const error = await shell.openPath(file); if (error) throw new Error(`无法打开：${error}`) }
   handle('snapshot', () => service.snapshot())
+  handle('copyPath', value => { clipboard.writeText(z.string().min(1).max(32768).refine(text => !text.includes('\0')).parse(value)) })
   handle('savePendingView', value => service.savePendingView(value))
   handle('saveProject', input => service.saveProject(input))
   handle('deleteProject', value => { stringId.parse(value); service.deleteProject(value) })

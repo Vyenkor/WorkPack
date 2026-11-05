@@ -15,6 +15,7 @@ export interface EventUpdateInput { id: string; projectId: string; name: string;
 export interface ItemInput { id?: string; eventId: string; name: string; note: string }
 export interface WorkPackAPI {
   snapshot(): Promise<Snapshot>
+  copyPath(value: string): Promise<void>
   savePendingView(input: PendingViewState): Promise<PendingViewState>
   saveProject(input: ProjectInput): Promise<string>
   deleteProject(id: string): Promise<void>

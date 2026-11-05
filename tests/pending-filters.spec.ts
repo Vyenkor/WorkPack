@@ -39,7 +39,7 @@ test('pending filters match the custom checklist model', async () => {
     await expect(page.locator('.pending-row')).toHaveCount(1)
     await page.getByRole('searchbox', { name: '搜索待处理' }).fill('不匹配')
     await expect(page.locator('.pending-row')).toHaveCount(0)
-    await page.getByRole('button', { name: '清除' }).click()
+    await page.getByRole('button', { name: '清除', exact: true }).click()
     await expect(page.locator('.pending-row')).toHaveCount(1)
     await page.getByRole('combobox', { name: '客户' }).selectOption({ label: '客户甲' })
     await page.getByRole('combobox', { name: '经办人' }).selectOption({ label: '经办甲' })

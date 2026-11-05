@@ -66,7 +66,15 @@ test('approved empty pages, six dialogs and minimum desktop window', async ({}, 
   await page.keyboard.press('Escape')
   await addProject(); await page.screenshot({ path: info.outputPath('05-project.png'), scale: 'css' })
   await page.getByRole('button', { name: '复制项目路径' }).click()
-  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toContain('山职陶瓷展会')
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toContain('山职陶瓷展会')
+  const copied = await app.evaluate(({ clipboard }) => clipboard.readText())
+  for (const invalid of ['', 'a'.repeat(32769), 'bad\0path']) {
+    const rejected = await page.evaluate(async value => {
+      try { await window.workpack.copyPath(value); return false } catch { return true }
+    }, invalid)
+    expect(rejected).toBe(true)
+    expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe(copied)
+  }
   await page.getByRole('button', { name: '新建事项' }).click()
   await page.screenshot({ path: info.outputPath('modal-event.png'), scale: 'css' })
   await page.getByRole('textbox', { name: '事项名称' }).fill('第一批交付')

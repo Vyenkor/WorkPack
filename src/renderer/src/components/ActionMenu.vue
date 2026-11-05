@@ -28,7 +28,11 @@ function keys(event: KeyboardEvent) {
   buttons[next]?.focus()
 }
 function outside(event: Event) { if (!root.value?.contains(event.target as Node)) close() }
-function focusOut() { nextTick(() => { if (!root.value?.contains(document.activeElement)) close() }) }
+// focusout runs before the next control receives focus. activeElement may still
+// be body here; relatedTarget identifies the actual destination reliably.
+function focusOut(event: FocusEvent) {
+  if (!root.value?.contains(event.relatedTarget as Node | null)) close()
+}
 function select(event: MouseEvent) {
   if (!(event.target as Element).closest('button') || (event.target as Element).closest('button')?.hasAttribute('disabled')) return
   close(true)

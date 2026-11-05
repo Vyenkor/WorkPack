@@ -10,6 +10,7 @@
 
 - 当前仓库：`Vyenkor/WorkPack`，本地目录 `E:\张路瑶\Workspace\WorkPack`。
 - 当前工作分支：`codex/warm-ui-reproduction`。
+- 草稿 PR：[PR #30](https://github.com/Vyenkor/WorkPack/pull/30)，目标分支 main。实现阶段提交：`a1171a0`。
 - 开始实现时的远端 main 基线：`2188e8a219e84b6e8b63db284f355111131050f1`，v0.2.0。
 - 原本地 main 落后 29 个提交，已经从最新远端 main 创建新分支。请勿基于旧本地 main 重新做一遍。
 - 用户要求产物放在 `Agent/Codex`。根目录 `AGENT.md` 要求更新测试、检查并提交 commit；`DESIGN.md` 已按本次用户确认的风格更新。当前允许先提交未完成草稿 PR，是用户最新明确要求。

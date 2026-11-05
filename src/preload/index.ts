@@ -30,6 +30,13 @@ const api: WorkPackAPI = {
   importAttachments: id => call('importAttachments', id),
   openAttachment: id => call('openAttachment', id),
   relocateAttachment: id => call('relocateAttachment', id),
-  removeAttachment: id => call('removeAttachment', id)
+  removeAttachment: id => call('removeAttachment', id),
+  saveLibraryCategory: input => call('saveLibraryCategory', input),
+  deleteLibraryCategory: id => call('deleteLibraryCategory', id),
+  saveLibraryFile: input => call('saveLibraryFile', input),
+  createLibraryEvent: input => call('createLibraryEvent', input),
+  saveDocumentTask: input => call('saveDocumentTask', input),
+  setDocumentTaskDone: input => call('setDocumentTaskDone', input),
+  deleteDocumentTask: id => call('deleteDocumentTask', id)
 }
 contextBridge.exposeInMainWorld('workpack', Object.freeze(api))

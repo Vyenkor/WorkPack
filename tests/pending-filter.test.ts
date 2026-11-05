@@ -106,6 +106,16 @@ describe('pending filters', () => {
     expect(matchesPendingQuery(row, { ...openQuery(), keyword: '流程已删除' }, '流程已删除', 40)).toBe(true)
   })
 
+  it('matches a library file on the checklist item instead of only the event primary template', () => {
+    const row = sample({ event: { templateId: 'shipping', templateIds: ['shipping', 'training'] }, item: { templateId: 'training' } })
+    expect(matchesPendingQuery(row, { ...openQuery(), templateId: 'training' }, '', 40)).toBe(true)
+    expect(matchesPendingQuery(row, { ...openQuery(), templateId: 'shipping' }, '', 40)).toBe(false)
+    const manual = sample({ event: { templateId: 'shipping', templateIds: ['shipping', 'training'] }, item: { templateId: null } })
+    expect(matchesPendingQuery(manual, { ...openQuery(), templateId: 'shipping' }, '', 40)).toBe(false)
+    expect(matchesPendingQuery(sample(), { ...openQuery(), templateId: 'shipping' }, '', 40)).toBe(true)
+    expect(matchesPendingQuery(sample({ event: { templateIds: ['shipping', 'training'] } }), { ...openQuery(), templateId: 'training' }, '', 40)).toBe(true)
+  })
+
   it('trims customer and owner on both the query and the row', () => {
     const row = sample({ project: { customer: ' 客户甲 ' }, event: { owner: ' 经办甲 ' } })
     expect(matchesPendingQuery(row, { ...openQuery(), customer: '客户甲' }, '', 40)).toBe(true)

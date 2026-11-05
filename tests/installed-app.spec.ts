@@ -42,13 +42,12 @@ test('安装后的程序能建库、在中文路径下建项目，重启后数�
   await page.getByRole('textbox', { name: '项目名称' }).fill('安装 冒烟项目')
   await page.getByRole('textbox', { name: '客户名称' }).fill('测试客户')
   await page.getByRole('textbox', { name: '负责人' }).fill('测试负责人')
-  await page.locator('.template-check input').first().check()
   await page.getByRole('button', { name: '选择文件夹' }).click()
   await page.locator('.modal-card button[type="submit"]').click()
   await expect(page.locator('.project-detail h1')).toHaveText('安装 冒烟项目')
   await application.close()
 
-  expect(fs.existsSync(path.join(dataDir, 'workpack.sqlite'))).toBe(true)
+  expect(fs.existsSync(path.join(dataDir, 'workpack-v3.sqlite'))).toBe(true)
   expect(fs.existsSync(path.join(parent, '安装 冒烟项目', '.workpack-project.json'))).toBe(true)
 
   ;[application, page] = await launch(dataDir)

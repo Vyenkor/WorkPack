@@ -8,33 +8,21 @@ CHECKLIST = (ROOT / "src" / "renderer" / "src" / "components" / "ItemChecklist.v
 
 
 class RendererCopyTest(unittest.TestCase):
-    def test_template_library_is_presented_as_workflows(self):
-        self.assertIn("templates: '流程'", APP)
-        self.assertIn("<h1>流程</h1>", APP)
-        self.assertIn("新建流程", APP)
-        self.assertIn("编辑流程", APP)
-        self.assertNotIn("<h1>模板</h1>", APP)
+    def test_library_and_event_selection_are_explicit(self):
+        self.assertIn("templates: '文件库'", APP)
+        self.assertIn('<h1>文件库</h1>', APP)
+        self.assertIn('添加文件模板', APP)
+        self.assertIn('新建分类', APP)
+        self.assertIn('eventForm.templateIds', APP)
+        self.assertIn('createLibraryEvent', APP)
+        self.assertNotIn('适用流程', APP)
 
-    def test_workflow_form_only_asks_for_a_workflow_name(self):
-        self.assertIn('<label class="full-width">流程名称', APP)
-        self.assertNotIn('templateTypeInput', APP)
-        self.assertNotIn('事项类型', APP)
-
-    def test_projects_and_events_show_workflow_names(self):
-        self.assertIn('templateFor(event.templateId)?.name', APP)
-        self.assertIn('workflowLabel(row.event.templateId)', APP)
-        self.assertIn("templateFor(id)?.name || '流程已删除'", APP)
-        self.assertNotIn('typeLabel(', APP)
-
-    def test_workflow_categories_do_not_drive_icons_or_filters(self):
-        self.assertIn('<UiIcon name="workflow" />', APP)
-        self.assertNotIn('projectFilter.type', APP)
-        self.assertNotIn('pendingFilter.type', APP)
-        self.assertNotIn('availableTypes', APP)
-
-    def test_pending_page_filters_cover_mvp_dimensions_and_gaps(self):
-        for label in ("全部项目", "全部客户", "全部流程", "全部经办人", "事项经办人", "全部完成状态", "未准备", "未填写", "未签字", "未归档", "没有符合条件的待处理项"):
+    def test_pending_page_filters_cover_relevant_dimensions(self):
+        for label in ("全部项目", "全部客户", "全部经办人", "事项经办人", "全部文件", "全部完成状态", "没有符合条件的待处理项"):
             self.assertIn(label, APP)
+        self.assertNotIn('aria-label="流程"', APP)
+        self.assertNotIn('流程已删除', APP)
+        self.assertNotIn('v-model="pendingFilter.gap"', APP)
         self.assertIn("matchesPendingQuery", APP)
         self.assertIn("cachedProjectPercent", APP)
         self.assertIn("clearPendingFilters", APP)
@@ -49,17 +37,12 @@ class RendererCopyTest(unittest.TestCase):
         self.assertIn("projects.find(item => item.id === saved)", APP)
         self.assertNotIn("projects.find(item => item.name === name)", APP)
 
-    def test_prepared_done_requires_available_attachment(self):
-        self.assertIn('class="status-toggle"', CHECKLIST)
-        self.assertIn("function canToggle", CHECKLIST)
-        self.assertIn("item.states[step] === 'na'", CHECKLIST)
-        self.assertIn("step !== 'prepared' || item.states[step] === 'done' || item.attachments.some(file => file.exists)", CHECKLIST)
-        self.assertIn("'请先上传文件'", CHECKLIST)
-        self.assertIn('<option value="na">不适用</option>', CHECKLIST)
-
-    def test_not_applicable_status_does_not_toggle_to_done(self):
-        self.assertIn("if (!canToggle(item, step)) return", CHECKLIST)
-        self.assertIn("item.states[step] === 'done' ? 'pending' : 'done'", CHECKLIST)
+    def test_checklist_uses_custom_checkboxes(self):
+        self.assertIn('class="document-task"', CHECKLIST)
+        self.assertIn('type="checkbox"', CHECKLIST)
+        self.assertIn('添加待办', CHECKLIST)
+        self.assertIn('item.attachments.some(file => file.exists)', CHECKLIST)
+        self.assertNotIn('status-more', CHECKLIST)
 
     def test_error_toast_clears_on_the_next_action(self):
         self.assertIn("function clearToast()", APP)
@@ -79,12 +62,10 @@ class RendererCopyTest(unittest.TestCase):
             self.assertNotIn(phrase, APP)
 
     def test_keeps_operational_copy_and_short_actions(self):
-        self.assertIn("模板文件保存在本机数据目录", APP)
-        self.assertIn("准备步骤需有文件。", APP)
-        self.assertIn("未选步骤按“不适用”处理，不计入完成率。", (ROOT / "src" / "renderer" / "src" / "components" / "RulesEditor.vue").read_text(encoding="utf-8"))
-        self.assertIn(">完成</button>", CHECKLIST)
-        self.assertIn(">编辑</button>", CHECKLIST)
-        self.assertIn(">删除</button>", CHECKLIST)
+        self.assertIn('每份文件都有独立的待办清单。', APP)
+        self.assertIn('新文件默认包含“准备文件”待办。', APP)
+        self.assertIn('>编辑</button>', CHECKLIST)
+        self.assertIn('>删除</button>', CHECKLIST)
 
 
 if __name__ == "__main__":

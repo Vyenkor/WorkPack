@@ -38,7 +38,7 @@ class EventDrawerTest(unittest.TestCase):
         self.assertIn('aria-labelledby="event-drawer-title"', drawer)
         self.assertIn("@keydown=\"handleDrawerKeydown\"", drawer)
         self.assertIn("@click=\"requestCloseDrawer\"", drawer)
-        self.assertIn("准备步骤需有文件。", drawer)
+        self.assertIn("每份文件都有独立的待办清单。", drawer)
         self.assertIn('class="drawer-scrim"', APP)
         self.assertIn("view.value === 'pending'", APP)
         self.assertIn("openEvent(row.project, row.event, { projectPage: true })", APP)

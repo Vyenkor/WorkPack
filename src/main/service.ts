@@ -61,11 +61,11 @@ function workflowFolder(value: string) {
 export class WorkPackService {
   db: Database.Database
   templateRoot: string
-  constructor(readonly dataDirectory: string, readonly copyFile = fs.copyFileSync) {
+  constructor(readonly dataDirectory: string, readonly copyFile = fs.copyFileSync, readonly libraryMode = false) {
     fs.mkdirSync(dataDirectory, { recursive: true })
     this.templateRoot = path.join(dataDirectory, 'templates')
     fs.mkdirSync(this.templateRoot, { recursive: true })
-    this.db = new Database(path.join(dataDirectory, 'workpack.sqlite'))
+    this.db = new Database(path.join(dataDirectory, libraryMode ? 'workpack-v3.sqlite' : 'workpack.sqlite'))
     this.db.pragma('foreign_keys = ON')
     // WAL keeps recent commits in workpack.sqlite-wal. Copying only the main file while this connection is open can miss them.
     this.db.pragma('journal_mode = WAL')
@@ -90,10 +90,36 @@ export class WorkPackService {
         receiving: [['收货登记表', [...steps]], ['到货验收单', [...steps]], ['异常情况记录', ['prepared', 'filled', 'archived']]],
         training: [['培训计划', ['prepared', 'filled', 'archived']], ['培训签到表', [...steps]], ['培训记录', [...steps]], ['现场照片', ['prepared', 'archived']]]
       }
-      for (const type of Object.keys(seeds)) this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(randomUUID(), `${legacyWorkflowFolders[type]}资料模板`, type, JSON.stringify(seeds[type].map(([name, required]) => ({ id: randomUUID(), name, note: '', required }))))
+      if (!libraryMode) for (const type of Object.keys(seeds)) this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(randomUUID(), `${legacyWorkflowFolders[type]}资料模板`, type, JSON.stringify(seeds[type].map(([name, required]) => ({ id: randomUUID(), name, note: '', required }))))
     })()
     if ((this.db.pragma('user_version', { simple: true }) as number) < 2) this.db.transaction(() => {
       this.db.exec(`CREATE TABLE IF NOT EXISTS preferences (key TEXT PRIMARY KEY, value TEXT NOT NULL); PRAGMA user_version = 2;`)
+    })()
+    if (libraryMode) {
+      this.db.exec(`CREATE TABLE IF NOT EXISTS library_categories (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE);
+        CREATE TABLE IF NOT EXISTS library_meta (template_id TEXT PRIMARY KEY REFERENCES templates(id) ON DELETE CASCADE, category_id TEXT REFERENCES library_categories(id) ON DELETE SET NULL, purpose TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS event_templates (event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE, template_id TEXT NOT NULL, PRIMARY KEY(event_id, template_id));
+        CREATE TABLE IF NOT EXISTS document_tasks (id TEXT PRIMARY KEY, item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE, name TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL);`)
+      this.ensureItemTemplateLink()
+    }
+  }
+  /** Items created before the file link existed are matched once by name within the matter. */
+  private ensureItemTemplateLink() {
+    const columns = this.db.prepare('PRAGMA table_info(items)').all() as Array<{ name: string }>
+    if (columns.some(column => column.name === 'template_id')) return
+    this.db.transaction(() => {
+      this.db.exec('ALTER TABLE items ADD COLUMN template_id TEXT')
+      const templates = new Map((this.db.prepare('SELECT id, name FROM templates').all() as Array<{ id: string; name: string }>).map(row => [row.id, row.name]))
+      const links = this.db.prepare('SELECT event_id, template_id FROM event_templates ORDER BY rowid').all() as Array<{ event_id: string; template_id: string }>
+      const items = this.db.prepare('SELECT id, event_id, name FROM items').all() as Array<{ id: string; event_id: string; name: string }>
+      const claimed = new Set<string>()
+      const update = this.db.prepare('UPDATE items SET template_id=? WHERE id=?')
+      for (const item of items) {
+        const matches = links.filter(link => link.event_id === item.event_id && templates.get(link.template_id) === item.name && !claimed.has(`${link.event_id}\0${link.template_id}`))
+        if (matches.length !== 1) continue
+        claimed.add(`${item.event_id}\0${matches[0].template_id}`)
+        update.run(matches[0].template_id, item.id)
+      }
     })()
   }
   close() { this.db.close() }
@@ -155,21 +181,24 @@ export class WorkPackService {
   }
   snapshot(): Snapshot {
     const assets = this.all('assets')
-    const templates = this.all('templates').map(t => ({ ...t, rules: JSON.parse(t.rules), assets: assets.filter(a => a.template_id === t.id).map(a => {
+    const metadata = this.libraryMode ? this.all('library_meta') : []
+    const templates = this.all('templates').map(t => ({ ...t, rules: JSON.parse(t.rules), purpose: metadata.find(m => m.template_id === t.id)?.purpose ?? '', categoryId: metadata.find(m => m.template_id === t.id)?.category_id ?? null, assets: assets.filter(a => a.template_id === t.id).map(a => {
       let exists = false
       try { exists = present(inside(this.templateRoot, a.path)) } catch { /* Keep unavailable assets visible. */ }
       return { id: a.id, name: a.name, path: a.path, exists }
     }) })) as Template[]
     const allEvents = this.all('events'), allItems = this.all('items'), attachments = this.all('attachments')
+    const tasks = this.libraryMode ? this.all('document_tasks') : []
+    const eventTemplates = this.libraryMode ? this.all('event_templates') : []
     const projects = this.all('projects').map(p => {
       let folderExists = false
       try { this.root(p); folderExists = true } catch { /* A replaced directory is not the original project. */ }
       return {
       id: p.id, name: p.name, customer: p.customer, contact: p.contact, owner: p.owner, note: p.note, folder: p.folder, templateIds: JSON.parse(p.template_ids), folderExists,
       events: allEvents.filter(e => e.project_id === p.id).map(e => ({
-        id: e.id, projectId: p.id, templateId: e.template_id, name: e.name, date: e.date, owner: e.owner,
+        id: e.id, projectId: p.id, templateId: e.template_id, templateIds: this.libraryMode ? eventTemplates.filter(link => link.event_id === e.id).map(link => link.template_id) : undefined, name: e.name, date: e.date, owner: e.owner,
         items: allItems.filter(i => i.event_id === e.id).map(i => ({
-          id: i.id, eventId: e.id, name: i.name, note: i.note, required: JSON.parse(i.required), states: JSON.parse(i.states),
+          id: i.id, eventId: e.id, name: i.name, note: i.note, required: JSON.parse(i.required), states: JSON.parse(i.states), templateId: this.libraryMode ? i.template_id ?? null : undefined, tasks: this.libraryMode ? tasks.filter(task => task.item_id === i.id).sort((a,b) => a.position - b.position).map(task => ({ id: task.id, itemId: i.id, name: task.name, done: Boolean(task.done), position: task.position })) : undefined,
           attachments: attachments.filter(a => a.item_id === i.id).map(a => {
             let exists = false
             try { exists = folderExists && present(inside(p.folder, a.path)) } catch { /* Invalid paths are shown as missing. */ }
@@ -180,8 +209,9 @@ export class WorkPackService {
     }}) as Project[]
     for (const project of projects) for (const event of project.events) for (const item of event.items) {
       if (!item.attachments.some(a => a.exists) && item.states.prepared === 'done') item.states.prepared = 'pending'
+      if (!item.attachments.some(a => a.exists)) for (const task of item.tasks ?? []) if (task.name === '准备文件') task.done = false
     }
-    return { projects, templates: templates.map(template => ({ id: template.id, name: template.name, rules: template.rules, assets: template.assets })), dataDirectory: this.dataDirectory, pendingView: this.reconcilePendingView() }
+    return { projects, templates: templates.map(template => ({ id: template.id, name: template.name, purpose: template.purpose, categoryId: template.categoryId, rules: template.rules, assets: template.assets })), categories: this.libraryMode ? this.all('library_categories') as {id:string;name:string}[] : undefined, dataDirectory: this.dataDirectory, pendingView: this.reconcilePendingView() }
   }
   savePendingView(input: unknown): PendingViewState {
     const normalized = normalizePendingViewState(parsePendingViewState(input), this.pendingFilterIds())
@@ -239,13 +269,18 @@ export class WorkPackService {
   }
   deleteTemplate(value: string) {
     this.get('templates', value)
+    if (this.libraryMode && this.db.prepare('SELECT 1 FROM event_templates WHERE template_id=? LIMIT 1').get(value)) throw new Error('文件已被事项使用，不能删除')
     if (this.all('projects').some(p => JSON.parse(p.template_ids).includes(value))) throw new Error('流程仍被项目使用，请先调整项目设置')
-    if (this.db.prepare('SELECT 1 FROM events WHERE template_id=? LIMIT 1').get(value)) throw new Error('流程已被事项使用，不能删除')
+    if (!this.libraryMode && this.db.prepare('SELECT 1 FROM events WHERE template_id=? LIMIT 1').get(value)) throw new Error('流程已被事项使用，不能删除')
     this.db.prepare('DELETE FROM templates WHERE id=?').run(value)
     this.reconcilePendingView()
   }
   importTemplates(value: string, sources: string[]) {
     this.get('templates', value)
+    if (this.libraryMode) {
+      if (sources.length !== 1) throw new Error('每个文件模板只能导入一份文件')
+      if (this.db.prepare('SELECT 1 FROM assets WHERE template_id=? LIMIT 1').get(value)) throw new Error('请先移除原模板文件记录，再导入新文件')
+    }
     this.atomic((files, dirs) => {
       const target = this.mkdir(this.templateRoot, value, dirs)
       for (const source of sources) {
@@ -346,7 +381,7 @@ export class WorkPackService {
       for (const rule of rules) {
         const itemId = randomUUID()
         const states = stateMap(rule.required)
-        this.db.prepare('INSERT INTO items VALUES (?, ?, ?, ?, ?, ?)').run(itemId, eventId, rule.name, rule.note, JSON.stringify(rule.required), JSON.stringify(states))
+        this.db.prepare('INSERT INTO items (id, event_id, name, note, required, states) VALUES (?, ?, ?, ?, ?, ?)').run(itemId, eventId, rule.name, rule.note, JSON.stringify(rule.required), JSON.stringify(states))
         const asset = assets.find(candidate => !usedAssets.has(candidate.id) && (candidate.id === rule.assetId || assetMatchesRule(candidate.name, rule.name)))
         if (asset) {
           const source = inside(this.templateRoot, asset.path)
@@ -455,9 +490,29 @@ export class WorkPackService {
       const previous = JSON.parse(old.states)
       const states = Object.fromEntries(steps.map(s => [s, data.required.includes(s) ? previous[s] === 'na' ? 'pending' : previous[s] : 'na']))
       this.db.prepare('UPDATE items SET name=?, note=?, required=?, states=? WHERE id=?').run(data.name, data.note, JSON.stringify(data.required), JSON.stringify(states), data.id)
-    } else this.db.prepare('INSERT INTO items VALUES (?, ?, ?, ?, ?, ?)').run(randomUUID(), data.eventId, data.name, data.note, JSON.stringify(data.required), JSON.stringify(stateMap(data.required)))
+    } else {
+      const itemId = randomUUID()
+      this.db.transaction(() => {
+        this.db.prepare('INSERT INTO items (id, event_id, name, note, required, states) VALUES (?, ?, ?, ?, ?, ?)').run(itemId, data.eventId, data.name, data.note, JSON.stringify(data.required), JSON.stringify(stateMap(data.required)))
+        if (this.libraryMode) this.db.prepare('INSERT INTO document_tasks VALUES (?, ?, ?, 0, 0)').run(randomUUID(), itemId, '准备文件')
+      })()
+    }
   }
-  deleteItem(value: string) { this.get('items', value); this.db.prepare('DELETE FROM items WHERE id=?').run(value) }
+  private releaseItemTemplate(item: Row) {
+    if (!this.libraryMode || !item.template_id) return
+    this.db.prepare('DELETE FROM event_templates WHERE event_id=? AND template_id=?').run(item.event_id, item.template_id)
+    const event = this.get('events', item.event_id)
+    if (event.template_id !== item.template_id) return
+    const next = this.db.prepare('SELECT template_id FROM event_templates WHERE event_id=? ORDER BY rowid LIMIT 1').get(item.event_id) as { template_id: string } | undefined
+    this.db.prepare('UPDATE events SET template_id=? WHERE id=?').run(next?.template_id ?? '', item.event_id)
+  }
+  deleteItem(value: string) {
+    const item = this.get('items', value)
+    this.db.transaction(() => {
+      this.releaseItemTemplate(item)
+      this.db.prepare('DELETE FROM items WHERE id=?').run(value)
+    })()
+  }
   setStatus(input: unknown) {
     const data = statusSchema.parse(input), item = this.get('items', data.id)
     if (data.step === 'prepared' && data.status === 'done') {
@@ -507,6 +562,94 @@ export class WorkPackService {
         states.prepared = 'pending'
         this.db.prepare('UPDATE items SET states=? WHERE id=?').run(JSON.stringify(states), item.id)
       }
+      if (this.libraryMode && !remaining) this.db.prepare("UPDATE document_tasks SET done=0 WHERE item_id=? AND name='准备文件'").run(item.id)
     })()
+  }
+  saveLibraryCategory(input: unknown) {
+    if (!this.libraryMode) throw new Error('文件库不可用')
+    const data = z.object({ id: id.optional(), name }).parse(input)
+    if (data.id) { this.get('library_categories', data.id); this.db.prepare('UPDATE library_categories SET name=? WHERE id=?').run(data.name, data.id) }
+    else this.db.prepare('INSERT INTO library_categories VALUES (?, ?)').run(randomUUID(), data.name)
+  }
+  deleteLibraryCategory(value: string) {
+    if (!this.libraryMode) throw new Error('文件库不可用')
+    this.get('library_categories', value)
+    this.db.prepare('DELETE FROM library_categories WHERE id=?').run(value)
+  }
+  saveLibraryFile(input: unknown) {
+    if (!this.libraryMode) throw new Error('文件库不可用')
+    const data = z.object({ id: id.optional(), name, purpose: text, categoryId: id.nullish() }).parse(input)
+    if (data.categoryId) this.get('library_categories', data.categoryId)
+    const fileName = safeName(data.name)
+    if (data.id) {
+      this.get('templates', data.id)
+      this.db.transaction(() => {
+        this.db.prepare('UPDATE templates SET name=?, type=? WHERE id=?').run(fileName, customTypePrefix + fileName, data.id)
+        this.db.prepare('UPDATE library_meta SET purpose=?, category_id=? WHERE template_id=?').run(data.purpose, data.categoryId ?? null, data.id)
+      })()
+    } else {
+      const fileId = randomUUID()
+      this.db.transaction(() => {
+        this.db.prepare('INSERT INTO templates VALUES (?, ?, ?, ?)').run(fileId, fileName, customTypePrefix + fileName, '[]')
+        this.db.prepare('INSERT INTO library_meta VALUES (?, ?, ?)').run(fileId, data.categoryId ?? null, data.purpose)
+      })()
+    }
+  }
+  createLibraryEvent(input: unknown) {
+    if (!this.libraryMode) throw new Error('文件库不可用')
+    const data = z.object({ projectId: id, templateIds: z.array(id).min(1).max(100).refine(ids => new Set(ids).size === ids.length), name, date: eventSchema.shape.date, owner: name }).parse(input)
+    const project = this.get('projects', data.projectId), root = this.root(project)
+    const templates = data.templateIds.map(templateId => this.get('templates', templateId))
+    const eventId = randomUUID()
+    this.atomic((files, dirs) => {
+      this.db.prepare('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?, ?)').run(eventId, data.projectId, data.templateIds[0], 'custom:事项', data.name, data.date, data.owner)
+      for (const template of templates) {
+        this.db.prepare('INSERT INTO event_templates VALUES (?, ?)').run(eventId, template.id)
+        const itemId = randomUUID()
+        const purpose = (this.db.prepare('SELECT purpose FROM library_meta WHERE template_id=?').get(template.id) as {purpose:string}|undefined)?.purpose ?? ''
+        this.db.prepare('INSERT INTO items (id, event_id, name, note, required, states, template_id) VALUES (?, ?, ?, ?, ?, ?, ?)').run(itemId, eventId, template.name, purpose, '["prepared"]', JSON.stringify(stateMap(['prepared'])), template.id)
+        const taskId = randomUUID()
+        this.db.prepare('INSERT INTO document_tasks VALUES (?, ?, ?, 0, 0)').run(taskId, itemId, '准备文件')
+        const asset = this.db.prepare('SELECT * FROM assets WHERE template_id=? ORDER BY rowid LIMIT 1').get(template.id) as Row | undefined
+        if (asset) {
+          const source = inside(this.templateRoot, asset.path)
+          if (!present(source)) throw new Error(`模板文件已失效：${template.name}`)
+          const target = this.mkdir(root, path.join('事项', `${data.date}_${eventId}`, itemId), dirs)
+          const copied = this.copy(source, target, files)
+          this.db.prepare('INSERT INTO attachments VALUES (?, ?, ?, ?, ?)').run(randomUUID(), itemId, path.basename(copied), path.relative(root, copied), new Date().toISOString())
+        }
+      }
+    })
+    return eventId
+  }
+  saveDocumentTask(input: unknown) {
+    if (!this.libraryMode) throw new Error('文件库不可用')
+    const data = z.object({ id: id.optional(), itemId: id, name }).parse(input)
+    this.get('items', data.itemId)
+    const task = data.id ? this.get('document_tasks', data.id) : undefined
+    if (task && task.item_id !== data.itemId) throw new Error('待办不属于此文件')
+    if (task?.name === '准备文件' && data.name !== '准备文件') throw new Error('准备文件是默认待办，不能修改')
+    if (data.name === '准备文件' && task?.name !== '准备文件') throw new Error('准备文件已自动加入清单')
+    if (task) {
+      this.db.prepare('UPDATE document_tasks SET name=? WHERE id=?').run(data.name, data.id)
+    } else {
+      const next = (this.db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS position FROM document_tasks WHERE item_id=?').get(data.itemId) as {position:number}).position
+      this.db.prepare('INSERT INTO document_tasks VALUES (?, ?, ?, 0, ?)').run(randomUUID(), data.itemId, data.name, next)
+    }
+  }
+  setDocumentTaskDone(input: unknown) {
+    if (!this.libraryMode) throw new Error('文件库不可用')
+    const data = z.object({ id, done: z.boolean() }).parse(input), task = this.get('document_tasks', data.id)
+    if (data.done && task.name === '准备文件') {
+      const { project } = this.projectForItem(task.item_id)
+      if (!this.hasFile(task.item_id, this.root(project))) throw new Error('请先添加文件，再勾选准备文件')
+    }
+    this.db.prepare('UPDATE document_tasks SET done=? WHERE id=?').run(data.done ? 1 : 0, data.id)
+  }
+  deleteDocumentTask(value: string) {
+    if (!this.libraryMode) throw new Error('文件库不可用')
+    const task = this.get('document_tasks', value)
+    if (task.name === '准备文件') throw new Error('准备文件是默认待办')
+    this.db.prepare('DELETE FROM document_tasks WHERE id=?').run(value)
   }
 }

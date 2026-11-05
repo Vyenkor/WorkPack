@@ -59,7 +59,7 @@ function registerIPC() {
   handle('openProject', value => open(service.projectPath(stringId.parse(value))))
   handle('saveTemplate', value => service.saveTemplate(value))
   handle('deleteTemplate', value => service.deleteTemplate(stringId.parse(value)))
-  handle('importTemplates', async value => { stringId.parse(value); const files = await selectFiles(); if (!files.length) return false; service.importTemplates(value, files); return true })
+  handle('importTemplates', async value => { stringId.parse(value); const files = await selectFiles(false); if (!files.length) return false; service.importTemplates(value, files); return true })
   handle('removeTemplateAsset', value => service.removeTemplateAsset(stringId.parse(value)))
   handle('exportTemplates', async value => { z.array(stringId).min(1).parse(value); const folder = await selectFolder(); return folder ? service.exportTemplates(value, folder) : 0 })
   handle('createEvent', value => service.createEvent(value))
@@ -74,6 +74,13 @@ function registerIPC() {
   handle('openAttachment', value => open(service.attachmentPath(stringId.parse(value))))
   handle('relocateAttachment', async value => { stringId.parse(value); const files = await selectFiles(false); if (!files.length) return false; service.relocateAttachment(value, files[0]); return true })
   handle('removeAttachment', value => service.removeAttachment(stringId.parse(value)))
+  handle('saveLibraryCategory', value => service.saveLibraryCategory(value))
+  handle('deleteLibraryCategory', value => service.deleteLibraryCategory(stringId.parse(value)))
+  handle('saveLibraryFile', value => service.saveLibraryFile(value))
+  handle('createLibraryEvent', value => service.createLibraryEvent(value))
+  handle('saveDocumentTask', value => service.saveDocumentTask(value))
+  handle('setDocumentTaskDone', value => service.setDocumentTaskDone(value))
+  handle('deleteDocumentTask', value => service.deleteDocumentTask(stringId.parse(value)))
 }
 
 const hasInstanceLock = app.requestSingleInstanceLock()
@@ -87,7 +94,7 @@ if (!hasInstanceLock) {
     window.focus()
   })
   app.whenReady().then(() => {
-    service = new WorkPackService(app.getPath('userData'))
+    service = new WorkPackService(app.getPath('userData'), undefined, true)
     window = new BrowserWindow({
       title: 'WorkPack · 项目资料管理', width: 1440, height: 960, minWidth: 1050, minHeight: 700,
       backgroundColor: '#f5f7f6', show: false,

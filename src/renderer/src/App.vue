@@ -620,11 +620,11 @@ onBeforeUnmount(() => {
         <template v-else>
           <section v-if="view === 'home'" class="page-section home-page">
             <div class="page-heading"><h1>工作台</h1><button class="button primary" @click="openProjectModal()"><UiIcon name="plus" />新建项目</button></div>
-            <div class="home-grid">
+            <div class="home-grid" :class="{ 'home-grid-clear': !pendingRows.length }">
               <section class="attention-panel">
-                <div class="panel-heading"><div class="title-with-count"><h2>待处理文件</h2><span class="count-badge">{{ navPending }}</span></div><button class="link muted" @click="go('pending')">查看全部<UiIcon name="arrow" /></button></div>
-                <div v-if="!pendingRows.length" class="empty compact"><UiIcon name="check" class="empty-icon" /><strong>暂无待处理文件</strong></div>
+                <div v-if="!pendingRows.length" class="attention-empty"><UiIcon name="check" /><span>暂无待处理文件</span><button class="link muted" @click="go('pending')">查看全部<UiIcon name="arrow" /></button></div>
                 <template v-else>
+                  <div class="panel-heading"><div class="title-with-count"><h2>待处理文件</h2><span class="count-badge">{{ navPending }}</span></div><button class="link muted" @click="go('pending')">查看全部<UiIcon name="arrow" /></button></div>
                   <div class="attention-columns"><span>文件</span><span>项目及事项</span><span>待办状态</span></div>
                   <button v-for="row in pendingRows.slice(0, 5)" :key="row.item.id" class="attention-row" @click="openEvent(row.project, row.event)">
                     <span class="pending-file"><UiIcon name="file" /><strong>{{ row.item.name }}</strong></span>

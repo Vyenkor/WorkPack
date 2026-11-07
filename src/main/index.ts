@@ -89,7 +89,7 @@ if (!hasInstanceLock) {
     storage = new StorageManager(app.getPath('userData'), path.join(app.getPath('documents'), 'WorkPack', '项目'))
     service = storage.service
     window = new BrowserWindow({
-      title: 'WorkPack · 项目资料管理', width: 1440, height: 960, minWidth: 1050, minHeight: 700,
+      title: 'WorkPack', width: 1440, height: 960, minWidth: 1050, minHeight: 700,
       icon: path.join(__dirname, '../renderer/icon.png'),
       backgroundColor: '#ededee', show: false,
       webPreferences: { preload: path.join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true }

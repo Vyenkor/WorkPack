@@ -10,6 +10,8 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
   try {
     const page = await application.firstWindow()
     await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
+    await expect(page).toHaveTitle('WorkPack')
+    expect(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getTitle())).toBe('WorkPack')
     await page.evaluate(() => document.fonts.ready)
     const fontSession = await page.context().newCDPSession(page)
     await fontSession.send('DOM.enable')

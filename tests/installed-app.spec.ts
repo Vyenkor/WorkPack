@@ -24,6 +24,8 @@ async function launch(dataDir: string): Promise<[ElectronApplication, Page]> {
   const application = await _electron.launch({ executablePath: installedExe!, env: { ...process.env, WORKPACK_TEST_DATA: dataDir } })
   const page = await application.firstWindow()
   await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
+  await expect(page).toHaveTitle('WorkPack')
+  expect(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getTitle())).toBe('WorkPack')
   return [application, page]
 }
 

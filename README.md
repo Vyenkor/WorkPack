@@ -102,6 +102,8 @@ npm run dist        # 生成 NSIS 安装包 WorkPack-<版本>-Setup.exe
 
 安装程序和程序图标的资源在 `build/`：`build/icon.ico` 是程序图标，`build/installer.nsh` 定义了安装附加任务和卸载数据选项。
 
+品牌图标统一为灰色。程序、安装和卸载图标共用 `build/icon.ico`，运行窗口使用 `src/renderer/public/icon.png`；更新品牌资源后运行 `npm run brand:sync` 同步灰度版本及多尺寸 ICO。
+
 设置环境变量 `WORKPACK_TEST_DATA=<目录>` 可以让应用使用独立的数据目录，避免影响日常数据。
 
 ## 测试

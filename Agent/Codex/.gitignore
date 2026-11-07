@@ -9,3 +9,6 @@
 
 # Generated screenshots are retained as GitHub Actions artifacts.
 /evidence/**/*.png
+
+# Local installer deliveries; CI publishes installer artifacts.
+/artifacts/

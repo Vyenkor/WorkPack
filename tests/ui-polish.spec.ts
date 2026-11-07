@@ -45,6 +45,10 @@ test('empty messages, plain breadcrumbs and selection feedback stay consistent a
     await expect(page.locator('.breadcrumb')).toHaveCSS('border-radius', '0px')
     await expect(page.locator('.breadcrumb-current')).toHaveText(name)
   }
+  await expect(nav('工作台').locator('svg')).toHaveAttribute('data-icon', 'inbox')
+  await expect(nav('项目').locator('svg')).toHaveAttribute('data-icon', 'cube')
+  await expect(nav('文件库').locator('svg')).toHaveAttribute('data-icon', 'library')
+  await expect(page.locator('.library-page .empty-icon')).toHaveAttribute('data-icon', 'library')
   const navigationFile = await nav('文件库').locator('svg path').evaluateAll(paths => paths.map(path => path.getAttribute('d')))
   const emptyFile = await page.locator('.library-page .empty-icon path').evaluateAll(paths => paths.map(path => path.getAttribute('d')))
   expect(navigationFile).toEqual(emptyFile)
@@ -54,6 +58,11 @@ test('empty messages, plain breadcrumbs and selection feedback stay consistent a
   await page.keyboard.press('Control+k')
   await expect(page.getByRole('searchbox', { name: '搜索项目或客户' })).toBeFocused()
   await page.screenshot({ path: info.outputPath('library-empty-polish.png'), scale: 'css' })
+  await nav('项目').click()
+  await expect(page.locator('.projects-page .empty-icon')).toHaveAttribute('data-icon', 'cube')
+  await nav('工作台').click()
+  await expect(page.locator('.recent-panel .empty-icon')).toHaveAttribute('data-icon', 'cube')
+  await page.screenshot({ path: info.outputPath('navigation-icons.png'), scale: 'css' })
 })
 
 test('search focus, aligned lists and dropdowns follow the compact desktop layout', async ({}, info) => {

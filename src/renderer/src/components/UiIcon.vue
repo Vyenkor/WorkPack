@@ -1,10 +1,22 @@
 <script setup lang="ts">
-defineProps<{ name: 'project' | 'clock' | 'event' | 'back' | 'forward' | 'sidebar' | 'check' | 'plus' | 'search' | 'file' | 'info' | 'warning' | 'error' | 'close' | 'settings' | 'chevron-down' | 'more' | 'copy' | 'edit' | 'arrow' | 'upload' }>()
+defineProps<{ name: 'inbox' | 'cube' | 'library' | 'project' | 'clock' | 'event' | 'back' | 'forward' | 'sidebar' | 'check' | 'plus' | 'search' | 'file' | 'info' | 'warning' | 'error' | 'close' | 'settings' | 'chevron-down' | 'more' | 'copy' | 'edit' | 'arrow' | 'upload' }>()
 </script>
 
 <template>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-    <template v-if="name === 'more'"><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></template>
+  <svg :data-icon="name" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+    <template v-if="name === 'inbox'">
+      <path d="M7.4 4.5h9.2a2 2 0 0 1 1.9 1.4l2 7.1v4.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V13l2-7.1a2 2 0 0 1 1.9-1.4Z" />
+      <path d="M3.5 13h4.1a1.4 1.4 0 0 1 1.3.9l.3.7a1.4 1.4 0 0 0 1.3.9h3a1.4 1.4 0 0 0 1.3-.9l.3-.7a1.4 1.4 0 0 1 1.3-.9h4.1" />
+    </template>
+    <template v-else-if="name === 'cube'">
+      <path d="m12 2.75 8.25 4.6v9.3L12 21.25l-8.25-4.6v-9.3L12 2.75Z" />
+      <path d="M3.75 7.35 12 12l8.25-4.65M12 12v9.25" />
+    </template>
+    <template v-else-if="name === 'library'">
+      <path d="M10.5 20.25H6a2 2 0 0 1-2-2V5.75a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3.5M8 8h6M8 11.5h3" />
+      <path d="m13 16 6.5-6.5 2 2L15 18l-3 1 1-3ZM18 11l2 2" />
+    </template>
+    <template v-else-if="name === 'more'"><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></template>
     <template v-else-if="name === 'copy'"><rect x="4" y="7" width="12" height="14" rx="2" /><path d="M8 7V3h12v14h-4" /></template>
     <template v-else-if="name === 'edit'"><path d="m15 4 5 5-11 11-6 1 1-6zM13 6l5 5" /></template>
     <template v-else-if="name === 'arrow'"><path d="M4 12h16m-6-6 6 6-6 6" /></template>

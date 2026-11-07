@@ -13,6 +13,7 @@ colors:
   surface: "#f8f8f9"
   surface-subtle: "#efeff1"
   surface-hover: "#e9e9ed"
+  nav-selected: "#e1e1e2"
   sidebar: "#ededee"
   hairline: "#e3e3e7"
   hairline-strong: "#c9c9d0"
@@ -186,7 +187,7 @@ components:
     padding: 4px 8px
     height: 34px
   nav-item-active:
-    backgroundColor: "{colors.surface-hover}"
+    backgroundColor: "{colors.nav-selected}"
     textColor: "{colors.ink}"
     typography: "{typography.label}"
     rounded: "{rounded.lg}"
@@ -272,7 +273,7 @@ components:
 
 ## Colors
 
-灰色 `canvas` 与 `sidebar` 包围较亮的 `surface`。蓝紫色 `primary` 用于主操作、焦点及当前资料进度。`primary-soft` 用于轻量选中状态，侧栏当前项使用 `surface-hover` 中性底。蓝紫色 `status-done` 表示完成，琥珀色表示待办或路径异常，红色表示错误或删除。状态同时显示文字、图形或数值。
+灰色 `canvas` 与 `sidebar` 包围较亮的 `surface`。蓝紫色 `primary` 用于主操作、焦点及当前资料进度。`primary-soft` 用于轻量选中状态，侧栏当前项使用 `nav-selected` 中性底，悬停使用 `surface-hover`。蓝紫色 `status-done` 表示完成，琥珀色表示待办或路径异常，红色表示错误或删除。状态同时显示文字、图形或数值。
 
 正文与背景对比度至少 4.5，控件边框和焦点至少 3。装饰分隔线使用 `hairline`，输入边界使用 `control-border`。
 
@@ -280,7 +281,7 @@ components:
 
 使用 Linear 当前应用的字体栈，英文及数字优先使用随应用打包的 Inter Variable 4.1。后续回退依次为 SF Pro Display、Apple 系统字体、Segoe UI、Roboto、Oxygen、Ubuntu、Cantarell、Open Sans、Helvetica Neue 和 sans-serif。中文由系统选择该栈支持的 CJK 字体。中文保留默认字距。
 
-字号采用 Linear 的应用级比例。正文和项目名称 15px，辅助文字、输入控件及按钮 13px，标签 12px，页面标题 18px。正文默认字重 450，操作与列表名称 500，分区标题 600。正文行高 1.5，进度数字采用等宽数字。长路径使用 13px 的等宽系统字体。
+字号采用 Linear 的应用级比例。正文和项目名称 15px，辅助文字、输入控件及按钮 13px，标签 12px，页面标题 18px。正文默认字重 450，操作与列表名称 500，分区标题 600。各页面空状态提示统一为 13px、450 字重，行高 1.5。正文行高 1.5，进度数字采用等宽数字。长路径使用 13px 的等宽系统字体。
 
 来源为 [Linear 应用样式](https://static.linear.app/client/assets/style-nDwjYmzh.css)及其登录页的字体声明，核对日期为 2026年11月7日。Inter 的 OFL 许可随应用保存在 `licenses/Inter-OFL.txt`。
 
@@ -289,6 +290,8 @@ components:
 ### 页面结构
 
 窗口最小宽度 1050px。侧栏宽度在 192px 至 232px 之间，优先容纳导航文字和计数。右侧顶部 44px 用于当前位置和全局搜索，主面板占据剩余高度并独立滚动。侧栏顶部居中显示 WorkPack 字标，使用 Inter Variable 的 600 字重和 18px 字号。左下角单独显示 `src/renderer/src/assets/workpack-logo.png` 的灰度图形标。
+
+顶部当前位置使用透明背景的文字面包屑，项目层级保留返回操作。侧栏选中项使用 500 字重。文件库导航与页面文件标记使用同一折角文件图标。
 
 ### 一级布局
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ name: 'home' | 'projects' | 'pending' | 'templates' }>()
+defineProps<{ name: 'home' | 'projects' | 'pending' }>()
 </script>
 
 <template>
@@ -17,12 +17,6 @@ defineProps<{ name: 'home' | 'projects' | 'pending' | 'templates' }>()
     <template v-else-if="name === 'pending'">
       <circle cx="12" cy="12" r="8.25" />
       <path d="M12 7.5v5l3.25 2" />
-    </template>
-    <template v-else>
-      <rect x="3.5" y="4" width="5" height="5" rx="1.25" />
-      <rect x="15.5" y="4" width="5" height="5" rx="1.25" />
-      <rect x="15.5" y="15" width="5" height="5" rx="1.25" />
-      <path d="M8.5 6.5h7M6 9v8.5h9.5" />
     </template>
   </svg>
 </template>

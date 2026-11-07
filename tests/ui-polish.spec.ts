@@ -24,6 +24,38 @@ async function clip(selector: string, name: string, info: { outputPath: (name: s
   await page.screenshot({ path: info.outputPath(name), clip: (await page.locator(selector).first().boundingBox())!, scale: 'css' })
 }
 
+test('empty messages, plain breadcrumbs and selection feedback stay consistent across pages', async ({}, info) => {
+  const selectedFill = 'rgb(225, 225, 226)'
+  const hoveringFill = 'rgb(233, 233, 237)'
+  for (const name of ['工作台', '项目', '待处理', '文件库']) {
+    const selected = nav(name)
+    await selected.click()
+    await selected.hover()
+    await expect(selected).toHaveAttribute('aria-current', 'page')
+    await expect(selected).toHaveCSS('background-color', selectedFill)
+    await expect(selected).toHaveCSS('font-weight', '500')
+    const messages = page.locator('.empty h3, .empty > strong')
+    expect(await messages.count()).toBeGreaterThan(0)
+    for (const message of await messages.all()) {
+      await expect(message).toHaveCSS('font-size', '13px')
+      await expect(message).toHaveCSS('font-weight', '450')
+      await expect(message).toHaveCSS('line-height', '19.5px')
+    }
+    await expect(page.locator('.breadcrumb')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+    await expect(page.locator('.breadcrumb')).toHaveCSS('border-radius', '0px')
+    await expect(page.locator('.breadcrumb-current')).toHaveText(name)
+  }
+  const navigationFile = await nav('文件库').locator('svg path').evaluateAll(paths => paths.map(path => path.getAttribute('d')))
+  const emptyFile = await page.locator('.library-page .empty-icon path').evaluateAll(paths => paths.map(path => path.getAttribute('d')))
+  expect(navigationFile).toEqual(emptyFile)
+  await nav('项目').hover()
+  await expect(nav('项目')).toHaveCSS('background-color', hoveringFill)
+  await expect(nav('文件库')).toHaveCSS('background-color', selectedFill)
+  await page.keyboard.press('Control+k')
+  await expect(page.getByRole('searchbox', { name: '搜索项目或客户' })).toBeFocused()
+  await page.screenshot({ path: info.outputPath('library-empty-polish.png'), scale: 'css' })
+})
+
 test('search focus, aligned lists and dropdowns follow the compact desktop layout', async ({}, info) => {
   const navButtons = page.locator('.nav button')
   const navBox = await navButtons.evaluateAll(buttons => buttons.map(button => button.getBoundingClientRect().height))

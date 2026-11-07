@@ -516,7 +516,7 @@ onBeforeUnmount(() => {
         <button type="button" :aria-current="(view === 'home') ? 'page' : undefined" @click="go('home')"><NavIcon class="nav-icon" name="home" />工作台</button>
         <button type="button" :aria-current="(view === 'projects' || view === 'project') ? 'page' : undefined" @click="go('projects')"><NavIcon class="nav-icon" name="projects" />项目</button>
         <button type="button" aria-label="待处理" :aria-current="(view === 'pending') ? 'page' : undefined" @click="go('pending')"><NavIcon class="nav-icon" name="pending" />待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
-        <button type="button" :aria-current="(view === 'templates') ? 'page' : undefined" @click="go('templates')"><NavIcon class="nav-icon" name="templates" />文件库</button>
+        <button type="button" :aria-current="(view === 'templates') ? 'page' : undefined" @click="go('templates')"><UiIcon class="nav-icon" name="file" />文件库</button>
       </nav>
       <div class="sidebar-emblem" aria-hidden="true"><span><img :src="workpackLogo" alt=""></span></div>
     </aside>

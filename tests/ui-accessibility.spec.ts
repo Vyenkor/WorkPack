@@ -15,8 +15,8 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
     await fontSession.send('DOM.enable')
     await fontSession.send('CSS.enable')
     const domDocument = await fontSession.send('DOM.getDocument')
-    const wordmarkNode = await fontSession.send('DOM.querySelector', { nodeId: domDocument.root.nodeId, selector: '.brand strong' })
-    const platformFonts = await fontSession.send('CSS.getPlatformFontsForNode', { nodeId: wordmarkNode.nodeId })
+    const latinNode = await fontSession.send('DOM.querySelector', { nodeId: domDocument.root.nodeId, selector: '.global-search kbd' })
+    const platformFonts = await fontSession.send('CSS.getPlatformFontsForNode', { nodeId: latinNode.nodeId })
     expect(platformFonts.fonts.some(font => font.isCustomFont && /Inter/.test(font.familyName))).toBe(true)
     await fontSession.detach()
     await expect(page.locator('body')).toHaveCSS('font-size', '15px')
@@ -24,13 +24,11 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
     const nav = page.getByRole('navigation', { name: '主导航' })
     await expect(nav.locator('button')).toHaveCount(4)
     await expect(nav.getByRole('button', { name: '工作台' })).toHaveAttribute('aria-current', 'page')
-    const sidebar = (await page.locator('.sidebar').boundingBox())!
-    const wordmark = (await page.getByText('WorkPack', { exact: true }).boundingBox())!
-    const emblem = (await page.locator('.sidebar-emblem > span').boundingBox())!
-    expect(Math.abs((wordmark.x + wordmark.width / 2) - (sidebar.x + sidebar.width / 2))).toBeLessThan(1)
-    expect(emblem.x - sidebar.x).toBeLessThan(24)
-    expect(sidebar.y + sidebar.height - (emblem.y + emblem.height)).toBeLessThan(24)
-    await expect(page.locator('.brand img')).toHaveCount(0)
+    const footer = (await page.locator('.app-footer').boundingBox())!
+    const emblem = (await page.locator('.footer-emblem').boundingBox())!
+    expect(emblem.x - footer.x).toBe(24)
+    expect(Math.abs(emblem.y + emblem.height / 2 - footer.y - footer.height / 2)).toBeLessThan(1)
+    await expect(page.getByText('WorkPack', { exact: true })).toHaveCount(0)
     for (const icon of await nav.locator('svg.nav-icon').all()) {
       await expect(icon).toHaveAttribute('aria-hidden', 'true')
       await expect(icon).toHaveCSS('width', '16px')

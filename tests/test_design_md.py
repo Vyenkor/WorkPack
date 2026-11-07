@@ -113,9 +113,10 @@ class DesignMdTest(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, layout)
 
-    def test_brand_wordmark_and_emblem_have_separate_positions(self):
+    def test_navigation_toolbar_and_emblem_have_separate_positions(self):
         self.assertIn("src/renderer/src/assets/workpack-logo.png", CONTENT)
-        self.assertIn("侧栏顶部居中显示 WorkPack 字标", CONTENT)
+        self.assertIn("工具始终与顶栏当前位置文字垂直居中对齐", CONTENT)
+        self.assertIn("左右外边距均为 8px", CONTENT)
         self.assertIn("左下角单独显示", CONTENT)
 
     def test_library_identity_uses_one_shared_visual_treatment(self):

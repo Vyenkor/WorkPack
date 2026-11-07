@@ -37,11 +37,14 @@ test('toolbar stays available when collapsed and follows page navigation branche
   await expect(tools().getByRole('button')).toHaveCount(3)
   await expect(back()).toBeDisabled()
   await expect(forward()).toBeDisabled()
-  const brand = (await page.locator('.brand').boundingBox())!
   const toolRow = (await tools().boundingBox())!
+  const currentPage = (await page.locator('.breadcrumb').boundingBox())!
   const workspace = (await page.locator('.workspace-control').boundingBox())!
-  expect(toolRow.y).toBeGreaterThanOrEqual(brand.y + brand.height)
+  expect(Math.abs(toolRow.y + toolRow.height / 2 - currentPage.y - currentPage.height / 2)).toBeLessThan(1)
   expect(toolRow.y + toolRow.height).toBeLessThanOrEqual(workspace.y)
+  const expandedPanel = (await page.locator('.view').boundingBox())!
+  const expandedFooter = (await page.locator('.app-footer').boundingBox())!
+  expect(expandedPanel.y + expandedPanel.height).toBe(expandedFooter.y)
 
   await nav('项目').click()
   await page.getByRole('searchbox', { name: '搜索项目', exact: true }).fill('保留筛选')
@@ -66,7 +69,24 @@ test('toolbar stays available when collapsed and follows page navigation branche
   expect(await page.locator('.view').evaluate(element => element.clientWidth)).toBeGreaterThan(expandedWidth)
   const row = (await tools().boundingBox())!
   const breadcrumb = (await page.locator('.breadcrumb').boundingBox())!
+  expect(row.y).toBe(toolRow.y)
+  expect(Math.abs(row.y + row.height / 2 - breadcrumb.y - breadcrumb.height / 2)).toBeLessThan(1)
   expect(row.x + row.width).toBeLessThanOrEqual(breadcrumb.x)
+  for (const [width, height] of [[1050, 700], [1280, 800], [1600, 1000]]) {
+    await app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setContentSize(...size as [number, number]), [width, height])
+    const margins = await page.locator('.view').evaluate(element => {
+      const box = element.getBoundingClientRect()
+      return { left: box.left, right: innerWidth - box.right, bottom: innerHeight - box.bottom }
+    })
+    expect(margins.left).toBe(8)
+    expect(margins.right).toBe(8)
+    expect(margins.bottom).toBe(40)
+    await expect(page.locator('.footer-emblem')).toBeVisible()
+    const footer = (await page.locator('.app-footer').boundingBox())!
+    const emblem = (await page.locator('.footer-emblem').boundingBox())!
+    expect(Math.abs(emblem.y + emblem.height / 2 - footer.y - footer.height / 2)).toBeLessThan(1)
+  }
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1050, 700))
   await back().click()
   await expect(page.getByRole('heading', { name: '项目', exact: true })).toBeVisible()
   await forward().click()

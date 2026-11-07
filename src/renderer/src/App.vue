@@ -565,7 +565,6 @@ onBeforeUnmount(() => {
       <button class="icon-button" type="button" aria-label="前进一步" title="前进一步（Alt+→）" :disabled="nextPageIndex < 0 || busy || loading" @click="travelPage(1)"><UiIcon name="forward" /></button>
     </nav>
     <aside v-show="!sidebarCollapsed" id="workspace-sidebar" class="sidebar" :inert="drawerOpen || Boolean(modal)">
-      <div class="brand"><strong>WorkPack</strong></div>
       <div class="workspace-control" @focusout="workspaceFocusOut"><button ref="workspaceTrigger" type="button" class="workspace-switch" aria-controls="workspace-menu" :aria-expanded="workspaceMenu" @click="workspaceMenu = !workspaceMenu" @keydown.esc.stop.prevent="closeWorkspaceMenu"><span class="workspace-avatar">W</span><span>我的工作空间</span><UiIcon name="chevron-down" /></button><div v-if="workspaceMenu" id="workspace-menu" class="workspace-popover" @keydown.esc.stop.prevent="closeWorkspaceMenu"><section class="whats-new" aria-label="这次更新了什么"><h3>这次更新了什么</h3><ul><li>浅色工作区与紧凑列表</li><li>文件库新增搜索与分类筛选</li><li>待处理默认显示未完成文件</li><li>存储路径支持一键复制</li></ul></section><button type="button" @click="go('settings')"><UiIcon name="settings" />设置</button></div></div>
       <nav class="nav" aria-label="主导航">
         <button type="button" :aria-current="(view === 'home') ? 'page' : undefined" @click="go('home')"><NavIcon class="nav-icon" name="home" />工作台</button>
@@ -573,7 +572,6 @@ onBeforeUnmount(() => {
         <button type="button" aria-label="待处理" :aria-current="(view === 'pending') ? 'page' : undefined" @click="go('pending')"><NavIcon class="nav-icon" name="pending" />待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
         <button type="button" :aria-current="(view === 'templates') ? 'page' : undefined" @click="go('templates')"><UiIcon class="nav-icon" name="file" />文件库</button>
       </nav>
-      <div class="sidebar-emblem" aria-hidden="true"><span><img :src="workpackLogo" alt=""></span></div>
     </aside>
 
     <section class="content-shell" :aria-hidden="drawerOpen ? 'true' : undefined">
@@ -680,6 +678,7 @@ onBeforeUnmount(() => {
 
       <template v-else-if="modal === 'item'"><div class="modal-heading"><div><h2 id="modal-title">{{ itemForm.id ? '编辑清单项' : '添加文件项' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form @submit.prevent="saveItem"><fieldset class="form-grid" :disabled="busy"><label class="full-width">文件名称<input v-model="itemForm.name" required maxlength="100"></label><label class="full-width">文件说明<textarea v-model="itemForm.note" rows="3" maxlength="4000"></textarea></label><div class="modal-actions"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></fieldset></form></template>
     </section></div>
+    <footer class="app-footer" aria-hidden="true"><span class="footer-emblem"><img :src="workpackLogo" alt=""></span></footer>
     <div v-if="toast.visible" class="toast" :class="toast.tone" :role="toast.tone === 'error' ? 'alert' : 'status'"><span><UiIcon :name="toast.tone === 'success' ? 'check' : 'error'" /></span>{{ toast.message }}<button v-if="toast.tone === 'error'" class="toast-close" aria-label="关闭错误提示" @click="clearToast"><UiIcon name="close" /></button></div>
   </div>
 </template>

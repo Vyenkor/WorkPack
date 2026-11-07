@@ -117,4 +117,38 @@ test('search focus, aligned lists and dropdowns follow the compact desktop layou
   await page.waitForTimeout(250)
   await page.screenshot({ path: info.outputPath('select-open.png'), clip: { x: view.x, y: view.y, width: view.width, height: 420 }, scale: 'css' })
   await page.keyboard.press('Escape')
+  for (const [width, height] of [[1600, 1000], [1280, 800], [1050, 700]]) {
+    await app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setContentSize(...size as [number, number]), [width, height])
+    await nav('工作台').click()
+    const anchor = (await page.getByRole('button', { name: '新建项目', exact: true }).boundingBox())!
+    for (const destination of ['项目', 'detail', '文件库']) {
+      if (destination === 'detail') await page.locator('.project-card-main').click()
+      else await nav(destination).click()
+      const action = page.getByRole('button', { name: destination === 'detail' ? '编辑项目' : destination === '文件库' ? '添加文件模板' : '新建项目', exact: true })
+      const box = (await action.boundingBox())!
+      expect(box.y).toBeCloseTo(anchor.y, 3)
+      expect(box.x + box.width).toBeCloseTo(anchor.x + anchor.width, 3)
+      expect(box.height).toBeCloseTo(34, 3)
+      if (destination === 'detail') {
+        const more = page.getByRole('button', { name: '项目操作', exact: true })
+        const moreBox = (await more.boundingBox())!
+        expect(moreBox.height).toBeCloseTo(box.height, 3)
+        expect(moreBox.y).toBeCloseTo(box.y, 3)
+        await expect(more).toHaveCSS('border-radius', '8px')
+        await expect(page.locator('.project-overview-grid')).toHaveCSS('border-top-width', '0px')
+        await expect(page.locator('.project-folder')).toHaveCSS('border-left-width', '0px')
+        if (width === 1600) await page.screenshot({ path: info.outputPath('stable-project-header.png'), scale: 'css' })
+      }
+      if (destination === '文件库') {
+        const controls = page.locator('.library-filters .filter-search, .category-filters button, .library-page .page-heading .button')
+        for (const control of await controls.all()) {
+          expect((await control.boundingBox())!.height).toBeCloseTo(34, 3)
+          await expect(control).toHaveCSS('border-radius', '8px')
+        }
+        await expect(page.locator('.library-table th').first()).toHaveCSS('border-bottom-color', 'rgb(238, 238, 240)')
+        if (width === 1600) await page.screenshot({ path: info.outputPath('aligned-library-controls.png'), scale: 'css' })
+      }
+    }
+  }
+
 })

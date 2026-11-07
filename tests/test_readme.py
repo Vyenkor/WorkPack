@@ -24,6 +24,17 @@ class ReadmeTest(unittest.TestCase):
             with self.subTest(link=link):
                 self.assertTrue((ROOT / link).is_file())
 
+    def test_ui_evidence_uses_ci_artifacts_without_broken_local_image_links(self):
+        ignore = (ROOT / "Agent/Codex/.gitignore").read_text(encoding="utf-8")
+        self.assertIn("/evidence/**/*.png", ignore)
+        self.assertIn("docs/assets/workbench.png", README)
+        report = ROOT / "Agent/Codex/UI改版验收记录.md"
+        content = report.read_text(encoding="utf-8")
+        self.assertIn("WorkPack-UI-evidence", content)
+        for link in re.findall(r"\]\(([^)#]+)\)", content):
+            if "://" not in link:
+                self.assertTrue((report.parent / link).is_file(), link)
+
     def test_npm_test_runs_python_checks(self):
         runner = (ROOT / "scripts" / "test.cjs").read_text(encoding="utf-8")
         self.assertIn("'unittest', 'discover'", runner)

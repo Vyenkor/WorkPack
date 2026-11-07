@@ -16,7 +16,13 @@ WorkPack 是一个面向 Windows 的本地桌面应用，按项目整理业务�
 
 在工作空间菜单中可以打开**设置 → 存储**，分别选择项目、模板和工作空间数据的位置。三个位置都有默认值，无需首次使用时强制选择。更改模板或工作空间位置时，应用会复制已有数据并在成功后切换，原目录保留。
 
-工作台、项目和事项显示待办完成率；待处理页汇总未完成的文件，可按项目、客户、经办人和完成状态筛选，也可按项目或经办人分组。
+工作台优先显示待处理文件及最近项目，项目和事项显示待办完成率。待处理页默认列出未完成文件，也可切换全部或已完成。清除筛选会恢复未完成，主动选择的筛选会保留，可按项目、客户、经办人和完成状态筛选，也可按项目或经办人分组。
+
+## 界面
+
+![工作台](docs/assets/workbench.png)
+
+[查看本轮 UI 验收与截图](Agent/Codex/UI改版验收记录.md)。
 
 ## 数据存放
 
@@ -32,11 +38,11 @@ WorkPack 是一个面向 Windows 的本地桌面应用，按项目整理业务�
 
 ## 技术栈
 
-- 界面：Vue 3、TypeScript、Element Plus
+- 界面：Vue 3、TypeScript、自有组件与设计 token
 - 桌面：Electron、electron-vite
 - 数据：SQLite（better-sqlite3），输入校验使用 zod
 - 打包：electron-builder（Windows NSIS 安装包）
-- 测试：Vitest（服务层）、Python `unittest`（文档和界面文案检查）
+- 测试：Vitest（服务层）、Python `unittest`（文档与构建检查）、Playwright（Electron 端到端）
 
 界面进程不能直接访问文件系统和数据库。所有磁盘和数据库操作都在主进程中执行，预加载脚本只暴露固定的接口，窗口启用了上下文隔离和沙箱。
 
@@ -95,6 +101,8 @@ npm run dist        # 生成 NSIS 安装包 WorkPack-<版本>-Setup.exe
 批量部署时可以静默安装：`WorkPack-<版本>-Setup.exe /S /currentuser /D=C:\路径\WorkPack`。`/D=` 必须放在最后，路径不加引号；加上 `--no-desktop-shortcut` 不创建桌面快捷方式。静默卸载：`"Uninstall WorkPack.exe" /S /currentuser`。
 
 安装程序和程序图标的资源在 `build/`：`build/icon.ico` 是程序图标，`build/installer.nsh` 定义了安装附加任务和卸载数据选项。
+
+品牌图标统一为灰色。程序、安装和卸载图标共用 `build/icon.ico`，运行窗口使用 `src/renderer/public/icon.png`；更新品牌资源后运行 `npm run brand:sync` 同步灰度版本及多尺寸 ICO。
 
 设置环境变量 `WORKPACK_TEST_DATA=<目录>` 可以让应用使用独立的数据目录，避免影响日常数据。
 

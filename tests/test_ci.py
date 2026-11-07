@@ -46,9 +46,11 @@ class CiWorkflowTest(unittest.TestCase):
     def test_windows_job_tests_builds_and_smoke_tests_the_installer(self):
         text = WORKFLOW.read_text(encoding="utf-8")
         windows = text[text.index("runs-on: windows-latest"):]
-        steps = ["npm ci", "npm run typecheck", "npm test", "npm run test:e2e", "npm run dist", "scripts/installer-smoke.ps1", "actions/upload-artifact"]
+        steps = ["npm ci", "npm run typecheck", "npm test", "npm run test:e2e", "npm run dist", "scripts/installer-smoke.ps1", "name: WorkPack-Setup"]
         positions = [windows.index(step) for step in steps]
         self.assertEqual(positions, sorted(positions))
+        self.assertIn("name: WorkPack-UI-evidence", windows)
+        self.assertLess(windows.index("name: Upload UI evidence"), windows.index("npm run dist"))
         self.assertIn("node-version: 26", windows)
         self.assertIn("release/WorkPack-*-Setup.exe", windows)
 

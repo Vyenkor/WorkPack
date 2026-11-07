@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import ActionMenu from './components/ActionMenu.vue'
 import ItemChecklist from './components/ItemChecklist.vue'
 import NavIcon from './components/NavIcon.vue'
 import UiIcon from './components/UiIcon.vue'
 import workpackLogo from './assets/workpack-logo.png'
 import {
-  cachedProjectPercent,
   gaps,
   defaultPendingFilter,
   groupPendingRows,
@@ -25,12 +25,33 @@ import {
 } from '../../shared/model'
 
 type MainView = 'home' | 'projects' | 'pending' | 'templates' | 'project' | 'settings'
+type PageLocation = { view: MainView; projectId: string | null }
 type ModalName = 'project' | 'event' | 'template' | 'category' | 'task' | 'item' | null
 
 const emptySnapshot = (): Snapshot => ({ projects: [], templates: [], categories: [], pendingView: { filter: defaultPendingFilter(), groupBy: 'project' } })
 const snapshot = ref<Snapshot>(emptySnapshot())
 const view = ref<MainView>('home')
+const sidebarCollapsed = ref(false)
 const workspaceMenu = ref(false)
+const workspaceNews = ref(false)
+const workspaceTrigger = ref<HTMLButtonElement | null>(null)
+const newsTrigger = ref<HTMLButtonElement | null>(null)
+const newsBack = ref<HTMLButtonElement | null>(null)
+let changingWorkspaceNews = false
+function toggleWorkspaceMenu() { workspaceNews.value = false; workspaceMenu.value = !workspaceMenu.value }
+function closeWorkspaceMenu() { workspaceMenu.value = false; workspaceTrigger.value?.focus() }
+async function showWorkspaceNews(show: boolean) {
+  changingWorkspaceNews = true
+  workspaceNews.value = show
+  await nextTick()
+  const target = show ? newsBack.value : newsTrigger.value
+  target?.focus()
+  changingWorkspaceNews = false
+}
+function workspaceEscape() { if (workspaceNews.value) void showWorkspaceNews(false); else closeWorkspaceMenu() }
+function workspaceFocusOut(event: FocusEvent) {
+  if (!changingWorkspaceNews && !(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) workspaceMenu.value = false
+}
 const storageLocations = ref<StorageLocations>({ project: '', template: '', workspace: '' })
 const storageNotice = ref('')
 const activeProjectId = ref<string | null>(null)
@@ -41,6 +62,33 @@ const loading = ref(true)
 const busy = ref(false)
 const errorMessage = ref('')
 const search = ref('')
+const globalSearchInput = ref<HTMLInputElement | null>(null)
+const librarySearch = ref('')
+const libraryCategory = ref<string | null>(null)
+const statusOptions: { value: CompletionFilter; label: string }[] = [{ value: 'all', label: '全部' }, { value: 'open', label: '未完成' }, { value: 'done', label: '已完成' }]
+const storageKinds: { key: keyof StorageLocations; label: string }[] = [{ key: 'project', label: '项目存储位置' }, { key: 'template', label: '模板存储位置' }, { key: 'workspace', label: '工作空间数据位置' }]
+const filteredLibrary = computed(() => snapshot.value.templates.filter(file =>
+  (libraryCategory.value === null || (file.categoryId ?? '') === libraryCategory.value) &&
+  [file.name, file.purpose, ...file.assets.map(asset => asset.name)].some(value => value.toLowerCase().includes(librarySearch.value.trim().toLowerCase()))))
+const selectedCategory = computed(() => snapshot.value.categories.find(category => category.id === libraryCategory.value))
+function categoryName(id: string | null) { return snapshot.value.categories.find(category => category.id === id)?.name ?? '未分类' }
+function templateStatus(file: Template) { return !file.assets.length ? '未导入' : file.assets.every(asset => asset.exists) ? '可用' : '失效' }
+function shortPath(value: string) { const separator = value.includes('\\') ? '\\' : '/'; const parts = value.split(/[\\/]/); return parts.length > 3 ? `…${separator}${parts.slice(-3).join(separator)}` : value }
+async function copyPath(value: string) {
+  try { await window.workpack.copyPath(value); showToast('路径已复制') }
+  catch { showToast('无法复制路径，请重试', 'error') }
+}
+function searchShortcut(event: KeyboardEvent) {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !modal.value && !drawerOpen.value) {
+    event.preventDefault(); globalSearchInput.value?.focus(); globalSearchInput.value?.select()
+  }
+  if (event.altKey && !event.ctrlKey && !event.metaKey && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+    event.preventDefault()
+    if (modal.value || drawerOpen.value || busy.value || loading.value) return
+    travelPage(event.key === 'ArrowLeft' ? -1 : 1)
+  }
+}
+
 const projectFilter = reactive({ keyword: '', status: 'all' as CompletionFilter })
 const pendingFilter = reactive<PendingFilterQuery>(defaultPendingFilter())
 const pendingGroupBy = ref<PendingGroupBy>('project')
@@ -59,7 +107,13 @@ async function flushPendingView() {
     do {
       pendingViewDirty = false
       const requested = currentPendingView()
-      const saved = await window.workpack.savePendingView(requested)
+      let saved: PendingViewState
+      try { saved = await window.workpack.savePendingView(requested) }
+      catch {
+        // Drain edits queued during a failed write, but do not retry an unchanged failure.
+        if (pendingViewDirty) continue
+        break
+      }
       if (pendingViewDirty) continue
       const projectChanged = saved.filter.projectId !== pendingFilter.projectId
       if (!projectChanged) continue
@@ -87,12 +141,53 @@ const itemForm = reactive({ id: '', eventId: '', name: '', note: '' })
 const activeProject = computed(() => snapshot.value.projects.find(project => project.id === activeProjectId.value) ?? null)
 const activeEvent = computed(() => activeProject.value?.events.find(event => event.id === activeEventId.value) ?? null)
 
+const pageLocations = ref<PageLocation[]>([{ view: 'home', projectId: null }])
+const pageLocationIndex = ref(0)
+let restoringPage = false
+watch([view, activeProjectId], () => {
+  if (restoringPage || loading.value || (view.value === 'project' && !activeProject.value)) return
+  const location: PageLocation = { view: view.value, projectId: view.value === 'project' ? activeProjectId.value : null }
+  const current = pageLocations.value[pageLocationIndex.value]
+  if (current.view === location.view && current.projectId === location.projectId) return
+  pageLocations.value = [...pageLocations.value.slice(0, pageLocationIndex.value + 1), location]
+  pageLocationIndex.value = pageLocations.value.length - 1
+}, { flush: 'post' })
+function availablePageIndex(direction: -1 | 1) {
+  const current = pageLocations.value[pageLocationIndex.value]
+  for (let index = pageLocationIndex.value + direction; index >= 0 && index < pageLocations.value.length; index += direction) {
+    const location = pageLocations.value[index]
+    if (location.view === current.view && location.projectId === current.projectId) continue
+    if (location.view !== 'project' || snapshot.value.projects.some(project => project.id === location.projectId)) return index
+  }
+  return -1
+}
+const previousPageIndex = computed(() => availablePageIndex(-1))
+const nextPageIndex = computed(() => availablePageIndex(1))
+async function travelPage(direction: -1 | 1) {
+  if (modal.value || drawerOpen.value || busy.value || loading.value) return
+  const index = direction === -1 ? previousPageIndex.value : nextPageIndex.value
+  if (index < 0) return
+  restoringPage = true
+  clearToast()
+  workspaceMenu.value = false
+  closeDrawer()
+  pageLocationIndex.value = index
+  const location = pageLocations.value[index]
+  view.value = location.view
+  activeProjectId.value = location.projectId
+  await nextTick()
+  restoringPage = false
+  if (document.activeElement?.matches('button:disabled')) document.querySelector<HTMLElement>('main.view')?.focus()
+}
+function toggleSidebar() {
+  workspaceMenu.value = false
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
 const allEvents = computed(() => snapshot.value.projects.flatMap(project => project.events.map(event => ({ project, event }))))
 const itemRows = computed(() => allEvents.value.flatMap(({ project, event }) => event.items.map(item => ({ project, event, item, gaps: gaps(item) }))))
 const pendingRows = computed(() => itemRows.value.filter(row => row.gaps.length))
 const navPending = computed(() => pendingRows.value.length)
-const openEvents = computed(() => allEvents.value.filter(pair => progress(pair.event.items).percent < 100))
-const totalItems = computed(() => allEvents.value.reduce((sum, pair) => sum + pair.event.items.length, 0))
 const recentProjects = computed(() => [...snapshot.value.projects].sort((a, b) => projectActivity(b).localeCompare(projectActivity(a))).slice(0, 4))
 const filteredProjects = computed(() => {
   const keyword = projectFilter.keyword.trim().toLowerCase()
@@ -110,27 +205,21 @@ function withSelected(options: string[], selected: string) {
   return value && !options.includes(value) ? [...options, value].sort((a, b) => a.localeCompare(b, 'zh-CN')) : options
 }
 const pendingProjectOptions = computed(() => {
-  const names = new Map(pendingRows.value.map(row => [row.project.id, row.project.name]))
+  const names = new Map(itemRows.value.map(row => [row.project.id, row.project.name]))
   if (pendingFilter.projectId && !names.has(pendingFilter.projectId)) {
     const project = snapshot.value.projects.find(item => item.id === pendingFilter.projectId)
     if (project) names.set(project.id, project.name)
   }
   return [...names.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
 })
-const pendingCustomerOptions = computed(() => withSelected(sortedUnique(pendingRows.value.map(row => row.project.customer)), pendingFilter.customer))
-const pendingOwnerOptions = computed(() => withSelected(sortedUnique(pendingRows.value.map(row => row.event.owner)), pendingFilter.owner))
-const pendingFiltersActive = computed(() => Boolean(pendingFilter.keyword.trim() || pendingFilter.projectId || pendingFilter.customer.trim() || pendingFilter.owner.trim() || pendingFilter.status !== 'all'))
+const pendingCustomerOptions = computed(() => withSelected(sortedUnique(itemRows.value.map(row => row.project.customer)), pendingFilter.customer))
+const pendingOwnerOptions = computed(() => withSelected(sortedUnique(itemRows.value.map(row => row.event.owner)), pendingFilter.owner))
+const pendingFiltersActive = computed(() => Boolean(pendingFilter.keyword.trim() || pendingFilter.projectId || pendingFilter.customer.trim() || pendingFilter.owner.trim() || pendingFilter.status !== defaultPendingFilter().status))
 function clearPendingFilters() {
-  pendingFilter.keyword = ''
-  pendingFilter.projectId = ''
-  pendingFilter.customer = ''
-  pendingFilter.owner = ''
-  pendingFilter.status = 'all'
+  Object.assign(pendingFilter, defaultPendingFilter())
 }
-const filteredPending = computed(() => {
-  const percents = new Map<string, number>()
-  return pendingRows.value.filter(row => matchesPendingQuery(row, pendingFilter, () => cachedProjectPercent(row.project.id, percents, () => projectProgress(row.project).percent)))
-})
+const filteredPending = computed(() => itemRows.value.filter(row =>
+  matchesPendingQuery(row, pendingFilter)))
 const pendingGroups = computed(() => groupPendingRows(filteredPending.value, pendingGroupBy.value))
 const currentBreadcrumb = computed(() => {
   if (view.value !== 'project') return ({ home: '工作台', projects: '项目', pending: '待处理', templates: '文件库', settings: '设置' } as Record<Exclude<MainView, 'project'>, string>)[view.value]
@@ -155,12 +244,13 @@ function clearToast() {
 }
 function confirmDiscardUnsaved() { return window.confirm('有未保存修改，关闭？') }
 function requestCloseModal() {
+  if (busy.value) return
   if (modalDirty.value && !confirmDiscardUnsaved()) return
   clearToast()
   modal.value = null
 }
 function focusableElements(root: HTMLElement | null) {
-  return Array.from(root?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])
+  return Array.from(root?.querySelectorAll<HTMLElement>('button:enabled, input:enabled, textarea:enabled, select:enabled, [tabindex]:not([tabindex="-1"])') ?? [])
 }
 function trapTab(event: KeyboardEvent, root: HTMLElement | null) {
   const elements = focusableElements(root)
@@ -170,6 +260,8 @@ function trapTab(event: KeyboardEvent, root: HTMLElement | null) {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
 }
 function handleModalKeydown(event: KeyboardEvent) {
+  // Let the native picker consume Escape before the containing dialog handles it.
+  if (event.key === 'Escape' && modalCard.value?.querySelector('select:open')) { event.stopPropagation(); return }
   if (event.key === 'Escape') { event.preventDefault(); requestCloseModal(); return }
   if (event.key !== 'Tab') return
   trapTab(event, modalCard.value)
@@ -216,6 +308,7 @@ function closeDrawer(restoreFocus = false) {
   if (restoreFocus) restoreDrawerFocus(origin)
 }
 function requestCloseDrawer() {
+  if (busy.value) return
   if (modal.value) { requestCloseModal(); return }
   clearToast()
   closeDrawer(true)
@@ -255,7 +348,6 @@ function formatDate(date: string) {
   const value = new Date(`${date}T00:00:00`)
   return Number.isNaN(value.getTime()) ? date : value.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
 }
-function formatFullDate(date: string) { return new Date(`${date}T00:00:00`).toLocaleDateString('zh-CN') }
 function projectProgress(project: Project) { return progress(project.events.flatMap(event => event.items)) }
 function eventProgress(event: BusinessEvent) { return progress(event.items) }
 function eventPending(event: BusinessEvent) { return event.items.filter(item => gaps(item).length).length }
@@ -282,6 +374,9 @@ async function refresh(showLoading: boolean | Event = true) {
   }
 }
 async function run<T>(action: () => Promise<T>, success?: string): Promise<T | boolean> {
+  if (busy.value) return false
+  const drawerControl = drawerCard.value?.contains(document.activeElement) ? document.activeElement as HTMLElement : null
+  const modalControl = modalCard.value?.contains(document.activeElement) ? document.activeElement as HTMLElement : null
   clearToast()
   busy.value = true
   try {
@@ -293,7 +388,19 @@ async function run<T>(action: () => Promise<T>, success?: string): Promise<T | b
   } catch (error) {
     showToast(error instanceof Error ? error.message : '操作失败', 'error')
     return false
-  } finally { busy.value = false }
+  } finally {
+    busy.value = false
+    await nextTick()
+    if (modalControl && modal.value && !modalCard.value?.contains(document.activeElement)) {
+      const target = modalControl.isConnected && !modalControl.matches(':disabled') ? modalControl : focusableElements(modalCard.value)[0]
+      target?.focus({ preventScroll: true })
+    }
+    // Refresh can replace or remove the focused attachment/menu control.
+    if (drawerControl && drawerOpen.value && !modal.value && !drawerCard.value?.contains(document.activeElement)) {
+      const target = drawerControl.isConnected && !drawerControl.hasAttribute('disabled') ? drawerControl : focusableElements(drawerCard.value)[0]
+      target?.focus({ preventScroll: true })
+    }
+  }
 }
 function go(next: MainView) {
   clearToast()
@@ -316,7 +423,9 @@ function showEventDrawer(project: Project, event: BusinessEvent) {
   drawerOpen.value = true
 }
 function openEvent(project: Project, event: BusinessEvent, options?: { projectPage?: boolean }) {
-  const stay = !options?.projectPage && (view.value === 'pending' || (view.value === 'project' && activeProjectId.value === project.id))
+  const stay = !options?.projectPage && (
+    view.value === 'home' || view.value === 'pending' || (view.value === 'project' && activeProjectId.value === project.id)
+  )
   if (!stay) view.value = 'project'
   showEventDrawer(project, event)
 }
@@ -356,7 +465,10 @@ async function saveEvent() {
   modal.value = null
   const project = snapshot.value.projects.find(item => item.id === eventForm.projectId)
   const event = project?.events.find(item => item.id === (typeof saved === 'string' ? saved : eventForm.id))
-  if (project && event) { if (view.value !== 'pending') view.value = 'project'; showEventDrawer(project, event) }
+  if (project && event) {
+    if (view.value !== 'pending' && view.value !== 'home') view.value = 'project'
+    showEventDrawer(project, event)
+  }
 }
 function resetTemplateForm(template?: Template) { Object.assign(templateForm, template ? { id: template.id, name: template.name, purpose: template.purpose ?? '', categoryId: template.categoryId ?? '' } : { id: '', name: '', purpose: '', categoryId: '' }) }
 function openTemplateModal(template?: Template) { clearToast(); resetTemplateForm(template); modal.value = 'template'; markModalClean() }
@@ -371,8 +483,7 @@ async function deleteTemplate(template: Template) {
 }
 function openCategoryModal(category?: {id:string;name:string}) { Object.assign(categoryForm, category ?? {id:'',name:''}); modal.value='category'; markModalClean() }
 async function saveCategory() { const result=await run(() => window.workpack.saveLibraryCategory({id:categoryForm.id || undefined,name:categoryForm.name}),'已保存'); if(result) modal.value=null }
-async function deleteCategory(category:{id:string;name:string}) { if(window.confirm(`删除分类“${category.name}”？其中的文件会保留。`)) await run(() => window.workpack.deleteLibraryCategory(category.id),'已删除') }
-const libraryGroups = computed(() => [{id:'',name:'未分类'},...(snapshot.value.categories ?? [])].map(category => ({...category,files:snapshot.value.templates.filter(file => (file.categoryId ?? '') === category.id)})).filter(group => group.files.length || group.id))
+async function deleteCategory(category:{id:string;name:string}) { if(window.confirm(`删除分类“${category.name}”？其中的文件会保留。`)) { const result = await run(() => window.workpack.deleteLibraryCategory(category.id),'已删除'); if (result) libraryCategory.value = null } }
 async function deleteProject(project: Project) {
   const confirmed = window.confirm(`“${project.name}”的事项、清单及附件记录将被删除。项目文件夹和实际文件会保留。`)
   if (!confirmed) return
@@ -424,7 +535,7 @@ async function openProjectFolder(project: Project) { await run(() => window.work
 async function relocateProject(project: Project) { const moved = await run(() => window.workpack.relocateProject(project.id), '已重新定位'); if (moved) await refresh() }
 
 function handleWorkspaceOutside(event: MouseEvent) {
-  if (!(event.target as HTMLElement).closest('.sidebar-bottom')) workspaceMenu.value = false
+  if (!(event.target as HTMLElement).closest('.workspace-control')) workspaceMenu.value = false
 }
 async function chooseStorage(kind: keyof StorageLocations) {
   clearToast()
@@ -440,11 +551,17 @@ async function chooseStorage(kind: keyof StorageLocations) {
   finally { busy.value = false }
 }
 
+let modalOrigin: HTMLElement | null = null
 watch(modal, value => {
-  if (value) focusModal()
+  if (value) {
+    const active = document.activeElement as HTMLElement | null
+    modalOrigin = active?.closest('.action-menu')?.querySelector<HTMLButtonElement>('.menu-trigger') ?? active
+    focusModal()
+  }
   else {
     modalBaseline.value = ''
-    if (drawerOpen.value) focusDrawer()
+    if (modalOrigin?.isConnected) nextTick(() => modalOrigin?.focus())
+    else if (drawerOpen.value) focusDrawer()
   }
 })
 watch(drawerOpen, open => { if (open) focusDrawer() })
@@ -453,49 +570,128 @@ onMounted(() => {
   window.workpack.storageLocations().then(value => { storageLocations.value = value }).catch(() => {})
   document.addEventListener('click', handleModalClick, true)
   document.addEventListener('click', handleWorkspaceOutside)
+  document.addEventListener('keydown', searchShortcut)
 })
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleModalClick, true)
   document.removeEventListener('click', handleWorkspaceOutside)
+  document.removeEventListener('keydown', searchShortcut)
   if (toastTimer) clearTimeout(toastTimer)
 })
 </script>
 
 <template>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand"><img class="brand-logo" :src="workpackLogo" alt="WorkPack"></div>
+  <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <nav class="sidebar-tools" aria-label="页面导航" :inert="drawerOpen || Boolean(modal)">
+      <button class="icon-button sidebar-toggle" type="button" :aria-label="sidebarCollapsed ? '展开侧栏' : '折叠侧栏'" :title="sidebarCollapsed ? '展开侧栏' : '折叠侧栏'" aria-controls="workspace-sidebar" :aria-expanded="!sidebarCollapsed" @click="toggleSidebar"><UiIcon name="sidebar" /></button>
+      <button class="icon-button" type="button" aria-label="返回上一步" title="返回上一步（Alt+←）" :disabled="previousPageIndex < 0 || busy || loading" @click="travelPage(-1)"><UiIcon name="back" /></button>
+      <button class="icon-button" type="button" aria-label="前进一步" title="前进一步（Alt+→）" :disabled="nextPageIndex < 0 || busy || loading" @click="travelPage(1)"><UiIcon name="forward" /></button>
+    </nav>
+    <aside v-show="!sidebarCollapsed" id="workspace-sidebar" class="sidebar" :inert="drawerOpen || Boolean(modal)">
+      <div class="workspace-control" @focusout="workspaceFocusOut">
+        <button ref="workspaceTrigger" type="button" class="workspace-switch" aria-controls="workspace-menu" :aria-expanded="workspaceMenu" @click="toggleWorkspaceMenu" @keydown.esc.stop.prevent="closeWorkspaceMenu"><span class="workspace-avatar">W</span><span>我的工作空间</span><UiIcon name="chevron-down" /></button>
+        <div v-if="workspaceMenu" id="workspace-menu" class="workspace-popover" :class="{ 'news-view': workspaceNews }" @click.stop @keydown.esc.stop.prevent="workspaceEscape">
+          <template v-if="!workspaceNews">
+            <button ref="newsTrigger" type="button" @click="showWorkspaceNews(true)"><UiIcon name="file" /><span>News</span><UiIcon name="forward" class="submenu-arrow" /></button>
+            <button type="button" @click="go('settings')"><UiIcon name="settings" />设置</button>
+          </template>
+          <section v-else class="whats-new" aria-label="最近更新">
+            <div class="news-heading"><button ref="newsBack" type="button" class="icon-button" aria-label="返回工作空间菜单" @click="showWorkspaceNews(false)"><UiIcon name="back" /></button><h3>最近更新</h3></div>
+            <time datetime="2026-11-07">2026年11月7日</time>
+            <ul><li>浅色工作区与紧凑列表</li><li>侧栏支持折叠、返回与前进</li><li>统一字体、图标及控件尺寸</li><li>减淡分隔线，精简页面布局</li></ul>
+          </section>
+        </div>
+      </div>
       <nav class="nav" aria-label="主导航">
-        <button type="button" :class="{ active: view === 'home' }" @click="go('home')"><NavIcon class="nav-icon" name="home" />工作台</button>
-        <button type="button" :class="{ active: view === 'projects' || view === 'project' }" @click="go('projects')"><NavIcon class="nav-icon" name="projects" />项目</button>
-        <button type="button" :class="{ active: view === 'pending' }" @click="go('pending')"><NavIcon class="nav-icon" name="pending" />待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
-        <button type="button" :class="{ active: view === 'templates' }" @click="go('templates')"><NavIcon class="nav-icon" name="templates" />文件库</button>
+        <button type="button" :aria-current="(view === 'home') ? 'page' : undefined" @click="go('home')"><NavIcon class="nav-icon" name="home" />工作台</button>
+        <button type="button" :aria-current="(view === 'projects' || view === 'project') ? 'page' : undefined" @click="go('projects')"><NavIcon class="nav-icon" name="projects" />项目</button>
+        <button type="button" aria-label="待处理" :aria-current="(view === 'pending') ? 'page' : undefined" @click="go('pending')"><NavIcon class="nav-icon" name="pending" />待处理 <span v-if="navPending" class="nav-count">{{ navPending }}</span></button>
+        <button type="button" :aria-current="(view === 'templates') ? 'page' : undefined" @click="go('templates')"><UiIcon class="nav-icon" name="library" />文件库</button>
       </nav>
-      <div class="sidebar-bottom"><button type="button" class="workspace-switch" aria-controls="workspace-menu" :aria-expanded="workspaceMenu" @click="workspaceMenu = !workspaceMenu" @keydown.esc="workspaceMenu = false"><span class="workspace-avatar">W</span><span>我的工作空间</span><UiIcon name="chevron-down" /></button><div v-if="workspaceMenu" id="workspace-menu" class="workspace-popover" @keydown.esc="workspaceMenu = false"><section class="whats-new" aria-label="这次更新了什么"><h3>这次更新了什么</h3><ul><li>文件库可分类管理模板</li><li>事项文件可自定义待办</li><li>可分别设置三个存储位置</li><li>卸载时可选清理工作空间记录</li></ul></section><button type="button" @click="go('settings')"><UiIcon name="settings" />设置</button></div></div>
     </aside>
 
     <section class="content-shell" :aria-hidden="drawerOpen ? 'true' : undefined">
-      <header class="topbar"><div class="breadcrumb"><span v-if="view === 'project'" class="breadcrumb-link" @click="go('projects')">项目</span><span v-if="view === 'project'" class="breadcrumb-divider">/</span>{{ currentBreadcrumb }}</div><div class="topbar-actions"><label class="global-search"><UiIcon name="search" class="search-icon" /><input v-model="search" type="search" placeholder="搜索项目或客户" aria-label="搜索项目或客户" @keyup.enter="runGlobalSearch"><kbd>↵</kbd></label></div></header>
+      <header class="topbar" :inert="drawerOpen || Boolean(modal)"><div class="breadcrumb"><button v-if="view === 'project'" class="breadcrumb-link" @click="go('projects')">项目</button><UiIcon v-if="view === 'project'" name="back" class="breadcrumb-divider" /><span class="breadcrumb-current" :title="currentBreadcrumb">{{ currentBreadcrumb }}</span></div><div class="topbar-actions"><label class="global-search"><UiIcon name="search" class="search-icon" /><input ref="globalSearchInput" v-model="search" type="search" placeholder="搜索项目或任意内容" aria-label="搜索项目或任意内容" @keyup.enter="runGlobalSearch"><kbd>Ctrl K</kbd></label></div></header>
 
-      <main class="view">
+      <main class="view" :inert="drawerOpen || Boolean(modal)" tabindex="-1">
         <div v-if="loading" class="loading-state"><span class="spinner"></span><p>加载中…</p></div>
         <div v-else-if="errorMessage" class="error-state"><div class="empty-icon"><UiIcon name="error" /></div><h2>读取失败</h2><p>{{ errorMessage }}</p><button class="button primary" @click="refresh">重试</button></div>
 
         <template v-else>
-          <section v-if="view === 'home'" class="page-section">
-            <div class="page-heading"><div><span class="eyebrow">WORKSPACE OVERVIEW</span><h1>工作台</h1></div><div class="heading-actions"><button class="button secondary" @click="go('templates')">文件库</button><button class="button primary" @click="openProjectModal()">新建项目</button></div></div>
-            <div class="stat-grid"><article class="stat-card"><span class="stat-icon violet"><UiIcon name="project" /></span><div><span>项目</span><strong>{{ snapshot.projects.length }}</strong></div></article><article class="stat-card"><span class="stat-icon orange"><UiIcon name="clock" /></span><div><span>待处理</span><strong>{{ navPending }}</strong></div></article><article class="stat-card"><span class="stat-icon blue"><UiIcon name="event" /></span><div><span>未完成事项</span><strong>{{ openEvents.length }}</strong></div></article><article class="stat-card"><span class="stat-icon green"><UiIcon name="file" /></span><div><span>文件库</span><strong>{{ snapshot.templates.length }}</strong></div></article></div>
-            <div class="home-grid"><section class="panel attention-panel"><div class="panel-heading"><div><h2>需要关注</h2></div><button class="link" @click="go('pending')">查看全部</button></div><div v-if="!pendingRows.length" class="empty compact"><div class="empty-icon"><UiIcon name="check" /></div><strong>{{ allEvents.length ? '已完成' : '暂无事项' }}</strong></div><button v-for="row in pendingRows.slice(0, 5)" :key="row.item.id" class="attention-row" @click="openEvent(row.project, row.event)"><span class="attention-dot"></span><span class="attention-main"><strong>{{ row.item.name }}</strong><small>{{ row.project.name }} · {{ row.event.name }}</small></span><span class="attention-tags"><span v-for="gap in row.gaps.slice(0, 2)" :key="gap" class="tag orange">{{ gap }}</span></span></button></section><section class="panel recent-panel"><div class="panel-heading"><div><h2>最近项目</h2></div><button class="link" @click="go('projects')">全部项目</button></div><div v-if="!snapshot.projects.length" class="empty compact"><div class="empty-icon"><UiIcon name="plus" /></div><strong>暂无项目</strong></div><button v-for="project in recentProjects" :key="project.id" class="project-mini" @click="openProject(project)"><span class="project-mini-mark">{{ project.name.slice(0, 1) }}</span><span><strong>{{ project.name }}</strong><small>{{ project.customer }}</small></span><span class="mini-progress"><i :style="{ width: `${projectProgress(project).percent}%` }"></i></span><b>{{ projectProgress(project).percent }}%</b></button></section></div>
+          <section v-if="view === 'home'" class="page-section home-page">
+            <div class="page-heading"><h1>工作台</h1><button class="button primary" @click="openProjectModal()"><UiIcon name="plus" />新建项目</button></div>
+            <div class="home-grid">
+              <section class="attention-panel">
+                <div class="panel-heading"><div class="title-with-count"><h2>待处理文件</h2><span class="count-badge">{{ navPending }}</span></div><button class="link muted" @click="go('pending')">查看全部<UiIcon name="arrow" /></button></div>
+                <div v-if="!pendingRows.length" class="empty compact"><UiIcon name="check" class="empty-icon" /><strong>暂无待处理文件</strong></div>
+                <template v-else>
+                  <div class="attention-columns"><span>文件</span><span>项目及事项</span><span>待办状态</span></div>
+                  <button v-for="row in pendingRows.slice(0, 5)" :key="row.item.id" class="attention-row" @click="openEvent(row.project, row.event)">
+                    <span class="pending-file"><UiIcon name="file" /><strong>{{ row.item.name }}</strong></span>
+                    <span class="attention-main"><strong>{{ row.project.name }}</strong><small>{{ row.event.name }}</small></span>
+                    <span class="attention-tags"><span v-for="gap in row.gaps.slice(0, 2)" :key="gap" class="tag orange">{{ gap }}</span></span>
+                  </button>
+                </template>
+              </section>
+              <section class="recent-panel">
+                <div class="panel-heading"><h2>最近项目</h2><button class="link muted" @click="go('projects')">全部项目<UiIcon name="arrow" /></button></div>
+                <div v-if="!snapshot.projects.length" class="empty compact"><UiIcon name="cube" class="empty-icon" /><strong>还没有项目</strong></div>
+                <button v-for="project in recentProjects" :key="project.id" class="project-mini" @click="openProject(project)">
+                  <UiIcon name="cube" /><span><strong>{{ project.name }}</strong><small>{{ project.customer }}</small></span>
+                  <span class="mini-progress"><i :style="{ width: `${projectProgress(project).percent}%` }"></i></span><b>{{ projectProgress(project).percent }}%</b>
+                </button>
+              </section>
+            </div>
           </section>
 
-          <section v-else-if="view === 'projects'" class="page-section"><div class="page-heading"><div><span class="eyebrow">PROJECTS</span><h1>项目</h1></div><div class="filter-bar"><label class="filter-search"><UiIcon name="search" class="search-icon" /><input v-model="projectFilter.keyword" placeholder="搜索项目、客户或负责人"></label><select v-model="projectFilter.status"><option value="all">全部完成状态</option><option value="open">进行中</option><option value="done">已完成</option></select><span class="filter-result">共 {{ filteredProjects.length }} 个项目</span></div><button class="button primary" @click="openProjectModal()">新建项目</button></div><div class="project-list"><article v-for="project in filteredProjects" :key="project.id" class="project-card" tabindex="0" role="button" @click="openProject(project)" @keydown.enter.prevent="openProject(project)" @keydown.space.prevent="openProject(project)"><div class="project-card-main"><span class="project-mark">{{ project.name.slice(0, 1) }}</span><div class="project-title"><button class="title-button" @click="openProject(project)">{{ project.name }}</button><span class="project-code">{{ project.customer }}</span><p v-if="project.note">{{ project.note }}</p><small class="project-events">{{ project.events.length }} 个事项</small></div><div class="project-owner"><small>负责人</small><strong>{{ project.owner }}</strong></div><div class="project-progress"><div class="progress-meta"><span>资料进度</span><strong>{{ projectProgress(project).percent }}%</strong></div><div class="progress-track"><i :style="{ width: `${projectProgress(project).percent}%` }"></i></div><small>{{ projectProgress(project).done }} / {{ projectProgress(project).total || 0 }} 项待办</small></div></div><div class="project-card-footer"><span>事项 {{ project.events.length }} 个</span><span>待处理 {{ project.events.reduce((sum, event) => sum + eventPending(event), 0) }} 项</span><span class="folder-status" :class="project.folderExists ? 'ok' : 'warning'"><UiIcon :name="project.folderExists ? 'check' : 'warning'" />{{ project.folderExists ? '项目目录正常' : '项目目录需要重新定位' }}</span><button class="link danger-link project-delete" @click.stop="deleteProject(project)">删除</button><button class="link" @click.stop="openProjectFolder(project)">打开文件夹</button></div></article><div v-if="!filteredProjects.length" class="empty"><div class="empty-icon"><UiIcon name="search" /></div><h3>暂无项目</h3><p>调整筛选或新建项目。</p></div></div></section>
+          <section v-else-if="view === 'projects'" class="page-section projects-page">
+            <div class="page-heading"><h1>项目</h1><button class="button primary" @click="openProjectModal()"><UiIcon name="plus" />新建项目</button></div>
+            <div class="filter-bar project-filters"><label class="filter-search"><UiIcon name="search" /><input v-model="projectFilter.keyword" type="search" aria-label="搜索项目" placeholder="搜索项目、客户或负责人"></label><div class="segmented" role="group" aria-label="项目完成状态"><button v-for="option in statusOptions" :key="option.value" :aria-pressed="projectFilter.status === option.value" :class="{ active: projectFilter.status === option.value }" @click="projectFilter.status = option.value">{{ option.value === 'open' ? '进行中' : option.label }}</button></div></div>
+            <div class="project-list">
+              <div v-if="filteredProjects.length" class="project-columns" aria-hidden="true">
+                <span>名称</span><span>客户</span><span>负责人</span><span>事项</span><span>进度</span><span>操作</span>
+              </div>
+              <article v-for="project in filteredProjects" :key="project.id" class="project-card">
+                <button class="project-card-main" @click="openProject(project)"><span class="project-title"><UiIcon name="cube" class="project-mark" /><strong>{{ project.name }}</strong></span><span class="project-customer">{{ project.customer }}</span><span class="project-owner" :title="`负责人：${project.owner}`">{{ project.owner }}</span><span class="project-events" :title="`${project.events.length} 项事项`">{{ project.events.length }}</span><span class="project-progress"><span class="progress-track"><i :style="{ width: `${projectProgress(project).percent}%` }"></i></span><strong>{{ projectProgress(project).percent }}%</strong></span></button>
+                <div class="project-card-footer"><button class="icon-button" aria-label="打开文件夹" title="打开文件夹" :disabled="busy" @click="openProjectFolder(project)"><UiIcon name="project" /></button><ActionMenu :label="`${project.name}操作`" :disabled="busy"><button @click="openProjectModal(project)"><UiIcon name="edit" />编辑项目</button><button v-if="!project.folderExists" @click="relocateProject(project)"><UiIcon name="project" />重新定位</button><button class="danger" @click="deleteProject(project)">删除项目</button></ActionMenu></div>
+                <span v-if="!project.folderExists" class="project-folder-warning"><UiIcon name="warning" />目录不可用<button class="link" @click="relocateProject(project)">重新定位</button></span>
+              </article>
+              <div v-if="!filteredProjects.length" class="empty"><UiIcon name="cube" class="empty-icon" /><h3>{{ snapshot.projects.length ? '没有符合条件的项目' : '还没有项目' }}</h3><button v-if="snapshot.projects.length" class="button secondary" @click="projectFilter.keyword = ''; projectFilter.status = 'all'">清除筛选</button></div>
+            </div><div class="list-footer">共 {{ filteredProjects.length }} 个项目</div>
+          </section>
 
-          <section v-else-if="view === 'pending'" class="page-section"><div class="page-heading"><div><span class="eyebrow">FOLLOW UP</span><h1>待处理</h1></div><div class="filter-bar pending-filters"><label class="filter-search"><UiIcon name="search" class="search-icon" /><input v-model="pendingFilter.keyword" type="search" aria-label="搜索待处理" placeholder="搜索项目、事项或文件"></label><select v-model="pendingFilter.projectId" aria-label="项目"><option value="">全部项目</option><option v-for="option in pendingProjectOptions" :key="option.id" :value="option.id">{{ option.name }}</option></select><select v-model="pendingFilter.customer" aria-label="客户"><option value="">全部客户</option><option v-for="customer in pendingCustomerOptions" :key="customer" :value="customer">{{ customer }}</option></select><select v-model="pendingFilter.owner" aria-label="经办人" title="事项经办人"><option value="">全部经办人</option><option v-for="owner in pendingOwnerOptions" :key="owner" :value="owner">{{ owner }}</option></select><select v-model="pendingFilter.status" aria-label="完成状态"><option value="all">全部完成状态</option><option value="open">进行中</option><option value="done">已完成</option></select><button v-if="pendingFiltersActive" type="button" class="button secondary small" @click="clearPendingFilters">清除</button><div class="pending-group-by" role="group" aria-label="分组"><button type="button" :aria-pressed="pendingGroupBy === 'project'" :class="{ active: pendingGroupBy === 'project' }" @click="pendingGroupBy = 'project'">项目</button><button type="button" :aria-pressed="pendingGroupBy === 'owner'" :class="{ active: pendingGroupBy === 'owner' }" @click="pendingGroupBy = 'owner'">经办人</button><button type="button" :aria-pressed="pendingGroupBy === 'none'" :class="{ active: pendingGroupBy === 'none' }" @click="pendingGroupBy = 'none'">不分组</button></div></div><div class="summary-pill"><strong>{{ filteredPending.length }}</strong><span>项</span></div></div><div class="pending-table panel" tabindex="-1"><div v-if="!filteredPending.length" class="empty"><div class="empty-icon"><UiIcon :name="pendingRows.length ? 'search' : 'check'" /></div><h3>{{ pendingRows.length ? '没有符合条件的待处理项' : '已完成' }}</h3><p v-if="pendingRows.length">调整筛选条件。</p></div><template v-else><div class="pending-table-head"><span>文件</span><span>项目及事项</span><span>缺口</span><span title="事项经办人">经办人</span></div><section v-for="group in pendingGroups" :key="`${pendingGroupBy}:${group.key}`" class="pending-group"><h2 v-if="pendingGroupBy !== 'none'" class="pending-group-head"><span>{{ group.label }}</span><span class="pending-group-count">{{ group.rows.length }} 项</span></h2><button v-for="row in group.rows" :key="row.item.id" class="pending-row" @click="openEvent(row.project, row.event)"><span class="pending-file"><span class="file-icon"><UiIcon name="file" /></span><strong>{{ row.item.name }}</strong></span><span><strong>{{ row.project.name }}</strong><small>{{ row.project.customer }} · {{ row.event.name }}</small></span><span class="pending-gaps"><span v-for="gap in row.gaps" :key="gap" class="tag orange">{{ gap }}</span></span><span>{{ row.event.owner }}</span></button></section></template></div></section>
-          <section v-else-if="view === 'templates'" class="page-section"><div class="page-heading"><div><span class="eyebrow">FILE LIBRARY</span><h1>文件库</h1></div><div class="heading-actions"><button class="button secondary" @click="openCategoryModal()">新建分类</button><button class="button primary" @click="openTemplateModal()">添加文件模板</button></div></div><div class="notice-banner"><span class="notice-icon"><UiIcon name="info" /></span><span>在事项中选择所需文件，待办清单由每个事项单独管理。</span></div><div v-for="group in libraryGroups" :key="group.id" class="library-group"><div class="section-heading"><h2>{{ group.name }}</h2><div v-if="group.id" class="inline-actions"><button class="link" @click="openCategoryModal(group)">重命名</button><button class="link danger" @click="deleteCategory(group)">删除分类</button></div></div><div class="template-grid"><article v-for="file in group.files" :key="file.id" class="template-card"><div class="template-card-head"><span class="template-icon"><UiIcon name="file" /></span><div><h2>{{ file.name }}</h2><p v-if="file.purpose">{{ file.purpose }}</p></div><button class="more-button" :aria-label="`编辑${file.name}`" @click="openTemplateModal(file)">编辑</button></div><div class="asset-area"><div class="asset-heading"><strong>模板文件</strong><span>{{ file.assets.length ? file.assets[0].exists ? '可用' : '失效' : '未导入' }}</span></div><div v-for="asset in file.assets" :key="asset.id" class="asset-row"><span class="file-icon"><UiIcon name="file" /></span><span class="asset-name" :title="asset.path">{{ asset.name }}</span><button class="asset-remove" title="移除记录" @click="removeTemplateAsset(asset.id)"><UiIcon name="close" /></button></div></div><div class="template-actions"><button class="button secondary small" @click="importTemplateAssets(file)">导入模板</button><button class="button secondary small" :disabled="!file.assets.length" @click="exportTemplate(file)">导出</button><button class="button danger-link small" @click="deleteTemplate(file)">删除</button></div></article></div></div><div v-if="!snapshot.templates.length" class="empty"><div class="empty-icon"><UiIcon name="file" /></div><h3>文件库还没有文件</h3><p>添加模板后，可在创建事项时选用。</p></div></section>
+          <section v-else-if="view === 'pending'" class="page-section pending-page">
+            <div class="page-heading"><div class="title-with-count"><h1>待处理</h1><span>{{ filteredPending.length }} 项</span></div></div>
+            <div class="status-tabs" role="group" aria-label="完成状态"><button v-for="option in statusOptions" :key="option.value" :aria-pressed="pendingFilter.status === option.value" :class="{ active: pendingFilter.status === option.value }" @click="pendingFilter.status = option.value">{{ option.label }}</button></div>
+            <div class="filter-bar pending-filters"><label class="filter-search"><UiIcon name="search" /><input v-model="pendingFilter.keyword" type="search" aria-label="搜索待处理" placeholder="搜索项目、事项或文件"></label><select v-model="pendingFilter.projectId" aria-label="项目"><option value="">全部项目</option><option v-for="option in pendingProjectOptions" :key="option.id" :value="option.id">{{ option.name }}</option></select><select v-model="pendingFilter.customer" aria-label="客户"><option value="">全部客户</option><option v-for="customer in pendingCustomerOptions" :key="customer" :value="customer">{{ customer }}</option></select><select v-model="pendingFilter.owner" aria-label="经办人" title="事项经办人"><option value="">全部经办人</option><option v-for="owner in pendingOwnerOptions" :key="owner" :value="owner">{{ owner }}</option></select></div>
+            <div class="list-tools"><span>共 {{ filteredPending.length }} 项</span><button v-if="pendingFiltersActive" class="link" @click="clearPendingFilters">清除</button><div class="group-control"><span>分组方式</span><div class="pending-group-by segmented" role="group" aria-label="分组"><button :aria-pressed="pendingGroupBy === 'project'" :class="{ active: pendingGroupBy === 'project' }" @click="pendingGroupBy = 'project'">项目</button><button :aria-pressed="pendingGroupBy === 'owner'" :class="{ active: pendingGroupBy === 'owner' }" @click="pendingGroupBy = 'owner'">经办人</button><button :aria-pressed="pendingGroupBy === 'none'" :class="{ active: pendingGroupBy === 'none' }" @click="pendingGroupBy = 'none'">不分组</button></div></div></div>
+            <div class="pending-table" tabindex="-1"><div v-if="!filteredPending.length" class="empty"><UiIcon name="clock" class="empty-icon" /><h3>{{ pendingFiltersActive ? '没有符合条件的待处理项' : itemRows.length ? '暂无待处理文件' : '暂无事项' }}</h3><button v-if="itemRows.length && pendingFiltersActive" class="button secondary" @click="clearPendingFilters">清除筛选</button><button v-else class="button secondary accent" @click="go('projects')">查看项目<UiIcon name="arrow" /></button></div><template v-else><div class="pending-table-head"><span>文件</span><span>项目及事项</span><span>待办状态</span><span title="事项经办人">经办人</span></div><section v-for="group in pendingGroups" :key="`${pendingGroupBy}:${group.key}`" class="pending-group"><h2 v-if="pendingGroupBy !== 'none'" class="pending-group-head"><span>{{ group.label }}</span><span class="pending-group-count">{{ group.rows.length }} 项</span></h2><button v-for="row in group.rows" :key="row.item.id" class="pending-row" @click="openEvent(row.project, row.event)"><span class="pending-file"><UiIcon name="file" /><strong>{{ row.item.name }}</strong></span><span><strong>{{ row.project.name }}</strong><small>{{ row.project.customer }} · {{ row.event.name }}</small></span><span class="pending-gaps"><span v-for="gap in row.gaps" :key="gap" class="tag orange">{{ gap }}</span><span v-if="!row.gaps.length" class="tag green">已完成</span></span><span>{{ row.event.owner }}</span></button></section></template></div>
+          </section>
 
-          <section v-else-if="view === 'settings'" class="page-section"><div class="page-heading"><div><span class="eyebrow">WORKSPACE SETTINGS</span><h1>设置</h1></div></div><div class="settings-layout"><nav class="settings-nav" aria-label="设置分类"><span class="active">存储</span></nav><div class="settings-content"><h2>存储</h2><p>选择项目、模板和工作空间数据的位置。</p><div v-if="storageNotice" class="warning-banner"><UiIcon name="warning" class="warning-icon" /><span>{{ storageNotice }}</span></div><div class="storage-row"><div><strong>项目存储位置</strong><span :title="storageLocations.project">{{ storageLocations.project }}</span></div><button class="button secondary" :disabled="busy" @click="chooseStorage('project')">选择文件夹</button></div><div class="storage-row"><div><strong>模板存储位置</strong><span :title="storageLocations.template">{{ storageLocations.template }}</span></div><button class="button secondary" :disabled="busy" @click="chooseStorage('template')">选择文件夹</button></div><div class="storage-row"><div><strong>工作空间数据存储位置</strong><span :title="storageLocations.workspace">{{ storageLocations.workspace }}</span><p class="form-help storage-note">更换后会保留原目录中的 workpack-v3.sqlite。迁回原目录前，请先把该文件以及同名的 -wal、-shm 文件移走或删除。</p></div><button class="button secondary" :disabled="busy" @click="chooseStorage('workspace')">选择文件夹</button></div></div></div></section>
+          <section v-else-if="view === 'templates'" class="page-section library-page">
+            <div class="page-heading"><h1>文件库</h1><div class="heading-actions"><button class="button secondary" @click="openCategoryModal()">新建分类</button><button class="button primary" @click="openTemplateModal()"><UiIcon name="plus" />添加文件模板</button></div></div>
+            <div class="library-note"><UiIcon name="info" /><span>待办清单由各事项单独管理。</span></div>
+            <div class="filter-bar library-filters"><label class="filter-search"><UiIcon name="search" /><input v-model="librarySearch" type="search" aria-label="搜索文件模板" placeholder="搜索文件模板"></label><div class="category-filters" role="group" aria-label="文件分类"><button :class="{ active: libraryCategory === null }" :aria-pressed="libraryCategory === null" @click="libraryCategory = null">全部 {{ snapshot.templates.length }}</button><button :class="{ active: libraryCategory === '' }" :aria-pressed="libraryCategory === ''" @click="libraryCategory = ''">未分类 {{ snapshot.templates.filter(file => !file.categoryId).length }}</button><button v-for="category in snapshot.categories" :key="category.id" :aria-pressed="libraryCategory === category.id" :class="{ active: libraryCategory === category.id }" @click="libraryCategory = category.id">{{ category.name }} {{ snapshot.templates.filter(file => file.categoryId === category.id).length }}</button></div><ActionMenu v-if="selectedCategory" label="分类操作"><button @click="openCategoryModal(selectedCategory)">重命名</button><button class="danger" @click="deleteCategory(selectedCategory!)">删除分类</button></ActionMenu></div>
+            <div class="table-wrap"><table class="library-table"><thead><tr><th>模板名称</th><th>分类</th><th>模板文件</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="file in filteredLibrary" :key="file.id"><td><div class="library-name"><span class="file-tile"><UiIcon name="file" /></span><button class="title-button" :title="file.purpose || file.name" @click="openTemplateModal(file)">{{ file.name }}</button></div></td><td><span class="tag neutral">{{ categoryName(file.categoryId) }}</span></td><td><span v-for="asset in file.assets" :key="asset.id" class="library-asset" :title="asset.path"><UiIcon name="file" />{{ asset.name }}</span><span v-if="!file.assets.length" class="muted">未导入</span></td><td><span class="availability" :class="{ ok: templateStatus(file) === '可用', warning: templateStatus(file) === '失效' }"><i></i>{{ templateStatus(file) }}</span></td><td><div class="inline-actions"><button class="button secondary small" :disabled="busy || !file.assets.length || file.assets.some(asset => !asset.exists)" @click="exportTemplate(file)">导出</button><ActionMenu :label="`${file.name}操作`" :disabled="busy"><button @click="openTemplateModal(file)"><UiIcon name="edit" />编辑模板</button><button @click="importTemplateAssets(file)"><UiIcon name="upload" />导入模板</button><button v-for="asset in file.assets" :key="asset.id" @click="removeTemplateAsset(asset.id)"><UiIcon name="file" />{{ file.assets.length > 1 ? `移除 ${asset.name}` : '移除模板文件' }}</button><hr><button class="danger" @click="deleteTemplate(file)">删除模板</button></ActionMenu></div></td></tr></tbody></table></div>
+            <div v-if="!filteredLibrary.length" class="empty"><UiIcon name="library" class="empty-icon" /><h3>{{ snapshot.templates.length ? '没有符合条件的模板' : '文件库还没有文件' }}</h3><button v-if="librarySearch || libraryCategory !== null" class="button secondary" @click="librarySearch = ''; libraryCategory = null">清除筛选</button></div><div class="list-footer">共 {{ filteredLibrary.length }} 个模板</div>
+          </section>
 
-          <section v-else-if="view === 'project' && activeProject" class="page-section project-detail"><div class="detail-heading"><button class="back-button" @click="go('projects')"><UiIcon name="back" class="back-icon" />项目</button><div class="detail-title-row"><div><span class="eyebrow">PROJECT DETAIL</span><h1>{{ activeProject.name }}</h1><p>{{ activeProject.customer }}<span class="dot-separator">·</span>{{ activeProject.owner }} 负责</p></div><div class="heading-actions"><button class="button secondary" @click="openProjectFolder(activeProject)">打开文件夹</button><button class="button secondary" @click="openProjectModal(activeProject)">编辑</button><button class="button danger-link" @click="deleteProject(activeProject)">删除</button><button class="button primary" @click="openEventModal(activeProject)">新建事项</button></div></div></div><div v-if="!activeProject.folderExists" class="warning-banner"><UiIcon name="warning" class="warning-icon" /><span>项目目录已失效或被移动。请重新定位原项目文件夹，恢复附件和模板文件访问。</span><button class="button warning small" @click="relocateProject(activeProject)">重新定位</button></div><div class="project-overview-grid"><article><span>项目负责人</span><strong>{{ activeProject.owner }}</strong><small v-if="activeProject.contact && activeProject.contact !== activeProject.owner">{{ activeProject.contact }}</small></article><article><span>整体资料进度</span><strong>{{ projectProgress(activeProject).percent }}%</strong></article><article><span>文件清单</span><strong>{{ activeProject.events.reduce((total, event) => total + event.items.length, 0) }} 个</strong></article><article><span>项目文件夹</span><strong class="folder-value" :title="activeProject.folder">{{ activeProject.folder }}</strong><small :class="activeProject.folderExists ? 'text-success' : 'text-warning'">{{ activeProject.folderExists ? '目录可访问' : '目录不可用' }}</small></article></div><div class="event-list-section" tabindex="-1"><div class="section-heading"><div><h2>业务事项</h2></div><span class="section-count">{{ activeProject.events.length }} 个事项</span></div><div v-if="!activeProject.events.length" class="empty panel"><div class="empty-icon"><UiIcon name="event" /></div><h3>暂无事项</h3><button class="button primary" @click="openEventModal(activeProject)">新建事项</button></div><div v-else class="event-cards"><article v-for="event in activeProject.events" :key="event.id" class="event-card" tabindex="0" role="button" @click="openEvent(activeProject, event)" @keydown.enter.prevent="openEvent(activeProject, event)" @keydown.space.prevent="openEvent(activeProject, event)"><div class="event-card-head"><span class="event-type-icon"><UiIcon name="event" /></span><div><span class="event-meta">{{ event.items.length }} 个文件 · {{ formatDate(event.date) }}</span><h3>{{ event.name }}</h3></div></div><div class="event-card-meta"><span>经办人 {{ event.owner }}</span><span>{{ event.items.length }} 个文件项</span><span v-if="eventPending(event)" class="tag orange">待处理 {{ eventPending(event) }}</span><span v-else class="tag green">已完成</span></div><div class="progress-meta"><span>完成进度</span><strong>{{ eventProgress(event).percent }}%</strong></div><div class="progress-track"><i :style="{ width: `${eventProgress(event).percent}%` }"></i></div><div class="event-card-files"><span v-for="item in event.items.slice(0, 4)" :key="item.id" :class="{ done: !gaps(item).length }">{{ item.name }}</span><span v-if="event.items.length > 4">+{{ event.items.length - 4 }} 项</span></div></article></div></div></section>
+          <section v-else-if="view === 'settings'" class="page-section settings-page">
+            <div class="page-heading"><h1>设置</h1></div><nav class="status-tabs settings-nav" aria-label="设置分类"><span class="active">存储</span></nav>
+            <div class="settings-content"><div v-if="storageNotice" class="warning-banner" role="status"><UiIcon name="warning" /><span>{{ storageNotice }}</span></div><div v-for="location in storageKinds" :key="location.key" class="storage-row"><h2>{{ location.label }}</h2><div class="storage-control"><div class="path-field"><span :title="storageLocations[location.key]">{{ storageLocations[location.key] }}</span><button class="icon-button" :aria-label="`复制${location.label}`" :disabled="!storageLocations[location.key]" @click="copyPath(storageLocations[location.key])"><UiIcon name="copy" /></button></div><button class="button secondary" :disabled="busy" @click="chooseStorage(location.key)">更改位置</button></div></div>
+              <div class="migration-notice"><UiIcon name="info" /><div><strong>更换位置前请留意</strong><p>更换后，原目录仍会保留数据文件。迁回原目录前，需要先处理旧数据文件。</p><details><summary>查看迁移说明<UiIcon name="back" /></summary><p>更换位置后会保留原目录中的 workpack-v3.sqlite。迁回原目录前，请先备份并移走该文件及同名的 -wal、-shm 文件，再选择原目录。</p></details></div></div>
+            </div>
+          </section>
+
+          <section v-else-if="view === 'project' && activeProject" class="page-section project-detail">
+            <div class="detail-heading"><div class="page-heading detail-title-row"><h1>{{ activeProject.name }}</h1><div class="heading-actions"><ActionMenu label="项目操作" :disabled="busy"><button @click="openProjectFolder(activeProject)"><UiIcon name="project" />打开文件夹</button><button v-if="!activeProject.folderExists" @click="relocateProject(activeProject)">重新定位</button><button class="danger" @click="deleteProject(activeProject)">删除项目</button></ActionMenu><button class="button secondary" @click="openProjectModal(activeProject)"><UiIcon name="edit" />编辑项目</button></div></div><div class="project-metadata"><span class="owner-avatar">{{ activeProject.owner.slice(0, 1) }}</span><span>负责人 {{ activeProject.owner }}</span><span v-if="activeProject.customer" class="customer-name">{{ activeProject.customer }}</span><span v-if="activeProject.contact">{{ activeProject.contact }}</span></div><p v-if="activeProject.note" class="project-note">{{ activeProject.note }}</p></div>
+            <div v-if="!activeProject.folderExists" class="warning-banner"><UiIcon name="warning" /><span>项目目录不可用</span><button class="button secondary small" @click="relocateProject(activeProject)">重新定位</button></div>
+            <div class="project-overview-grid"><article><span>整体资料进度</span><strong>{{ projectProgress(activeProject).percent }}%</strong><div class="progress-track"><i :style="{ width: `${projectProgress(activeProject).percent}%` }"></i></div></article><article><span>文件清单</span><strong>{{ activeProject.events.reduce((total, event) => total + event.items.length, 0) }} 个</strong></article><article><span>业务事项</span><strong>{{ activeProject.events.length }} 个</strong></article></div>
+            <div class="project-body"><div class="event-list-section" tabindex="-1"><div class="section-heading"><div class="title-with-count"><h2>业务事项</h2><span class="count-badge">{{ activeProject.events.length }}</span></div><button class="button primary" @click="openEventModal(activeProject)"><UiIcon name="plus" />新建事项</button></div><div v-if="!activeProject.events.length" class="empty"><UiIcon name="event" class="empty-icon" /><h3>从第一件事项开始</h3></div><div v-else class="event-cards"><article v-for="event in activeProject.events" :key="event.id" class="event-card" tabindex="0" role="button" @click="openEvent(activeProject, event)" @keydown.enter.prevent="openEvent(activeProject, event)" @keydown.space.prevent="openEvent(activeProject, event)"><div class="event-card-head"><UiIcon name="event" /><h3>{{ event.name }}</h3><span class="tag" :class="eventPending(event) || !event.items.length ? 'orange' : 'green'">{{ eventPending(event) || !event.items.length ? '未完成' : '已完成' }}</span></div><div class="event-card-meta"><span>{{ formatDate(event.date) }}</span><span>{{ event.owner }}</span><span>{{ event.items.length }} 个文件</span></div><div class="progress-meta"><div class="progress-track"><i :style="{ width: `${eventProgress(event).percent}%` }"></i></div><strong>{{ eventProgress(event).percent }}%</strong></div></article></div></div>
+              <aside class="project-folder"><div class="section-heading"><h2>项目文件夹</h2></div><div class="folder-name"><UiIcon name="project" /><strong>{{ activeProject.name }}</strong></div><span class="availability" :class="activeProject.folderExists ? 'ok' : 'warning'"><i></i>{{ activeProject.folderExists ? '目录可访问' : '目录不可用' }}</span><div class="path-field"><span :title="activeProject.folder">{{ shortPath(activeProject.folder) }}</span><button class="icon-button" aria-label="复制项目路径" @click="copyPath(activeProject.folder)"><UiIcon name="copy" /></button></div><button class="button secondary" @click="openProjectFolder(activeProject)"><UiIcon name="project" />打开文件夹</button></aside>
+            </div>
+          </section>
+
         </template>
       </main>
       <div v-if="drawerOpen" class="drawer-scrim" @click="requestCloseDrawer"></div>
@@ -503,21 +699,22 @@ onBeforeUnmount(() => {
 
     <div v-if="drawerOpen && activeProject && activeEvent" ref="drawerCard" class="event-drawer" role="dialog" aria-modal="true" aria-labelledby="event-drawer-title" :aria-hidden="modal ? 'true' : undefined" tabindex="-1" @keydown="handleDrawerKeydown">
       <div class="event-detail">
-        <div class="event-detail-heading"><div><div class="event-actions"><button class="back-button small-back" @click="requestCloseDrawer"><UiIcon name="back" class="back-icon" />返回事项</button><button class="button secondary small" @click="openEventModal(activeProject, activeEvent)">编辑</button><button class="button danger-link small" @click="removeEvent(activeEvent)">删除</button></div><div class="event-title"><span class="event-type-icon"><UiIcon name="event" /></span><div><span class="event-meta">{{ activeEvent.items.length }} 个文件 · {{ formatFullDate(activeEvent.date) }}</span><h2 id="event-drawer-title">{{ activeEvent.name }}</h2><p>经办人：{{ activeEvent.owner }}</p></div></div></div><div class="event-progress-large"><strong>{{ eventProgress(activeEvent).percent }}%</strong><span>完成度</span><div class="progress-track"><i :style="{ width: `${eventProgress(activeEvent).percent}%` }"></i></div></div></div><div class="checklist-heading"><div><h3>文件清单</h3><p>每份文件都有独立的待办清单。</p></div><div class="heading-actions"><button class="button secondary small" @click="openItemModal(activeEvent)">添加文件项</button></div></div><ItemChecklist :items="activeEvent.items" :busy="busy" @task="toggleTask" @add-task="openTaskModal" @remove-task="removeTask" @edit="item => openItemModal(activeEvent!, item)" @remove="removeItem" @upload="importAttachments" @open="openAttachment" @relocate="relocateAttachment" @detach="removeAttachment" />
+        <div class="event-actions"><button class="back-button small-back" @click="requestCloseDrawer"><UiIcon name="back" class="back-icon" />返回事项</button><button class="button secondary small" @click="openEventModal(activeProject, activeEvent)"><UiIcon name="edit" />编辑</button><ActionMenu label="事项操作" :disabled="busy"><button class="danger" @click="removeEvent(activeEvent)">删除事项</button></ActionMenu></div><div class="event-detail-heading"><div class="event-title"><h2 id="event-drawer-title">{{ activeEvent.name }}</h2><p>{{ formatDate(activeEvent.date) }} · {{ activeEvent.owner }}</p></div><div class="event-progress-large"><strong>{{ eventProgress(activeEvent).percent }}%</strong><div class="progress-track"><i :style="{ width: `${eventProgress(activeEvent).percent}%` }"></i></div></div></div><div class="checklist-heading"><div><h3>文件清单</h3></div><div class="heading-actions"><button class="button primary small" @click="openItemModal(activeEvent)"><UiIcon name="plus" />添加文件项</button></div></div><ItemChecklist :items="activeEvent.items" :busy="busy" @task="toggleTask" @add-task="openTaskModal" @remove-task="removeTask" @edit="item => openItemModal(activeEvent!, item)" @remove="removeItem" @upload="importAttachments" @open="openAttachment" @relocate="relocateAttachment" @detach="removeAttachment" />
       </div>
     </div>
 
-    <div v-if="modal" class="modal-backdrop" @click.self="requestCloseModal"><section ref="modalCard" class="modal-card" :class="{ 'modal-wide': modal === 'event' || modal === 'item' }" role="dialog" aria-modal="true" tabindex="-1" @keydown="handleModalKeydown">
-      <template v-if="modal === 'project'"><div class="modal-heading"><div><span class="eyebrow">PROJECT</span><h2>{{ projectForm.id ? '编辑项目' : '新建项目' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveProject"><label>项目名称<input v-model="projectForm.name" required maxlength="100" placeholder="例如：华东智造产线升级项目"></label><label>客户名称<input v-model="projectForm.customer" required maxlength="100" placeholder="客户公司或单位"></label><label>负责人<input v-model="projectForm.owner" required maxlength="100" placeholder="项目负责人"></label><label>联系方式<input v-model="projectForm.contact" maxlength="4000" placeholder="电话、邮箱或其他联系方式"></label><label class="full-width">项目备注<textarea v-model="projectForm.note" rows="3" maxlength="4000" placeholder="项目背景或交付范围"></textarea></label><div class="full-width folder-picker"><div><span class="form-label">项目存储位置</span><p class="form-help">新项目会自动创建同名文件夹。</p><span class="selected-path" :title="storageLocations.project">{{ projectForm.id ? projectForm.directoryPath : storageLocations.project }}</span></div></div><div class="modal-actions"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></form></template>
+    <div v-if="modal" class="modal-backdrop" @click.self="requestCloseModal"><section aria-labelledby="modal-title" ref="modalCard" class="modal-card" :class="{ 'modal-wide': modal === 'event' || modal === 'item' }" role="dialog" aria-modal="true" tabindex="-1" @keydown="handleModalKeydown">
+      <template v-if="modal === 'project'"><div class="modal-heading"><div><h2 id="modal-title">{{ projectForm.id ? '编辑项目' : '新建项目' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form @submit.prevent="saveProject"><fieldset class="form-grid" :disabled="busy"><label>项目名称<input v-model="projectForm.name" required maxlength="100"></label><label>客户名称<input v-model="projectForm.customer" required maxlength="100"></label><label>负责人<input v-model="projectForm.owner" required maxlength="100"></label><label>联系方式<input v-model="projectForm.contact" maxlength="4000"></label><label class="full-width">项目备注<textarea v-model="projectForm.note" rows="3" maxlength="4000"></textarea></label><div class="full-width folder-picker"><div><span class="form-label">项目存储位置</span><span class="selected-path" :title="storageLocations.project">{{ projectForm.id ? projectForm.directoryPath : storageLocations.project }}</span></div></div><div class="modal-actions"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></fieldset></form></template>
 
-      <template v-else-if="modal === 'event'"><div class="modal-heading"><div><span class="eyebrow">BUSINESS EVENT</span><h2>{{ eventForm.id ? '编辑业务事项' : '新建业务事项' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveEvent"><label class="full-width">事项名称<input v-model="eventForm.name" required maxlength="100" placeholder="例如：第一批控制柜发货"></label><fieldset class="full-width"><legend>需要的模板文件</legend><div class="template-checks"><label v-for="file in snapshot.templates" :key="file.id" class="template-check"><input v-model="eventForm.templateIds" type="checkbox" :value="file.id" :disabled="Boolean(eventForm.id)"><span class="template-icon tiny"><UiIcon name="file" /></span><span><strong>{{ file.name }}</strong><small>{{ file.purpose || '暂无说明' }}</small></span></label><span v-if="!snapshot.templates.length" class="form-help">请先在文件库添加模板。</span></div></fieldset><label>日期<input v-model="eventForm.date" required type="date"></label><label>经办人<input v-model="eventForm.owner" required maxlength="100"></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : eventForm.id ? '保存' : '创建' }}</button></div></form></template>
+      <template v-else-if="modal === 'event'"><div class="modal-heading"><div><h2 id="modal-title">{{ eventForm.id ? '编辑业务事项' : '新建业务事项' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form @submit.prevent="saveEvent"><fieldset class="form-grid" :disabled="busy"><label class="full-width">事项名称<input v-model="eventForm.name" required maxlength="100"></label><fieldset class="full-width"><legend>需要的模板文件</legend><div class="template-checks"><label v-for="file in snapshot.templates" :key="file.id" class="template-check"><input v-model="eventForm.templateIds" type="checkbox" :value="file.id" :disabled="Boolean(eventForm.id)"><span class="template-icon"><UiIcon name="file" /></span><span><strong>{{ file.name }}</strong><small v-if="file.purpose">{{ file.purpose }}</small></span></label><span v-if="!snapshot.templates.length" class="form-help">请先在文件库添加模板。</span></div></fieldset><label>日期<input v-model="eventForm.date" required type="date"></label><label>经办人<input v-model="eventForm.owner" required maxlength="100"></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : eventForm.id ? '保存' : '创建' }}</button></div></fieldset></form></template>
 
-      <template v-else-if="modal === 'template'"><div class="modal-heading"><div><span class="eyebrow">FILE LIBRARY</span><h2>{{ templateForm.id ? '编辑文件模板' : '添加文件模板' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveTemplate"><label class="full-width">文件名称<input v-model="templateForm.name" required maxlength="100" placeholder="例如：发货清单"></label><label class="full-width">用途说明<textarea v-model="templateForm.purpose" rows="3" maxlength="4000" placeholder="这份文件用来做什么"></textarea></label><label class="full-width">分类<select v-model="templateForm.categoryId"><option value="">未分类</option><option v-for="category in snapshot.categories ?? []" :key="category.id" :value="category.id">{{ category.name }}</option></select></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">保存</button></div></form></template>
-      <template v-else-if="modal === 'category'"><div class="modal-heading"><div><span class="eyebrow">FILE LIBRARY</span><h2>{{ categoryForm.id ? '编辑分类' : '新建分类' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveCategory"><label class="full-width">分类名称<input v-model="categoryForm.name" required maxlength="100" placeholder="例如：发货前准备"></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">保存</button></div></form></template>
-      <template v-else-if="modal === 'task'"><div class="modal-heading"><div><span class="eyebrow">CHECKLIST</span><h2>添加待办</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveTask"><label class="full-width">待办名称<input v-model="taskForm.name" required maxlength="100" placeholder="例如：归档"></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">添加</button></div></form></template>
+      <template v-else-if="modal === 'template'"><div class="modal-heading"><div><h2 id="modal-title">{{ templateForm.id ? '编辑文件模板' : '添加文件模板' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form @submit.prevent="saveTemplate"><fieldset class="form-grid" :disabled="busy"><label class="full-width">文件名称<input v-model="templateForm.name" required maxlength="100"></label><label class="full-width">用途说明<textarea v-model="templateForm.purpose" rows="3" maxlength="4000"></textarea></label><label class="full-width">分类<select v-model="templateForm.categoryId"><option value="">未分类</option><option v-for="category in snapshot.categories ?? []" :key="category.id" :value="category.id">{{ category.name }}</option></select></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">保存</button></div></fieldset></form></template>
+      <template v-else-if="modal === 'category'"><div class="modal-heading"><div><h2 id="modal-title">{{ categoryForm.id ? '编辑分类' : '新建分类' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form @submit.prevent="saveCategory"><fieldset class="form-grid" :disabled="busy"><label class="full-width">分类名称<input v-model="categoryForm.name" required maxlength="100"></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">保存</button></div></fieldset></form></template>
+      <template v-else-if="modal === 'task'"><div class="modal-heading"><div><h2 id="modal-title">添加待办</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form @submit.prevent="saveTask"><fieldset class="form-grid" :disabled="busy"><label class="full-width">待办名称<input v-model="taskForm.name" required maxlength="100"></label><div class="modal-actions full-width"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">添加</button></div></fieldset></form></template>
 
-      <template v-else-if="modal === 'item'"><div class="modal-heading"><div><span class="eyebrow">CHECKLIST ITEM</span><h2>{{ itemForm.id ? '编辑清单项' : '添加文件项' }}</h2><p>新文件默认包含“准备文件”待办。</p></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form class="form-grid" @submit.prevent="saveItem"><label class="full-width">文件名称<input v-model="itemForm.name" required maxlength="100" placeholder="例如：客户签收单"></label><label class="full-width">文件说明<textarea v-model="itemForm.note" rows="3" maxlength="4000" placeholder="用途或填写要求"></textarea></label><div class="modal-actions"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></form></template>
+      <template v-else-if="modal === 'item'"><div class="modal-heading"><div><h2 id="modal-title">{{ itemForm.id ? '编辑清单项' : '添加文件项' }}</h2></div><button class="modal-close" aria-label="关闭弹窗" @click="requestCloseModal"><UiIcon name="close" /></button></div><form @submit.prevent="saveItem"><fieldset class="form-grid" :disabled="busy"><label class="full-width">文件名称<input v-model="itemForm.name" required maxlength="100"></label><label class="full-width">文件说明<textarea v-model="itemForm.note" rows="3" maxlength="4000"></textarea></label><div class="modal-actions"><button type="button" class="button secondary" @click="requestCloseModal">取消</button><button type="submit" class="button primary" :disabled="busy">{{ busy ? '保存中…' : '保存' }}</button></div></fieldset></form></template>
     </section></div>
+    <footer class="app-footer" aria-hidden="true"><span class="footer-emblem"><img :src="workpackLogo" alt=""></span></footer>
     <div v-if="toast.visible" class="toast" :class="toast.tone" :role="toast.tone === 'error' ? 'alert' : 'status'"><span><UiIcon :name="toast.tone === 'success' ? 'check' : 'error'" /></span>{{ toast.message }}<button v-if="toast.tone === 'error'" class="toast-close" aria-label="关闭错误提示" @click="clearToast"><UiIcon name="close" /></button></div>
   </div>
 </template>

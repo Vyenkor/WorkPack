@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
@@ -40,6 +40,7 @@ function registerIPC() {
   }
   const open = async (file: string) => { const error = await shell.openPath(file); if (error) throw new Error(`无法打开：${error}`) }
   handle('snapshot', () => service.snapshot())
+  handle('copyPath', value => { clipboard.writeText(z.string().min(1).max(32768).refine(text => !text.includes('\0')).parse(value)) })
   handle('savePendingView', value => service.savePendingView(value))
   handle('saveProject', input => service.saveProject(input))
   handle('deleteProject', value => { stringId.parse(value); service.deleteProject(value) })
@@ -88,8 +89,9 @@ if (!hasInstanceLock) {
     storage = new StorageManager(app.getPath('userData'), path.join(app.getPath('documents'), 'WorkPack', '项目'))
     service = storage.service
     window = new BrowserWindow({
-      title: 'WorkPack · 项目资料管理', width: 1440, height: 960, minWidth: 1050, minHeight: 700,
-      backgroundColor: '#f5f7f6', show: false,
+      title: 'WorkPack', width: 1440, height: 960, minWidth: 1050, minHeight: 700,
+      icon: path.join(__dirname, '../renderer/icon.png'),
+      backgroundColor: '#ededee', show: false,
       webPreferences: { preload: path.join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true }
     })
     window.removeMenu()

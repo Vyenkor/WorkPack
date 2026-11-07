@@ -1,0 +1,123 @@
+
+Running 8 tests using 1 worker
+
+(node:39296) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 tests\event-drawer.spec.ts:54:5 › event drawer shows an independent checklist and keeps the project page (4.1s)
+  x  2 tests\event-drawer.spec.ts:78:5 › a matter remains editable after its last template item is removed (9.1s)
+  -  3 tests\installed-app.spec.ts:30:5 › 安装后的程序能建库、在中文路径下建项目，重启后数据仍在
+(node:27608) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  4 tests\pending-filters.spec.ts:7:5 › pending filters match the custom checklist model (2.5s)
+(node:36632) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 5 tests\ui-accessibility.spec.ts:7:5 › navigation, workspace menu, and storage settings follow the desktop layout (2.6s)
+  x  6 tests\ui-redesign.spec.ts:46:5 › approved empty pages, six dialogs and minimum desktop window (4.5s)
+(node:47732) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  x  7 tests\ui-redesign.spec.ts:94:5 › library menus, categories, attachments and actual completion tabs remain functional (7.9s)
+(node:9488) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 8 tests\ui-redesign.spec.ts:139:5 › unsafe markup stays text, cancellation preserves data, and long content stays reachable (4.1s)
+
+
+  1) tests\event-drawer.spec.ts:78:5 › a matter remains editable after its last template item is removed
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.event-drawer').locator('.document-card')
+    Expected: 1
+    Received: 2
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.event-drawer').locator('.document-card') with timeout 5000ms
+      - waiting for locator('.event-drawer').locator('.document-card')
+        14 × locator resolved to 2 elements
+           - unexpected value "2"
+
+
+      86 |   await drawer.locator('.document-card').first().getByRole('button', { name: /操作$/ }).click()
+      87 |   await drawer.getByRole('button', { name: '删除文件项', exact: true }).click()
+    > 88 |   await expect(drawer.locator('.document-card')).toHaveCount(1)
+         |                                                  ^
+      89 |   for (const title of ['保留手动文件', '空事项']) {
+      90 |     await drawer.locator('.event-actions').getByRole('button', { name: '编辑', exact: true }).click()
+      91 |     await page.getByRole('textbox', { name: '事项名称' }).fill(title)
+        at E:\张路瑶\Workspace\WorkPack\tests\event-drawer.spec.ts:88:50
+
+    Error Context: test-results\event-drawer-a-matter-rema-67f5a-st-template-item-is-removed\error-context.md
+
+  2) tests\pending-filters.spec.ts:7:5 › pending filters match the custom checklist model ──────────
+
+    Error: locator.click: Error: strict mode violation: getByRole('button', { name: '清除' }) resolved to 2 elements:
+        1) <button class="link">清除</button> aka getByRole('button', { name: '清除', exact: true })
+        2) <button class="button secondary">清除筛选</button> aka getByRole('button', { name: '清除筛选' })
+
+    Call log:
+      - waiting for getByRole('button', { name: '清除' })
+
+
+      40 |     await page.getByRole('searchbox', { name: '搜索待处理' }).fill('不匹配')
+      41 |     await expect(page.locator('.pending-row')).toHaveCount(0)
+    > 42 |     await page.getByRole('button', { name: '清除' }).click()
+         |                                                    ^
+      43 |     await expect(page.locator('.pending-row')).toHaveCount(1)
+      44 |     await page.getByRole('combobox', { name: '客户' }).selectOption({ label: '客户甲' })
+      45 |     await page.getByRole('combobox', { name: '经办人' }).selectOption({ label: '经办甲' })
+        at E:\张路瑶\Workspace\WorkPack\tests\pending-filters.spec.ts:42:52
+
+    Error Context: test-results\pending-filters-pending-fi-d739a--the-custom-checklist-model\error-context.md
+
+  3) tests\ui-redesign.spec.ts:46:5 › approved empty pages, six dialogs and minimum desktop window ─
+
+    Error: expect(received).toContain(expected) // indexOf
+
+    Expected substring: "山职陶瓷展会"
+    Received string:    ""
+
+      67 |   await addProject(); await page.screenshot({ path: info.outputPath('05-project.png'), scale: 'css' })
+      68 |   await page.getByRole('button', { name: '复制项目路径' }).click()
+    > 69 |   expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toContain('山职陶瓷展会')
+         |                                                                       ^
+      70 |   await page.getByRole('button', { name: '新建事项' }).click()
+      71 |   await page.screenshot({ path: info.outputPath('modal-event.png'), scale: 'css' })
+      72 |   await page.getByRole('textbox', { name: '事项名称' }).fill('第一批交付')
+        at E:\张路瑶\Workspace\WorkPack\tests\ui-redesign.spec.ts:69:71
+
+    Error Context: test-results\ui-redesign-approved-empty-73afc--and-minimum-desktop-window\error-context.md
+
+  4) tests\ui-redesign.spec.ts:94:5 › library menus, categories, attachments and actual completion tabs remain functional
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: locator('.library-table')
+    Expected substring: "可用"
+    Received string:    "模板名称分类模板文件状态操作签收单交付未导入未导入导出"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toContainText" locator('.library-table') with timeout 5000ms
+      - waiting for locator('.library-table')
+        14 × locator resolved to <table class="library-table">…</table>
+           - unexpected value "模板名称分类模板文件状态操作签收单交付未导入未导入导出"
+
+
+      104 |   const fixture = path.join(root, '货物签收单.txt'); fs.writeFileSync(fixture, '测试附件')
+      105 |   await pick(fixture); await page.getByRole('button', { name: '签收单操作' }).click(); await page.getByRole('button', { name: '导入模板' }).click()
+    > 106 |   await expect(page.locator('.library-table')).toContainText('可用')
+          |                                                ^
+      107 |   const exportFolder = path.join(root, 'export'); fs.mkdirSync(exportFolder); await pick(exportFolder)
+      108 |   await page.getByRole('button', { name: '导出', exact: true }).click()
+      109 |   await expect.poll(() => fs.readdirSync(exportFolder).length).toBeGreaterThan(0)
+        at E:\张路瑶\Workspace\WorkPack\tests\ui-redesign.spec.ts:106:48
+
+    Error Context: test-results\ui-redesign-library-menus--03b2d-tion-tabs-remain-functional\error-context.md
+
+  4 failed
+    tests\event-drawer.spec.ts:78:5 › a matter remains editable after its last template item is removed
+    tests\pending-filters.spec.ts:7:5 › pending filters match the custom checklist model ───────────
+    tests\ui-redesign.spec.ts:46:5 › approved empty pages, six dialogs and minimum desktop window ──
+    tests\ui-redesign.spec.ts:94:5 › library menus, categories, attachments and actual completion tabs remain functional
+  1 skipped
+  3 passed (38.0s)

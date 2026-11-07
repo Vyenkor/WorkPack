@@ -71,6 +71,14 @@ jobs:
       - name: End-to-end test
         run: npm run test:e2e
 
+      - name: Upload UI evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: WorkPack-UI-evidence
+          path: test-results/
+          if-no-files-found: warn
+
       # 必须在 Windows 上打包：在 Linux 上交叉打包会把 Linux 版 better-sqlite3 原生模块装进安装包。
       - name: Build installer
         run: npm run dist

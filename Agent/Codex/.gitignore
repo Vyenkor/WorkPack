@@ -1,0 +1,14 @@
+# Local one-shot migration helpers; src and DESIGN.md are authoritative.
+/implement_ui.py
+/align_checks.py
+/update_design.py
+/page_templates.txt
+/warm_style.txt
+/capture.cjs
+/home-render.png
+
+# Generated screenshots are retained as GitHub Actions artifacts.
+/evidence/**/*.png
+
+# Local installer deliveries; CI publishes installer artifacts.
+/artifacts/

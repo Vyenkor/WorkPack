@@ -8,6 +8,7 @@ async function call(channel: string, input?: unknown) {
 }
 const api: WorkPackAPI = {
   snapshot: () => call('snapshot'),
+  copyPath: value => call('copyPath', value),
   savePendingView: input => call('savePendingView', input),
   saveProject: input => call('saveProject', input),
   deleteProject: id => call('deleteProject', id),

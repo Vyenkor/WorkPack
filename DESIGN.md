@@ -1,103 +1,104 @@
 ---
 version: alpha
 name: WorkPack
-description: "A calm, light, information-dense Windows desktop tool for tracking project paperwork. Cool gray canvas (#eaecf0) with three near-white rounded shell surfaces (sidebar, top bar, main) floating on it, separated by canvas gutters and quiet hairlines rather than shadows. Ink is near-black blue-gray (#1b1e24), not pure black. One low-saturation blue-gray accent (#3d5674) is reserved for primary actions, active navigation, selection, focus and links. Status stays separate: done green, pending brown, not-applicable gray, error red, always paired with a text label. Chinese-first typography: Microsoft YaHei UI, body at 14px with 1.6 line height, nothing below 12px."
+description: "Linear-inspired light desktop workspace with a compact sidebar, a rounded content surface, dense rows and indigo actions."
 
 colors:
-  primary: "#3d5674"
-  primary-hover: "#324860"
-  primary-soft: "#e7edf3"
+  primary: "#505bc7"
+  primary-hover: "#454fb2"
+  primary-soft: "#e8eafd"
   on-primary: "#ffffff"
-  focus-ring: "#3d5674"
-  canvas: "#eaecf0"
-  surface: "#fbfcfd"
-  surface-subtle: "#f0f1f4"
-  surface-hover: "#e8eaee"
-  sidebar: "#f3f4f6"
-  hairline: "#e4e6eb"
-  hairline-strong: "#d0d3da"
-  control-border: "#6e7582"
-  ink: "#1b1e24"
-  ink-secondary: "#3d4450"
-  ink-muted: "#5c6570"
-  status-done: "#1d6b4a"
-  status-done-soft: "#e6f1eb"
-  status-pending: "#8f5a24"
-  status-pending-soft: "#f6efe6"
-  status-na: "#5c656e"
-  status-na-soft: "#eef0f2"
-  danger: "#a33b34"
-  danger-soft: "#f6eceb"
-  overlay: "rgba(27, 30, 36, 0.3)"
+  focus-ring: "#505bc7"
+  canvas: "#ededee"
+  surface: "#f8f8f9"
+  surface-subtle: "#efeff1"
+  surface-hover: "#e9e9ed"
+  nav-selected: "#e1e1e2"
+  sidebar: "#ededee"
+  hairline: "#eeeef0"
+  hairline-strong: "#c9c9d0"
+  control-border: "#85858f"
+  ink: "#222225"
+  ink-secondary: "#424249"
+  ink-muted: "#5e5e68"
+  status-done: "#444eaf"
+  status-done-soft: "#e7e9fa"
+  status-pending: "#80541a"
+  status-pending-soft: "#fbf1dc"
+  status-na: "#595963"
+  status-na-soft: "#e9e9ed"
+  danger: "#a23845"
+  danger-soft: "#f9e8eb"
+  overlay: "rgba(34, 34, 37, 0.28)"
 
 typography:
   page-title:
-    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
-    fontSize: 24px
+    fontFamily: "Inter Variable, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif"
+    fontSize: 18px
     fontWeight: 600
     lineHeight: 1.35
     letterSpacing: 0
   section-title:
-    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
-    fontSize: 18px
+    fontFamily: "Inter Variable, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif"
+    fontSize: 15px
     fontWeight: 600
     lineHeight: 1.4
     letterSpacing: 0
   card-title:
-    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontFamily: "Inter Variable, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif"
     fontSize: 15px
     fontWeight: 600
     lineHeight: 1.45
     letterSpacing: 0
   body:
-    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
-    fontSize: 14px
-    fontWeight: 400
+    fontFamily: "Inter Variable, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif"
+    fontSize: 15px
+    fontWeight: 450
     lineHeight: 1.6
     letterSpacing: 0
   body-sm:
-    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontFamily: "Inter Variable, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif"
     fontSize: 13px
-    fontWeight: 400
+    fontWeight: 450
     lineHeight: 1.6
     letterSpacing: 0
   label:
-    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontFamily: "Inter Variable, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif"
     fontSize: 13px
     fontWeight: 500
     lineHeight: 1.4
     letterSpacing: 0
   caption:
-    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontFamily: "Inter Variable, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif"
     fontSize: 12px
-    fontWeight: 400
+    fontWeight: 450
     lineHeight: 1.5
     letterSpacing: 0
   button:
-    fontFamily: "Microsoft YaHei UI, Microsoft YaHei, PingFang SC, Segoe UI, sans-serif"
+    fontFamily: "Inter Variable, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif"
     fontSize: 13px
     fontWeight: 500
     lineHeight: 1.2
     letterSpacing: 0
   stat-number:
-    fontFamily: "Segoe UI, Microsoft YaHei UI, sans-serif"
-    fontSize: 26px
+    fontFamily: "Inter Variable, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Open Sans, Helvetica Neue, sans-serif"
+    fontSize: 20px
     fontWeight: 600
     lineHeight: 1.1
     letterSpacing: 0
   mono:
     fontFamily: "Cascadia Mono, Consolas, monospace"
-    fontSize: 12px
-    fontWeight: 400
+    fontSize: 13px
+    fontWeight: 450
     lineHeight: 1.5
     letterSpacing: 0
 
 rounded:
   sm: 4px
-  md: 6px
+  md: 8px
   lg: 8px
   xl: 12px
-  shell: 16px
+  shell: 12px
   pill: 9999px
 
 spacing:
@@ -134,14 +135,14 @@ components:
     textColor: "{colors.ink-muted}"
     typography: "{typography.button}"
     rounded: "{rounded.md}"
-    height: 36px
+    height: 34px
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
     typography: "{typography.button}"
     rounded: "{rounded.md}"
     padding: 0 16px
-    height: 36px
+    height: 34px
   button-primary-hover:
     backgroundColor: "{colors.primary-hover}"
     textColor: "{colors.on-primary}"
@@ -153,7 +154,7 @@ components:
     typography: "{typography.button}"
     rounded: "{rounded.md}"
     padding: 0 16px
-    height: 36px
+    height: 34px
   button-small:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink-secondary}"
@@ -172,7 +173,7 @@ components:
     typography: "{typography.body-sm}"
     rounded: "{rounded.md}"
     padding: 8px 10px
-    height: 36px
+    height: 34px
   text-input-focused:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
@@ -183,25 +184,27 @@ components:
     textColor: "{colors.ink-secondary}"
     typography: "{typography.body-sm}"
     rounded: "{rounded.lg}"
-    padding: 10px 12px
+    padding: 4px 8px
+    height: 34px
   nav-item-active:
-    backgroundColor: "{colors.primary-soft}"
-    textColor: "{colors.primary}"
+    backgroundColor: "{colors.nav-selected}"
+    textColor: "{colors.ink}"
     typography: "{typography.label}"
     rounded: "{rounded.lg}"
-    padding: 10px 12px
+    padding: 4px 8px
+    height: 34px
   panel:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
     typography: "{typography.body}"
     rounded: "{rounded.xl}"
-    padding: 20px
+    padding: 16px 24px
   table-header:
     backgroundColor: "{colors.surface-subtle}"
     textColor: "{colors.ink-muted}"
     typography: "{typography.caption}"
     rounded: "{rounded.sm}"
-    padding: 10px 12px
+    padding: 8px 12px
   table-row:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
@@ -235,7 +238,7 @@ components:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
     rounded: "{rounded.pill}"
-    height: 6px
+    height: 4px
   modal:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
@@ -264,314 +267,113 @@ components:
 
 # WorkPack 设计规范
 
-本文件是 WorkPack 界面的设计依据，供开发者和 AI agent 修改界面时参照。文件头部的 token 是唯一的取值来源，正文说明这些值的用途和交互规则。格式遵循 [Google Stitch DESIGN.md](https://stitch.withgoogle.com/docs/design-md/specification/)。
-
 ## Overview
 
-WorkPack 是给项目交付、物流和培训岗位的办公人员使用的 Windows 桌面工具，用户每天要在大量文件清单里找出“还缺什么”。界面的目标是**安静、清楚、高信息密度**：
-
-- 浅色、中性、低饱和的背景。层级靠间距、对齐、细边框和轻微的表面色差，不靠阴影、渐变、光晕或大面积品牌色。
-- 强调色是低饱和的冷灰蓝，只用于主要按钮、当前导航、选中、焦点、链接和少量交互强调，不做装饰。
-- 状态色与强调色分开，并且始终配文字标签。
-- 用户大多不是技术人员：文案直白，操作结果立即可见，删除这类不可逆操作之前一定要确认。
-
-风格参考 Notion 的温和极简和 Linear 的克制原则，但 WorkPack 使用浅色主题，并以中文排版为准。
+以用户提供的 Linear 浅色桌面项目列表截图为视觉基准。主界面采用灰白工作区、紧凑侧栏、无衬线文字、对齐的列表列和蓝紫色操作反馈。[Linear 设计参考](https://github.com/VoltAgent/awesome-design-md/blob/main/design-md/linear.app/DESIGN.md)用于补充控件和分隔线的规则。WorkPack 使用本机项目、事项、文件和模板数据。
 
 ## Colors
 
-颜色方向是 neutral / quiet / crisp / dense：中性、安静、清楚、密。不是绿色品牌的 SaaS 仪表盘。具体色值写在头部 token 里，页面不得另写一套 HEX。
+灰色 `canvas` 与 `sidebar` 包围较亮的 `surface`。蓝紫色 `primary` 用于主操作、焦点及当前资料进度。`primary-soft` 用于轻量选中状态，侧栏当前项使用 `nav-selected` 中性底，悬停使用 `surface-hover`。蓝紫色 `status-done` 表示完成，琥珀色表示待办或路径异常，红色表示错误或删除。状态同时显示文字、图形或数值。
 
-### Neutral
-
-- `canvas` 是窗口最底层背景，`surface` 是浮在它上面的面板。两者要在真实屏幕上一眼分得开，但仍是同一组冷灰，不要拉成纯白对深灰的强反差。
-- `sidebar` 使用中性表面，不带明显强调色。
-- `surface-subtle` 用于表头和面板底栏。`surface-hover` 只比普通 `surface` 略深，用来表示悬停。
-- `hairline` 和 `hairline-strong` 是安静的分隔线，不能单独作为控件边界。控件边界用 `control-border`。
-- 文字分三级：`ink` 用于标题和正文，对比度要高，但不是纯黑；`ink-secondary` 用于次要正文和按钮；`ink-muted` 用于说明、表头和时间，明确退后，也是最浅的文字色。
-- 禁用状态通过 `surface-subtle` 背景和去掉悬停效果来表达，不通过调低文字颜色或透明度。
-
-### Accent
-
-`primary` 是低饱和冷灰蓝。`primary-hover` 只用于主要按钮的悬停，`primary-soft` 是低饱和浅底，`focus-ring` 用同一冷灰蓝、清晰可见，不加高饱和光晕。`on-primary` 只放在 `primary` 填充上。
-
-Accent 只用于：主要操作、当前导航、选中、焦点、链接、进度条，以及少量交互强调。每个视图里的主要按钮不超过一个。不要用 Accent 做大面积色块或装饰。
-
-- 悬停：用 `surface-hover`，只比普通表面略有区别。
-- 选中：比悬停更明确，但仍用浅表面或细边界，不要铺成大块 Accent。
-- 当前导航：`nav-item-active` 使用 `primary-soft` 浅底，文字和图标用 `primary`。
-- 焦点：3px `focus-ring`，偏移 2px。鼠标点击不显示焦点框。
-
-### 状态色（最重要）
-
-状态色继续与 Accent 分离。Done、Pending、Not Applicable、Error 各用自己的色相。背景可以降低饱和度，让标签更克制，但语义必须一眼能分开，并且必须有文字标签。不能把状态色改成 Accent。
-
-| 状态 | 文字 | 背景 | 含义 |
-| --- | --- | --- | --- |
-| 已完成 | `status-done` | `status-done-soft` | 步骤完成，附件有效 |
-| 待处理 | `status-pending` | `status-pending-soft` | 待准备、待填写、待签字、待归档、未上传 |
-| 不适用 | `status-na` | `status-na-soft` | 不参与完成率计算 |
-| 错误 | `danger` | `danger-soft` | 附件失效、目录失效、操作失败、删除 |
-
-状态色只能表示状态。状态必须同时用文字表达（如“待签字”），不能只靠颜色区分。
-
-### 对比度要求
-
-- 文字和背景的组合对比度不低于 4.5（WCAG AA）。
-- 焦点框 `focus-ring` 和控件边框 `control-border` 在所有背景色（`surface`、`canvas`、`surface-subtle`、`surface-hover`、`sidebar`）上的对比度不低于 3（WCAG 1.4.11 非文本对比度）。
-- `hairline`、`hairline-strong` 只用于装饰性分隔，不能作为识别控件的唯一边界。
-
-新增颜色时也必须满足这些要求。
+正文与背景对比度至少 4.5，控件边框和焦点至少 3。装饰分隔线使用更浅的 `hairline`，仅保留必要的表头与状态边界；数据行、详情统计及分区优先用间距组织。输入边界使用 `control-border`。
 
 ## Typography
 
-- 字体栈：`"Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif`。英文和数字跟随系统字体，不单独引入网络字体。
-- 正文用 `body`（14px / 1.6），表格和表单用 `body-sm`（13px），说明文字用 `caption`（12px）。**任何需要阅读的文字不小于 12px。**
-- 中文不使用负字间距，也不全大写。标题通过字重（600）和字号区分，不使用斜体。
-- 统计数字、进度百分比和日期使用 `font-variant-numeric: tabular-nums`，保证数字对齐。
-- 文件路径使用 `mono`，过长时从中间截断，并在悬停提示中显示完整路径。
+使用 Linear 当前应用的字体栈，英文及数字优先使用随应用打包的 Inter Variable 4.1。后续回退依次为 SF Pro Display、Apple 系统字体、Segoe UI、Roboto、Oxygen、Ubuntu、Cantarell、Open Sans、Helvetica Neue 和 sans-serif。中文由系统选择该栈支持的 CJK 字体。中文保留默认字距。
+
+字号采用 Linear 的应用级比例。正文和项目名称 15px，辅助文字、输入控件及按钮 13px，标签 12px，页面标题 18px。正文默认字重 450，操作与列表名称 500，分区标题 600。各页面空状态提示统一为 13px、450 字重，行高 1.5。正文行高 1.5，进度数字采用等宽数字。长路径使用 13px 的等宽系统字体。
+
+来源为 [Linear 应用样式](https://static.linear.app/client/assets/style-nDwjYmzh.css)及其登录页的字体声明，核对日期为 2026年11月7日。Inter 的 OFL 许可随应用保存在 `licenses/Inter-OFL.txt`。
 
 ## Layout
 
-WorkPack 是桌面端高信息密度操作界面，不是营销页。布局要让用户在一屏里扫到更多有效信息。信息密度接近 Linear 一类桌面生产力工具：紧凑、可扫描、少装饰。
-
 ### 页面结构
 
-- 窗口最小宽度 1050px。左侧导航在 1180px 及以上为 240px，1050–1180px 时为 216px。内容区最大宽度 1400px，左右内边距 `spacing.xl`（1050–1180px 时改为 `spacing.lg`，见 Responsive Behavior）。
-- 主内容占满这条内容区的横向空间。待处理、文件清单、项目列表这类数据密集页面优先提高横向利用率。
-- 不要为了装饰再套一层更窄的最大宽度，也不要用大面积留白把内容挤在中间。
-- 窗口骨架是：侧边导航 + 顶栏（面包屑、全局搜索）+ 内容区。内容区内部是一条工具栏，然后是数据或功能区。
-- 侧边导航自上而下是：品牌标识、主导航，底部是工作空间标识。品牌标识使用横版标志图片 `src/renderer/src/assets/workpack-logo.png`（图形加 WorkPack 字样，透明背景），高度 40px，宽度按比例，在侧边栏内水平居中，左右留白相等，替代文字为 “WorkPack”。标志里的蓝色和青色只属于这张图片，不进入界面色板，页面其他地方仍只用上面的 token。顶栏只放面包屑和全局搜索，不放日期、头像这类没有操作的装饰控件。
+窗口最小宽度 1050px。侧栏宽度在 192px 至 232px 之间，优先容纳导航文字和计数。顶部统一预留 44px，用于页面导航工具、当前位置和全局搜索。主面板占据剩余高度并独立滚动。左下角单独显示 `src/renderer/src/assets/workpack-logo.png` 的灰度图形标。
+
+Windows 原生窗口标题及页面标题统一为 `WorkPack`。
+
+顶部当前位置使用透明背景的文字面包屑，项目层级保留返回操作。侧栏选中项使用 500 字重。工作台使用收件箱图标，项目入口、列表和空状态使用立方体图标。文件库导航及其空状态使用同一文档编辑图标，参照用户提供的 Linear 图标轮廓。实际文件及打开文件夹操作分别保留文件和文件夹图标。
+
+侧栏折叠、返回及前进工具始终与顶栏当前位置文字垂直居中对齐。折叠后内容区域扩展，工具保留在左上方，主面板左右外边距均为 8px，展开按钮持续可用。导航箭头根据本次窗口内的页面访问顺序启用。
+
+窗口底部预留 40px 高的公共留白区，主面板在该区域上方结束。灰度图形标距窗口左侧 24px，在底部区域内垂直居中。侧栏展开和折叠使用相同的底部留白及图标位置。
+
+品牌原图统一使用灰度资源。界面、运行窗口、任务栏、程序、安装及卸载图标保持一致；Windows ICO 保留 16px 至 256px 的七种尺寸。README 品牌图及社交预览也使用灰度版本。通过 `npm run brand:sync` 同步现有品牌资源，运行窗口读取 `src/renderer/public/icon.png`。
 
 ### 一级布局
 
-- Level 0 是 `canvas`，铺满整个窗口。
-- Level 1 是三块一级 Surface：侧边导航、顶栏、主内容。三块都用 `surface` 底色、1px `hairline` 边框和同一个圆角 `rounded.shell`，四个角都圆。
-- 三块 Surface 之间、以及它们和窗口四边之间，都要露出 `canvas`：1180px 及以上外圈留白和块间距都是 `spacing.md`；1050–1180px 都收到 `spacing.xs`。
-- 侧边导航的高度占满窗口可用高度。顶栏在主内容上方，两者之间露出 `canvas`。主内容在自己的 Surface 里滚动，顶栏保持在原位。
-- 浮层感只靠 `canvas` 与 `surface` 的色差、外圈留白、圆角和 `hairline` 表达。一级 Surface 不加阴影、渐变、发光或高饱和边框。
-- Level 2 是主内容里的统计、列表、表格和控件，继续按本文件原有规则绘制。不要因为有了一级 Surface，就把内部模块全部加白底、阴影或更大的圆角；空状态直接放在主内容 Surface 里，不再单独套一层卡片。
-- 窗口变窄时先缩小外圈留白和块间距，不压搜索框，不改表格最小宽度，也不让工具栏额外换行。
+Level 0 为窗口和灰色侧栏，Level 1 为单一浅色工作面板，`rounded.shell` 为 12px。Level 2 使用行、列和细分隔线组织内容。弹窗、抽屉及菜单与工作面板分层。
 
 ### 间距
 
-布局间距只用 `spacing` token，并且都是 4px 的倍数：
-
-| 关系 | token | 尺寸 |
-| --- | --- | --- |
-| 同一信息组内部 | `xs`–`sm` | 8–12px |
-| 控件之间 | `sm`–`md` | 12–16px |
-| 面板内部 | `md`–`lg` | 16–24px |
-| 不同内容区块之间 | `lg`–`xl` | 24–32px |
-| 页面级主要区域之间 | `xl`–`xxl` | 32–40px |
-
-- 数据页里，大于 `xxl`（40px）的间距不能用来制造呼吸感。页面级主要区域之间才用到 `xxl`。空状态，以及整页只有一个主动作的稀疏页面，可以超过 `xxl`，让唯一的内容和操作处在可读的位置。
-- 相同层级、相同用途的组件使用相同间距。不要给每个组件单独写一套 margin / padding。
-- 组件 token 里已经写明的内边距继续有效，例如 `panel` 的 20px（落在 `md`–`lg`）、`table-row` 的 12px，以及按钮和输入框的高度。布局引用这些 token，不要在外面再加一层临时间距。
-
-### 信息密度
-
-- 默认紧凑。一屏尽量展示更多有效记录。
-- 数据、文件、任务、记录用表格或紧凑列表。不要把每一条记录包成独立卡片。
-- 卡片只用于项目和事项这类需要概览的对象，并且卡片网格要铺满内容区宽度。
-- 不为了呼吸感加大行高、段间距或区块间距。
-- 次要信息不得占用与主要信息相同的布局权重。
+间距按 4px 栅格使用 `xs`、`sm`、`md`、`lg`、`xl`、`xxl`。空状态使用小图标、简短状态和必要操作。
 
 ### 工具栏
 
-工具栏默认保持单行，单行状态高度为 36–44px。当可用宽度不足，继续单行会导致控件压缩、截断或溢出时，允许操作组整体换行。换行后的工具栏高度由内容决定，不再受 36–44px 限制。
-
-默认单行顺序：
-
-`页面标题 | 搜索 | 筛选 | 排序 | 主要操作`
-
-- 主要操作靠右。每个视图最多一个主要按钮（见 Components）。
-- 搜索、筛选、排序组成稳定操作组，顺序固定。某一项不存在时，后面的控件前移，不留空位。换行时这一组一起换，不把每个控件拆成独立行。
-- 标题、说明、搜索、筛选各自占一整行不符合本规范。说明文字若必须出现，用 `caption` 跟在标题同一行。
-- 内部控件使用现有高度：`button-small` 28px，`button-primary`、`button-secondary`、`text-input` 36px。不要为了守住 44px 把搜索框压扁。
+页面标题和主要操作同行，筛选及搜索控件靠近列表。待处理保留完成状态筛选、项目及经办人分组。筛选栏可换行，窄窗口收紧间距。按钮、搜索框、下拉框及分类筛选统一为 34px 高，相邻控件采用相同圆角并垂直对齐，宽度按文字内容安排；紧凑行内操作 28px。一级页面标题区统一使用 36px 行高，右侧主要操作保持同一顶边及右边位置；详情页更多菜单位于编辑按钮左侧，两个控件均为 34px 高。仅为可执行的排序和筛选显示入口。
 
 ### 表格与列表
 
-数据密集页面使用稳定列，不平均分列。列宽按重要性分配：
-
-| 列 | 宽度 |
-| --- | --- |
-| 名称 / 标题 | 吃掉剩余空间，是最宽的列 |
-| 状态 | 固定或较窄 |
-| 时间 | 稳定宽度，不随相邻列伸缩 |
-| 类型 / 大小 | 较窄 |
-| 操作 | 固定宽度，靠右 |
-
-- 表头和数据行使用同一套列定义，边界对齐。图标、状态标签、操作按钮的有无不得把列左右推开。
-- 与 Components 一致：数字列右对齐，状态列居中，操作列固定在右侧。
-- 横向空间不够时表格横向滚动；文件名列和操作列保持可见（见 Responsive Behavior）。
+项目列表按名称、客户、负责人、事项数、资料进度和操作对齐。待处理列表展示文件、关联项目及事项、待办状态和经办人。文件库使用模板表格。长文本可换行，文件库表格可在内容区内部横向滚动。
 
 ### 行高与垂直密度
 
-- 单行数据行的目标高度是 32–40px。现有 `table-row` 的 padding 是 12px，加上 `body-sm` 单行，实际大约 45px。收紧这个 token 之前，单行行高以组件 token 为准，不要为了贴进 32–40px 去裁切文字。收紧项记在 Known Gaps。
-- 内容本身超过一行时，行高随内容增高，不受 40px 限制。这包括两行文件名、错误信息、辅助 metadata、多行状态说明，以及行内 Badge、操作按钮或其他控件确实需要额外垂直空间的情况。
-- 不要为了呼吸感把单行数据行做成 48px、56px 或 64px。单行文本使用 `body-sm`，不要再加大行高。
-- 不通过裁切内容、固定 `height` 或 `overflow: hidden` 把多行内容压进 32–40px。项目卡片和事项卡片继续作为概览组件，不把所有内容都改成表格。
-- 常规按钮和输入框 28–36px，对应现有组件 token，不另设高度。工具栏高度见上一节。
-
-### 对齐
-
-同一页面保持稳定的轴线，重点是这些边界：
-
-- 页面标题的左缘
-- 工具栏的左右缘
-- 面板边界
-- 表格列边界
-- 列表内容的基线
-- 表头和数据行
-
-不同区域不要各自用 margin 挪出一个不同的左侧起点。对齐靠 Grid、Flex 和固定列，不靠一次性的 margin 修正。
-
-### 面板
-
-- 面板只表示一块明确的功能区，不是装饰容器。
-- 能用 `spacing`、`divider` 或分列表达层级时，不要新增面板。
-- 不要卡片套卡片，不要在面板里再包一层无功能的容器，也不要给每个信息组各做一个面板。
-- 多个面板并排时按功能重要性分配宽度，不要机械地 50/50。次要面板更窄。
+项目行至少 48px，文件模板行至少 46px。待处理和事项行随名称、状态及附件内容展开。控件点击区域至少 28px，长标签和错误信息保留足够垂直空间。
 
 ### 主次信息
 
-主信息得到更多空间。以文件列表为例，权重大小是：
-
-文件名称 > 状态 / 修改时间 > 类型 / 大小 > 辅助信息
-
-字段数量相同也不平均分列。次要 metadata 用 `caption`，并放在更窄的列里。
-
-### 扫描效率
-
-布局先服务快速扫描。用户应能直接认出：当前页面、当前选中对象、核心名称、当前状态、关键属性和可执行操作。
-
-- 上下文里已经有的信息不要再重复显示。页面标题已经是项目名时，列表里不要再放一列项目名。
-- 层级不清时调整列宽、顺序和对齐。不要靠加一段说明文字来补救。
-- 选中行仍使用同一列网格，不另起缩进。
+项目和文件名称优先，其次为归属、状态与进度。用户录入的备注、路径失效及迁移信息在相关页面展示。
 
 ## Elevation & Depth
 
-- 默认层级：`app-canvas` 上放三块一级 Surface（见 Layout 的一级布局），其中再放 `surface` 面板，面板用 1px `hairline` 边框分隔，**不加阴影**。行与行、区块与区块之间用 `divider`，需要更明显的分隔时用 `divider-strong`。
-- 阴影只用于浮在内容之上的元素：弹窗、抽屉、下拉菜单和提示条，统一使用 `0 12px 32px rgba(27, 30, 36, .16)`。
-- 可点击卡片悬停时，边框改为 `hairline-strong`，可以加一层很浅的阴影，但不要位移或放大。
-- 弹窗遮罩使用 `modal-overlay`（`overlay` 已包含 30% 不透明度）。
-
-### 边框
-
-Stitch 的组件 token 不支持边框属性，边框统一按下表设置，宽度都是 1px：
-
-| 组件 | 边框颜色 |
-| --- | --- |
-| `panel`、`modal`、卡片、表格外框 | `hairline` |
-| `button-secondary`、`button-small` | `control-border`（白底按钮放在白色面板上，必须有看得见的轮廓） |
-| `text-input`、下拉框、复选框 | `control-border`，聚焦时改为 `focus-ring` |
-| 可点击卡片悬停 | `hairline-strong` |
-| `status-*` | 无边框 |
-| `toast-success`、`toast-error`、`banner-warning` | 对应文字色的 20% 透明度 |
-- 键盘焦点统一使用 `focus-indicator`：3px 的 `focus-ring` 外框，偏移 2px。鼠标点击不显示焦点框（使用 `:focus-visible`）。
+窗口面板及列表用背景层次和细线区分。弹窗、抽屉和下拉菜单使用浮层阴影。打开模态交互时隔离背景，浮层保持在视口内。
 
 ## Shapes
 
-- 标签和小元素用 `rounded.sm`–`md`，按钮和输入框用 `md`，面板、卡片和弹窗用 `xl`，状态标签用 `pill`。
-- `rounded.shell` 只给侧边导航、顶栏、主内容三块一级 Surface 使用，内部组件不跟着放大。
-- 同一层级的元素圆角保持一致，不要混用多种圆角。
+按钮、输入框及选中导航采用 8px 圆角。内容面板、菜单和弹窗为 12px。状态标签采用 4px 圆角。进度条和头像使用圆角端点。
 
 ## Components
 
-- **按钮**：主要按钮 `button-primary` 每个视图最多一个；其他操作用 `button-secondary`（边框见 Elevation & Depth 中的边框表）；表格和卡片内的操作用 `button-small` 或文字链接；删除用 `button-danger-text`，放在操作组的最后。不可用的按钮用 `button-disabled`，并通过悬停提示说明原因。按钮文案用动词，不超过 4 个字，如“新建项目”“上传”“完成”。
-- **返回按钮**：使用 16px 线性 `chevron-left` 图标配合简短文字，不使用文本箭头；悬停时只改变背景、边框和图标位置，保持方向明确。
-- **输入框**：`text-input` 边框为 `control-border`；获得焦点时（`text-input-focused`）边框改为 `focus-ring`，并加一圈 3px 的 `primary-soft` 光晕。标签放在输入框上方。必填项在提交时校验，错误信息用 `danger` 显示在字段下方。
-- **侧边导航**：`nav-item` 和 `nav-item-active`，待处理数量用 `status-pending` 的圆角数字徽标显示。「我的工作空间」固定在侧边导航底部，点击后显示设置入口和简短更新说明。WorkPack 是本机单用户应用，不显示用户头像或用户信息块。
-- **表格**：表头用 `table-header`，行用 `table-row`，可点击行悬停时用 `table-row-hover`。操作列固定在右侧。数字列右对齐，状态列居中。列宽、行高和横向利用率见 Layout。
-- **待办状态**：每份文件的待办由复选框表示完成与否，名称可由用户添加；“已准备”是默认待办。
-- **文件库标识**：模板文件统一使用文件图标和主色，不按文件名区分颜色。
-- **进度条**：6px 高，轨道为 `status-na-soft`，填充为 `progress-fill`，旁边同时显示百分比数字。
-- **弹窗**：`modal` 宽 640px，编辑文件库和清单项时可以加宽到 820px。标题在左上，关闭按钮在右上，操作按钮在右下，取消在前、确认在后。
-- **提示条**：`toast-success` 3 秒后自动消失；`toast-error` 一直显示，并带关闭按钮，直到用户关闭或进行下一次操作（已实现）。
-- **横幅**：`banner-warning` 用于项目目录失效这类需要用户处理的问题，横幅内必须提供修复操作按钮（如“重新定位”）。
-- **空状态**：图标、一句话说明、一个主要操作按钮，不写营销式文案。
+- 工作台优先展示待处理文件和最近项目。待处理行打开关联事项，项目行进入项目详情。
+- 工作区菜单在工作空间按钮下方展开，间隔 4px，右边缘与按钮对齐；首层为 184px 宽的紧凑菜单，仅显示 News 和设置。News 进入 264px 宽的二级更新日志，与按钮左侧对齐以保持在窗口内，提供返回按钮；Esc 从二级返回首层，再次 Esc 关闭菜单。重新打开始终显示首层。当前导航通过 `aria-current` 和中性色背景标识。
+- 项目及文件库把编辑、导入和删除收进更多菜单。删除确认说明本机文件的处理方式。
+- 详情和事项抽屉使用紧凑标题、状态和分组行。六类表单保持一致的标题、关闭、字段和提交区域。
+- 文件库使用文件图标及主色区分模板文件。存储设置保留必要的路径与迁移信息。
+- 存储设置的迁移提示采用紧凑样式，最大宽度 720px，内边距 8px × 12px，标题 13px，说明及展开入口 12px。保留完整说明，展开入口点击高度至少 28px。
+- Toast 成功三秒消失，错误持续到关闭或下次操作。
 
 ## Interaction Patterns
 
-标注“已实现”的是当前代码的行为，标注“规划”的是后续改造方向。新功能应遵循这里的规则。
-
-- **即时反馈**（已实现）：保存后在当前位置显示“已保存”，全局操作结果用提示条告知。操作进行中，相关按钮禁用并显示“保存中…”。
-- **弹窗键盘操作**（已实现）：打开弹窗时焦点移入弹窗，`Tab` 在弹窗内循环，`Esc` 关闭；有未保存修改时，关闭前需要确认。
-- **弹窗初始焦点**（已实现）：打开弹窗时焦点直接落在第一个输入框上。
-- **卡片键盘操作**（已实现）：项目和事项卡片可以用 `Tab` 聚焦，按 `Enter` 或空格打开。
-- **不可逆操作确认**（已实现）：删除前的确认文字要说清楚会删除什么、保留什么，例如“项目文件夹和实际文件会保留”。
-- **错误提示持久显示**（已实现）：见 Components 中的提示条。
-- **状态点击切换**（已实现）：清单中的四个步骤为可点击的状态标签，点一下在“待完成”和“已完成”之间切换，“不适用”放进更多菜单。“准备”步骤没有可用附件时不可点击，悬停时提示“请先上传文件”。
-- **侧边抽屉**（已实现）：从项目页打开事项时，从右侧滑出抽屉（宽 720px），不离开项目页。待处理页点击一行打开同一抽屉，不离开待处理页。顶栏搜索命中事项时先进入该事项所在的项目页，再打开抽屉。抽屉内容是该事项的文件清单、步骤状态和附件。打开时焦点移入抽屉，`Tab` 在抽屉内循环，`Esc` 或返回关闭后焦点回到打开它的控件；若该控件已不在，焦点落到相邻事项或列表区域。有未保存修改时，关闭前需要确认，取消则不把焦点移出抽屉。
-- **拖拽上传**（规划）：把文件拖到清单行上即可上传到该清单项；拖拽悬停时该行显示 `primary` 虚线边框。
-- **全局搜索**（规划）：`Ctrl+K` 打开搜索面板，可以搜索项目、事项和文件，用方向键选择，按 `Enter` 跳转。
-- **待处理分组**（已实现）：待处理页默认按项目分组，工具栏可切换为按经办人或不再分组。分组标题显示名称和数量，没有待处理项的分组不出现。筛选先于分组生效。上次的筛选条件和分组方式记在本机数据库，刷新或重新打开后恢复。清除只恢复筛选，不改变分组。项目删除后，对应的筛选会清掉。
+- **页面导航**（已实现）：返回与前进支持主页面及具体项目，支持 Alt+← 与 Alt+→。返回后进入其他页面会开始新的前进分支，已删除的项目从可返回目标中跳过。抽屉和表单打开期间背景工具不可操作，当前页筛选状态保留。
+- **侧边抽屉**（已实现）：最大宽度 720px，在工作台、项目详情或待处理页就地打开。Tab 在抽屉内循环，Esc 返回，背景使用 inert。操作进行中，Esc、返回按钮及遮罩均保留抽屉。关闭后聚焦原触发控件或相邻记录。有未保存修改时，关闭前需要确认。
+- **表单**（已实现）：初始焦点落在首个输入框，Tab 循环；关闭恢复原焦点；保存中不重复提交或关闭。下拉选择器展开时，Esc 先收起下拉层，再次 Esc 才处理弹窗关闭。
+- **全局搜索**（已实现）：输入提示及无障碍名称为“搜索项目或任意内容”。Ctrl+K 聚焦搜索，Enter 跳转到匹配项目或事项，未匹配时显示错误。
+- **待处理状态**（已实现）：首次进入默认显示未完成，清除筛选恢复未完成；全部包含所有文件项；未完成和已完成根据文件待办及附件可用性判断。用户主动选择的筛选、分组在本机持久化，清除不重置分组。侧栏角标始终只计有缺口的文件。
+- **文件库**（已实现）：名称及文件名搜索、分类筛选、编辑与分类管理、导入导出、移除记录；附件失效时禁用导出。
+- **路径**（已实现）：复制完整路径；存储位置使用原生选择器。迁回旧目录前需处理旧数据库，不承诺自动清理或自动备份。
+- **更多菜单**（已实现）：键盘打开后聚焦首个可用操作，方向键移动，Esc 返回触发按钮，点击外部关闭。
 
 ## Content & Copy
 
-- 使用简体中文，语气直接。用“项目”“事项”“文件库”“文件项”“附件”“待办”这几个固定名词。
-- 标题说明“是什么”，按钮说明“做什么”，错误信息说明“怎么办”，例如“项目文件夹已失效，请先重新定位项目目录”。
-- 不写欢迎语、口号或重复标题的说明文字，空状态不超过一句话。
-- 日期格式：列表中写“9月23日”，详情中写“2026/9/23”。
+使用简体中文。页面标题直接命名对象，按钮直接描述动作。空状态使用一行文案和必要操作。保留用户备注、错误及数据迁移信息。
 
 ## Do's and Don'ts
 
-### Do
-
-- 用 token 取值，不要在组件中硬编码颜色和字号。
-- 状态同时用颜色和文字表达。
-- 保持高信息密度，但每行只放一类信息。
-- 布局间距只用 `spacing` token；相同层级、相同用途使用相同间距。
-- 数据用表格或紧凑列表。工具栏默认单行；宽度不够时，搜索、筛选、排序作为一组换行。
-- 失效、缺失这类问题要就地提示，并附上修复入口。
-
-### Don't
-
-- 不要使用小于 12px 的文字，也不要使用比 `ink-muted` 更浅的文字色；禁用状态不要靠调低透明度表达。
-- 不要让类型色使用橙色或绿色，也不要用状态色做装饰。
-- 不要给普通面板加阴影，也不要在悬停时移动或放大元素。
-- 不要使用 Element Plus 默认的蓝色主题色 `#409eff`；使用 Element Plus 组件时，要覆盖成本文件的 token。
-- 不要使用暗色主题、渐变背景或大面积品牌色块。
-- 不要把标题、搜索、筛选各自占一整行，也不要为每条记录套一张卡片。宽度不够时按工具栏规则整组换行。
-- 不要卡片套卡片，也不要用临时 margin 错开同一页的左边界。数据页不要用大于 `spacing.xxl` 的留白；空状态和整页只有一个主动作的稀疏页面可以例外。
-- 不要把单行数据行加到 48px、56px 或 64px 来制造呼吸感。多行内容按内容增高，不要为了守住 40px 把文件名、错误信息或状态说明裁掉。
+使用共享颜色、间距和组件规则。真实资料进度显示百分比和进度条。界面使用本机字体和真实数据，入口对应 WorkPack 的实际行为。
 
 ## Responsive Behavior
 
-WorkPack 只运行在桌面端，需要适配的是窗口宽度，不是移动设备：
-
-- 1180px 及以上：导航 240px，文件库卡片三列，事项卡片两列。一级 Surface 的外圈留白和块间距为 `spacing.md`。
-- 1050–1180px：导航收窄到 216px，文件库卡片两列，内容区左右内边距改为 `spacing.lg`，一级 Surface 的外圈留白和块间距收到 `spacing.xs`。
-- 表格超出宽度时横向滚动，第一列（文件名）和操作列保持可见。列宽仍按重要性分配，不改成平均分列。
-- 窗口变窄、继续单行会导致控件压缩、截断或溢出时，搜索、筛选、排序作为一组换行，主要操作仍靠右。换行后高度由内容决定。不要拆成标题、搜索、筛选各占一行。
-- 可点击区域至少 28×28px，主要按钮高度 36px。
+核对 1600×1000、1280×800 和 1050×700。窄窗口优先保留项目及文件列，次要文本可换行，右侧面板可滚动。抽屉限制在侧栏以外的窗口宽度。弹窗最大高度为视口减去 48px。
 
 ## Agent Prompt Guide
 
-- 强调色 `#3d5674`，背景 `#eaecf0`，面板 `#fbfcfd`，边框 `#e4e6eb`，正文 `#1b1e24`，辅助文字 `#5c6570`。
-- 状态色必须使用 DESIGN.md 顶部 colors token，不在页面或提示词中重复硬编码 HEX：`status-done`、`status-done-soft`、`status-pending`、`status-pending-soft`、`status-na`、`status-na-soft`、`danger`、`danger-soft`。
-- 示例提示词：“按照 DESIGN.md 把事项详情中的清单状态下拉框改为 `status-done` / `status-pending` 样式的可点击状态标签，遵循 Interaction Patterns 中的状态点击切换规则。”
+以 Linear 浅色桌面截图为基准，优先还原导航、标题、行列密度和交互层级。依据 WorkPack 的现有数据与行为配置列和操作。以 Electron 实际运行截图核对。
 
 ## Iteration Guide
 
-1. 每次只改一个组件，并用 `components` 里的 token 名称指代它。
-2. 修改后运行 `npx @google/design.md lint DESIGN.md` 检查格式。
-3. 新增组件变体时，单独添加一个 token，不要修改已有 token 的含义。
-4. 规划中的交互实现后，把 Interaction Patterns 里对应的“规划”改为“已实现”。
+运行设计对比度检查、类型检查、单元测试和 Electron 端到端测试。涉及交互或尺寸时核对键盘、长名称和窄窗口。
 
 ## Known Gaps
 
-上述已按规范落地的部分：可读文字至少 12px；辅助文字、焦点框和控件边框符合对比度要求；类型色与状态色分开；普通面板不加阴影、悬停不位移；清单状态点击只在待完成与已完成之间切换，不适用需用更多菜单；错误提示一直显示直到关闭或下一次操作；弹窗打开时焦点落在第一个输入框。`src/renderer/src/style.css` 顶部的 CSS 变量与本文件 token 一致，选择器不再靠文末补丁覆盖。
-
-仍待后续处理：
-
-- 禁用按钮仍把文字改成 `ink-muted`，规范要求用 `surface-subtle` 背景而不是浅字色。
-- 弹窗宽度 650px，规范为 640px。
-- 仍全局引入 Element Plus 默认样式，有主题蓝泄漏风险。
-- 单行 `table-row` 的组件 token 仍是 12px 内边距，约 45px。没有用固定高度、内容裁切或 `overflow: hidden` 把它压到 32–40px。多行内容、附件和状态控件继续随内容增高。
-- 工作台、项目列表、待处理、文件清单以外的页面和弹窗，布局间距仍有非 4 倍数。
-
-以下内容受 Stitch 格式限制，只写在正文里，接入 CSS 变量时需要从正文取值：
-
-- 边框颜色（见 Elevation & Depth 中的边框表）。
-- 浮层阴影 `0 12px 32px rgba(27, 30, 36, .16)`。
+参考截图中的优先级、日期、头像和历史趋势属于 Linear 的数据。WorkPack 的项目列表显示当前资料进度和已有项目字段。Windows 标题栏和字体由系统呈现。

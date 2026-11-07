@@ -15,6 +15,7 @@ export interface EventUpdateInput { id: string; projectId: string; name: string;
 export interface ItemInput { id?: string; eventId: string; name: string; note: string }
 export interface WorkPackAPI {
   snapshot(): Promise<Snapshot>
+  copyPath(value: string): Promise<void>
   savePendingView(input: PendingViewState): Promise<PendingViewState>
   saveProject(input: ProjectInput): Promise<string>
   deleteProject(id: string): Promise<void>
@@ -65,20 +66,13 @@ export function gaps(item: Item): string[] {
     ...item.attachments.some(file => !file.exists) ? ['附件失效'] : []
   ]
 }
-export function cachedProjectPercent(projectId: string, cache: Map<string, number>, compute: () => number) {
-  const cached = cache.get(projectId)
-  if (cached !== undefined) return cached
-  const percent = compute()
-  cache.set(projectId, percent)
-  return percent
-}
-export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery, projectPercent: number | (() => number)) {
+export function matchesPendingQuery(row: { project: Project; event: BusinessEvent; item: Item }, query: PendingFilterQuery) {
   if (query.projectId && row.project.id !== query.projectId) return false
   if (query.customer.trim() && row.project.customer.trim() !== query.customer.trim()) return false
   if (query.owner.trim() && row.event.owner.trim() !== query.owner.trim()) return false
   if (query.status !== 'all') {
-    const percent = typeof projectPercent === 'function' ? projectPercent() : projectPercent
-    if (!matchesCompletionFilter(percent, row.project.events.length > 0, query.status)) return false
+    const complete = gaps(row.item).length === 0
+    if (query.status === 'done' ? !complete : complete) return false
   }
   const keyword = query.keyword.trim().toLowerCase()
   return !keyword || [row.project.name, row.project.customer, row.project.owner, row.event.name, row.event.owner, row.item.name].some(value => value.toLowerCase().includes(keyword))
@@ -87,7 +81,7 @@ export type PendingGroupBy = 'project' | 'owner' | 'none'
 export interface PendingGroup<T> { key: string; label: string; rows: T[] }
 export interface PendingViewState { filter: PendingFilterQuery; groupBy: PendingGroupBy }
 export const PENDING_VIEW_PREFERENCE_KEY = 'pending.view'
-export function defaultPendingFilter(): PendingFilterQuery { return { keyword: '', projectId: '', customer: '', owner: '', status: 'all' } }
+export function defaultPendingFilter(): PendingFilterQuery { return { keyword: '', projectId: '', customer: '', owner: '', status: 'open' } }
 export function defaultPendingViewState(): PendingViewState { return { filter: defaultPendingFilter(), groupBy: 'project' } }
 function storedString(value: unknown) { return typeof value === 'string' ? value : '' }
 export function parsePendingViewState(raw: unknown): PendingViewState {
@@ -100,7 +94,7 @@ export function parsePendingViewState(raw: unknown): PendingViewState {
   return {
     filter: {
       keyword: storedString(filter.keyword), projectId: storedString(filter.projectId), customer: storedString(filter.customer), owner: storedString(filter.owner),
-      status: filter.status === 'open' || filter.status === 'done' ? filter.status : 'all'
+      status: filter.status === 'all' || filter.status === 'open' || filter.status === 'done' ? filter.status : fallback.filter.status
     },
     groupBy: record.groupBy === 'owner' || record.groupBy === 'none' ? record.groupBy : 'project'
   }

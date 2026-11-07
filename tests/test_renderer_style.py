@@ -24,8 +24,8 @@ class RendererStyleTest(unittest.TestCase):
 
     def test_focus_and_status_styles_use_readable_design_colors(self):
         self.assertIn("outline: 3px solid var(--color-focus-ring)", STYLE)
-        self.assertIn("border-color: var(--color-control-border)", STYLE)
-        self.assertRegex(STYLE, r"\.template-icon, \.event-type-icon\s*\{[^}]*--color-primary")
+        self.assertIn("border: 1px solid var(--color-control-border)", STYLE)
+        self.assertRegex(STYLE, r"\.library-asset\s*\{[^}]*--color-primary")
         self.assertRegex(STYLE, r"\.document-task input:checked\s*\{[^}]*--color-primary")
         self.assertRegex(STYLE, r"\.document-task input:focus-visible\s*\{[^}]*--color-primary")
 
@@ -44,11 +44,10 @@ class RendererStyleTest(unittest.TestCase):
 
     def test_target_pages_use_spacing_tokens_for_layout(self):
         selectors = [
-            ".stat-grid",
-            ".stat-card",
             ".home-grid",
             ".attention-panel, .recent-panel",
             ".attention-row",
+            ".attention-columns, .attention-row",
             ".project-mini",
             ".project-list",
             ".project-card-main",
@@ -58,15 +57,13 @@ class RendererStyleTest(unittest.TestCase):
             ".event-detail",
             ".event-detail-heading",
             ".event-progress-large",
-            ".event-progress-large > span",
             ".event-actions",
             ".event-title",
             ".checklist-heading",
             ".document-card",
             ".document-tasks",
-            ".tags",
             ".document-attachments",
-            ".inline-actions",
+            ".heading-actions, .inline-actions",
         ]
         for selector in selectors:
             match = re.search(rf"(?m)^{re.escape(selector)}\s*\{{([^}}]*)\}}", REST)

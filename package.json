@@ -10,6 +10,7 @@
     "start": "electron-vite preview",
     "typecheck": "vue-tsc --noEmit",
     "build": "npm run typecheck && electron-vite build",
+    "brand:sync": "node scripts/sync-brand-assets.cjs",
     "postinstall": "electron-builder install-app-deps",
     "test": "node scripts/test.cjs",
     "test:e2e": "npm run build && playwright test",
@@ -28,7 +29,6 @@
     "electron": "^42.11.18",
     "electron-builder": "^26.0.0",
     "electron-vite": "^5.0.0",
-    "element-plus": "^2.11.0",
     "typescript": "^5.9.0",
     "vite": "^7.0.0",
     "vitest": "^5.1.0",
@@ -67,6 +67,9 @@
       "signExecutable": false
     },
     "nsis": {
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
@@ -82,5 +85,8 @@
       "include": "build/installer.nsh"
     },
     "artifactName": "WorkPack-${version}-Setup.${ext}"
+  },
+  "overrides": {
+    "minimatch@>=9 <11": "11.0.4"
   }
 }

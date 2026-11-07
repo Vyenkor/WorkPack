@@ -76,9 +76,10 @@ class InstallerConfigTest(unittest.TestCase):
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(package["dependencies"]), ["better-sqlite3", "zod"],
                          "渲染进程依赖由 Vite 打包，放进 dependencies 会被重复装进 app.asar")
-        for name in ["vue", "element-plus"]:
+        for name in ["vue"]:
             with self.subTest(name=name):
                 self.assertIn(name, package["devDependencies"])
+        self.assertNotIn("element-plus", package["devDependencies"])
         self.assertEqual(BUILD["electronLanguages"], ["zh-CN", "en-US"])
         self.assertIn("!node_modules/better-sqlite3/{deps,src}/**", BUILD["files"])
 
@@ -87,6 +88,10 @@ class InstallerConfigTest(unittest.TestCase):
         self.assertNotIn("signAndEditExecutable", win)
         self.assertIs(win["signExecutable"], False)
         self.assertEqual(win["icon"], "build/icon.ico")
+        for field in ("installerIcon", "uninstallerIcon", "installerHeaderIcon"):
+            self.assertEqual(BUILD["nsis"][field], "build/icon.ico")
+        self.assertTrue((ROOT / "src/renderer/public/icon.png").is_file())
+        self.assertIn("icon: path.join(__dirname, '../renderer/icon.png')", (ROOT / "src/main/index.ts").read_text(encoding="utf-8"))
         icon = (ROOT / "build" / "icon.ico").read_bytes()
         reserved, kind, count = struct.unpack("<HHH", icon[:6])
         self.assertEqual((reserved, kind), (0, 1))

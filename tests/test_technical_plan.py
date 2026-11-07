@@ -15,7 +15,7 @@ class TechnicalPlanTest(unittest.TestCase):
             "Vue 3",
             "TypeScript",
             "Vite",
-            "Element Plus",
+            "自有组件",
             "Electron",
             "SQLite",
             "better-sqlite3",
@@ -23,6 +23,16 @@ class TechnicalPlanTest(unittest.TestCase):
         ]:
             with self.subTest(technology=technology):
                 self.assertIn(technology, content)
+
+    def test_current_documents_describe_library_tasks_instead_of_retired_workflows(self):
+        product = (ROOT / "产品设计文档_MVP.md").read_text(encoding="utf-8")
+        technical = PLAN.read_text(encoding="utf-8")
+        for content in (product, technical):
+            self.assertIn("文件库", content)
+            self.assertIn("自定义待办", content)
+            self.assertIn("workpack-v3.sqlite", content)
+            self.assertNotIn("选择流程", content)
+            self.assertNotIn("不适用的步骤", content)
 
     def test_plan_covers_local_data_and_file_handling_boundaries(self):
         content = PLAN.read_text(encoding="utf-8")

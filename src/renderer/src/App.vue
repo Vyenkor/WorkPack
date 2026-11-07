@@ -25,11 +25,13 @@ import {
 } from '../../shared/model'
 
 type MainView = 'home' | 'projects' | 'pending' | 'templates' | 'project' | 'settings'
+type PageLocation = { view: MainView; projectId: string | null }
 type ModalName = 'project' | 'event' | 'template' | 'category' | 'task' | 'item' | null
 
 const emptySnapshot = (): Snapshot => ({ projects: [], templates: [], categories: [], pendingView: { filter: defaultPendingFilter(), groupBy: 'project' } })
 const snapshot = ref<Snapshot>(emptySnapshot())
 const view = ref<MainView>('home')
+const sidebarCollapsed = ref(false)
 const workspaceMenu = ref(false)
 const workspaceTrigger = ref<HTMLButtonElement | null>(null)
 function closeWorkspaceMenu() { workspaceMenu.value = false; workspaceTrigger.value?.focus() }
@@ -65,6 +67,11 @@ async function copyPath(value: string) {
 function searchShortcut(event: KeyboardEvent) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !modal.value && !drawerOpen.value) {
     event.preventDefault(); globalSearchInput.value?.focus(); globalSearchInput.value?.select()
+  }
+  if (event.altKey && !event.ctrlKey && !event.metaKey && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+    event.preventDefault()
+    if (modal.value || drawerOpen.value || busy.value || loading.value) return
+    travelPage(event.key === 'ArrowLeft' ? -1 : 1)
   }
 }
 
@@ -113,6 +120,49 @@ const itemForm = reactive({ id: '', eventId: '', name: '', note: '' })
 
 const activeProject = computed(() => snapshot.value.projects.find(project => project.id === activeProjectId.value) ?? null)
 const activeEvent = computed(() => activeProject.value?.events.find(event => event.id === activeEventId.value) ?? null)
+
+const pageLocations = ref<PageLocation[]>([{ view: 'home', projectId: null }])
+const pageLocationIndex = ref(0)
+let restoringPage = false
+watch([view, activeProjectId], () => {
+  if (restoringPage || loading.value || (view.value === 'project' && !activeProject.value)) return
+  const location: PageLocation = { view: view.value, projectId: view.value === 'project' ? activeProjectId.value : null }
+  const current = pageLocations.value[pageLocationIndex.value]
+  if (current.view === location.view && current.projectId === location.projectId) return
+  pageLocations.value = [...pageLocations.value.slice(0, pageLocationIndex.value + 1), location]
+  pageLocationIndex.value = pageLocations.value.length - 1
+}, { flush: 'post' })
+function availablePageIndex(direction: -1 | 1) {
+  const current = pageLocations.value[pageLocationIndex.value]
+  for (let index = pageLocationIndex.value + direction; index >= 0 && index < pageLocations.value.length; index += direction) {
+    const location = pageLocations.value[index]
+    if (location.view === current.view && location.projectId === current.projectId) continue
+    if (location.view !== 'project' || snapshot.value.projects.some(project => project.id === location.projectId)) return index
+  }
+  return -1
+}
+const previousPageIndex = computed(() => availablePageIndex(-1))
+const nextPageIndex = computed(() => availablePageIndex(1))
+async function travelPage(direction: -1 | 1) {
+  if (modal.value || drawerOpen.value || busy.value || loading.value) return
+  const index = direction === -1 ? previousPageIndex.value : nextPageIndex.value
+  if (index < 0) return
+  restoringPage = true
+  clearToast()
+  workspaceMenu.value = false
+  closeDrawer()
+  pageLocationIndex.value = index
+  const location = pageLocations.value[index]
+  view.value = location.view
+  activeProjectId.value = location.projectId
+  await nextTick()
+  restoringPage = false
+  if (document.activeElement?.matches('button:disabled')) document.querySelector<HTMLElement>('main.view')?.focus()
+}
+function toggleSidebar() {
+  workspaceMenu.value = false
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
 
 const allEvents = computed(() => snapshot.value.projects.flatMap(project => project.events.map(event => ({ project, event }))))
 const itemRows = computed(() => allEvents.value.flatMap(({ project, event }) => event.items.map(item => ({ project, event, item, gaps: gaps(item) }))))
@@ -508,8 +558,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell">
-    <aside class="sidebar" :inert="drawerOpen || Boolean(modal)">
+  <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <nav class="sidebar-tools" aria-label="页面导航" :inert="drawerOpen || Boolean(modal)">
+      <button class="icon-button sidebar-toggle" type="button" :aria-label="sidebarCollapsed ? '展开侧栏' : '折叠侧栏'" :title="sidebarCollapsed ? '展开侧栏' : '折叠侧栏'" aria-controls="workspace-sidebar" :aria-expanded="!sidebarCollapsed" @click="toggleSidebar"><UiIcon name="sidebar" /></button>
+      <button class="icon-button" type="button" aria-label="返回上一步" title="返回上一步（Alt+←）" :disabled="previousPageIndex < 0 || busy || loading" @click="travelPage(-1)"><UiIcon name="back" /></button>
+      <button class="icon-button" type="button" aria-label="前进一步" title="前进一步（Alt+→）" :disabled="nextPageIndex < 0 || busy || loading" @click="travelPage(1)"><UiIcon name="forward" /></button>
+    </nav>
+    <aside v-show="!sidebarCollapsed" id="workspace-sidebar" class="sidebar" :inert="drawerOpen || Boolean(modal)">
       <div class="brand"><strong>WorkPack</strong></div>
       <div class="workspace-control" @focusout="workspaceFocusOut"><button ref="workspaceTrigger" type="button" class="workspace-switch" aria-controls="workspace-menu" :aria-expanded="workspaceMenu" @click="workspaceMenu = !workspaceMenu" @keydown.esc.stop.prevent="closeWorkspaceMenu"><span class="workspace-avatar">W</span><span>我的工作空间</span><UiIcon name="chevron-down" /></button><div v-if="workspaceMenu" id="workspace-menu" class="workspace-popover" @keydown.esc.stop.prevent="closeWorkspaceMenu"><section class="whats-new" aria-label="这次更新了什么"><h3>这次更新了什么</h3><ul><li>浅色工作区与紧凑列表</li><li>文件库新增搜索与分类筛选</li><li>待处理默认显示未完成文件</li><li>存储路径支持一键复制</li></ul></section><button type="button" @click="go('settings')"><UiIcon name="settings" />设置</button></div></div>
       <nav class="nav" aria-label="主导航">

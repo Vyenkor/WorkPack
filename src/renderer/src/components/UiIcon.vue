@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ name: 'project' | 'clock' | 'event' | 'back' | 'check' | 'plus' | 'search' | 'file' | 'info' | 'warning' | 'error' | 'close' | 'settings' | 'chevron-down' | 'more' | 'copy' | 'edit' | 'arrow' | 'upload' }>()
+defineProps<{ name: 'project' | 'clock' | 'event' | 'back' | 'forward' | 'sidebar' | 'check' | 'plus' | 'search' | 'file' | 'info' | 'warning' | 'error' | 'close' | 'settings' | 'chevron-down' | 'more' | 'copy' | 'edit' | 'arrow' | 'upload' }>()
 </script>
 
 <template>
@@ -23,6 +23,12 @@ defineProps<{ name: 'project' | 'clock' | 'event' | 'back' | 'check' | 'plus' | 
     </template>
     <template v-else-if="name === 'back'">
       <path d="m14.5 5.5-6.5 6.5 6.5 6.5" />
+    </template>
+    <template v-else-if="name === 'forward'">
+      <path d="m9.5 5.5 6.5 6.5-6.5 6.5" />
+    </template>
+    <template v-else-if="name === 'sidebar'">
+      <rect x="3" y="4.5" width="18" height="15" rx="3" /><path d="M9 4.5v15" />
     </template>
     <template v-else-if="name === 'settings'">
       <circle cx="12" cy="12" r="3" /><path d="M12 2.8v2M12 19.2v2M4.04 4.04l1.42 1.42m13.08 13.08 1.42 1.42M2.8 12h2m14.4 0h2M4.04 19.96l1.42-1.42M18.54 5.46l1.42-1.42" />

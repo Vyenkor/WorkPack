@@ -51,6 +51,7 @@
   --spacing-xl: 32px;
   --spacing-xxl: 40px;
   --floating-shadow: 0 12px 32px rgba(34, 34, 37, .16);
+  --sidebar-width: clamp(192px, 16vw, 232px);
   font-family: var(--font-family);
   font-size: var(--font-body);
   line-height: 1.5;
@@ -87,9 +88,14 @@ h1 { font: 600 var(--font-page-title)/1.25 var(--font-display); }
 h2 { font: 600 var(--font-section-title)/1.4 var(--font-display); }
 h3 { font: 600 var(--font-card-title)/1.4 var(--font-display); }
 small { font-size: var(--font-body-sm); }
-.app-shell { display: flex; height: 100vh; width: 100%; overflow: hidden; background: var(--color-canvas); }
-.sidebar { width: clamp(192px, 16vw, 232px); flex-shrink: 0; display: flex; flex-direction: column; padding: 0 var(--spacing-xs) var(--spacing-md); background: var(--color-sidebar); }
-.brand { display: flex; align-items: center; justify-content: center; height: 44px; flex-shrink: 0; }
+.app-shell { position: relative; display: flex; height: 100vh; width: 100%; overflow: hidden; background: var(--color-canvas); }
+.sidebar { width: var(--sidebar-width); flex-shrink: 0; display: flex; flex-direction: column; padding: 0 var(--spacing-xs) var(--spacing-md); background: var(--color-sidebar); }
+.brand { display: flex; align-items: center; justify-content: center; height: 44px; flex-shrink: 0; margin-bottom: var(--spacing-xl); }
+.sidebar-tools { position: absolute; top: 44px; left: var(--spacing-xs); width: calc(var(--sidebar-width) - 16px); display: flex; align-items: center; gap: var(--spacing-xxs); z-index: 10; }
+.sidebar-tools .sidebar-toggle { margin-right: auto; }
+.sidebar-tools button:disabled { background: transparent; opacity: .45; }
+.sidebar-collapsed .sidebar-tools { top: var(--spacing-xs); width: 100px; }
+.sidebar-collapsed .topbar { padding-left: 116px; }
 .brand strong { font: 600 18px/1 var(--font-family); letter-spacing: -.025em; }
 .sidebar-emblem { margin-top: auto; padding-left: var(--spacing-xs); }
 .sidebar-emblem > span { display: block; width: 18px; height: 17px; overflow: hidden; }

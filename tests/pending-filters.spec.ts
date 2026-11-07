@@ -11,7 +11,7 @@ test('pending filters match the custom checklist model', async () => {
   const application = await _electron.launch({ executablePath: electronExecutable, args: ['.'], env: { ...process.env, WORKPACK_TEST_DATA: path.join(root, 'data') } })
   try {
     const page = await application.firstWindow()
-    await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
     await application.evaluate(({ dialog }, folder) => {
       Object.defineProperty(dialog, 'showOpenDialog', { configurable: true, value: async () => ({ canceled: false, filePaths: [folder] }) })
     }, projects)

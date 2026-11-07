@@ -15,7 +15,7 @@ test.beforeEach(async () => {
   errors.length = 0
   page.on('pageerror', error => errors.push(error.message))
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1600, 1000))
-  await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
   pickerPath = path.join(root, 'projects'); fs.mkdirSync(pickerPath)
 })
 test.afterEach(async () => {
@@ -43,10 +43,11 @@ async function addProject() {
   await page.getByRole('textbox', { name: '负责人' }).fill('张路瑶'); await submit()
 }
 
-test('approved empty pages, six dialogs and minimum desktop window', async ({}, info) => {
+test('Linear light empty pages, six dialogs and minimum desktop window', async ({}, info) => {
   await page.screenshot({ path: info.outputPath('01-home.png'), scale: 'css' })
   const shell = await page.evaluate(() => ({ color: getComputedStyle(document.body).color, background: getComputedStyle(document.querySelector('.app-shell')!).backgroundColor, left: document.querySelector('.sidebar')!.getBoundingClientRect().left, radius: getComputedStyle(document.querySelector('.sidebar')!).borderRadius }))
-  expect(shell).toMatchObject({ background: 'rgb(250, 249, 245)', left: 0, radius: '0px' })
+  expect(shell).toMatchObject({ background: 'rgb(237, 237, 238)', left: 0, radius: '0px' })
+  await expect(page.locator('.view')).toHaveCSS('border-top-left-radius', '12px')
   await page.keyboard.press('Control+k'); await expect(page.getByRole('searchbox', { name: '搜索项目或客户' })).toBeFocused()
   await nav('待处理').click(); await expect(page.getByRole('heading', { name: '暂无事项' })).toBeVisible()
   await page.screenshot({ path: info.outputPath('02-pending.png'), scale: 'css' })
@@ -87,6 +88,15 @@ test('approved empty pages, six dialogs and minimum desktop window', async ({}, 
   await drawer.getByRole('button', { name: '添加待办' }).click()
   await page.screenshot({ path: info.outputPath('modal-task.png'), scale: 'css' }); await page.keyboard.press('Escape')
   await page.screenshot({ path: info.outputPath('06-drawer.png'), scale: 'css' }); await page.keyboard.press('Escape')
+  await nav('工作台').click()
+  const queuedFile = page.getByRole('button', { name: /签收单.*第一批交付/ })
+  await expect(queuedFile).toBeVisible()
+  await queuedFile.click(); await expect(drawer.getByRole('heading', { name: '第一批交付' })).toBeVisible()
+  await drawer.locator('.event-actions').getByRole('button', { name: '编辑', exact: true }).click()
+  await page.getByRole('textbox', { name: '经办人', exact: true }).fill('测试经办人')
+  await submit()
+  await expect(drawer).toContainText('测试经办人')
+  await page.keyboard.press('Escape'); await expect(queuedFile).toBeFocused()
   await nav('项目').click(); await page.screenshot({ path: info.outputPath('07-projects.png'), scale: 'css' })
   await settings(); await page.screenshot({ path: info.outputPath('08-settings.png'), scale: 'css' })
   await page.getByText('查看迁移说明', { exact: true }).click(); await expect(page.locator('.migration-notice details')).toHaveAttribute('open', '')
@@ -154,7 +164,7 @@ test('library menus, categories, attachments and actual completion tabs remain f
   await page.getByRole('group', { name: '完成状态', exact: true }).getByRole('button', { name: '未完成' }).click(); await expect(page.locator('.pending-row')).toHaveCount(1)
   await expect(page.locator('.pending-row')).toContainText('待归档')
   await expect(nav('待处理').locator('.nav-count')).toHaveText('1')
-  await page.reload(); await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
+  await page.reload(); await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
   await nav('待处理').click(); await expect(page.getByRole('group', { name: '完成状态', exact: true }).getByRole('button', { name: '未完成' })).toHaveAttribute('aria-pressed', 'true')
 })
 

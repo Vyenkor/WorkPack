@@ -9,12 +9,31 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
   const application = await _electron.launch({ executablePath: electronExecutable, args: ['.'], env: { ...process.env, WORKPACK_TEST_DATA: path.join(root, 'data') } })
   try {
     const page = await application.firstWindow()
-    await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
+    await page.evaluate(() => document.fonts.ready)
+    const fontSession = await page.context().newCDPSession(page)
+    await fontSession.send('DOM.enable')
+    await fontSession.send('CSS.enable')
+    const domDocument = await fontSession.send('DOM.getDocument')
+    const wordmarkNode = await fontSession.send('DOM.querySelector', { nodeId: domDocument.root.nodeId, selector: '.brand strong' })
+    const platformFonts = await fontSession.send('CSS.getPlatformFontsForNode', { nodeId: wordmarkNode.nodeId })
+    expect(platformFonts.fonts.some(font => font.isCustomFont && /Inter/.test(font.familyName))).toBe(true)
+    await fontSession.detach()
+    await expect(page.locator('body')).toHaveCSS('font-size', '15px')
+    await expect(page.getByRole('button', { name: '新建项目' })).toHaveCSS('font-size', '13px')
     const nav = page.getByRole('navigation', { name: '主导航' })
     await expect(nav.locator('button')).toHaveCount(4)
+    await expect(nav.getByRole('button', { name: '工作台' })).toHaveAttribute('aria-current', 'page')
+    const sidebar = (await page.locator('.sidebar').boundingBox())!
+    const wordmark = (await page.getByText('WorkPack', { exact: true }).boundingBox())!
+    const emblem = (await page.locator('.sidebar-emblem > span').boundingBox())!
+    expect(Math.abs((wordmark.x + wordmark.width / 2) - (sidebar.x + sidebar.width / 2))).toBeLessThan(1)
+    expect(emblem.x - sidebar.x).toBeLessThan(24)
+    expect(sidebar.y + sidebar.height - (emblem.y + emblem.height)).toBeLessThan(24)
+    await expect(page.locator('.brand img')).toHaveCount(0)
     for (const icon of await nav.locator('svg.nav-icon').all()) {
       await expect(icon).toHaveAttribute('aria-hidden', 'true')
-      await expect(icon).toHaveCSS('width', '20px')
+      await expect(icon).toHaveCSS('width', '16px')
     }
     const workspace = page.getByRole('button', { name: '我的工作空间' })
     await workspace.click()
@@ -32,6 +51,7 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
     const popoverShadow = await page.locator('.workspace-popover').count()
     expect(popoverShadow).toBe(0)
     await nav.getByRole('button', { name: '文件库' }).click()
+    await expect(nav.getByRole('button', { name: '文件库' })).toHaveAttribute('aria-current', 'page')
     await expect(page.getByRole('heading', { name: '文件库', exact: true })).toBeVisible()
     await page.getByRole('button', { name: '添加文件模板' }).click()
     await expect(page.locator('.modal-card')).toBeVisible()

@@ -22,9 +22,8 @@ class EventDrawerTest(unittest.TestCase):
         self.assertIn("**侧边抽屉**（已实现）", patterns)
         self.assertNotIn("**侧边抽屉**（规划）", patterns)
         self.assertIn("720px", patterns)
-        self.assertIn("不离开项目页", patterns)
-        self.assertIn("不离开待处理页", patterns)
-        self.assertRegex(patterns, r"`Tab` 在抽屉内循环")
+        self.assertIn("在工作台、项目详情或待处理页就地打开", patterns)
+        self.assertIn("Tab 在抽屉内循环", patterns)
         self.assertIn("有未保存修改时，关闭前需要确认", patterns)
 
     def test_project_page_keeps_the_event_list_and_reuses_the_checklist(self):

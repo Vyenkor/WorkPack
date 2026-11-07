@@ -12,7 +12,7 @@ test.beforeEach(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-ui-'))
   application = await _electron.launch({ executablePath: electronExecutable, args: ['.'], env: { ...process.env, WORKPACK_TEST_DATA: path.join(root, 'data') } })
   page = await application.firstWindow()
-  await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
 })
 test.afterEach(async () => {
   await application?.close()

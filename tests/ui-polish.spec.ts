@@ -11,7 +11,7 @@ test.beforeEach(async () => {
   app = await _electron.launch({ executablePath: require('electron'), args: ['.'], env: { ...process.env, WORKPACK_TEST_DATA: path.join(root, 'data') } })
   page = await app.firstWindow()
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1600, 1000))
-  await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
 })
 test.afterEach(async () => {
   await app?.close()
@@ -24,21 +24,17 @@ async function clip(selector: string, name: string, info: { outputPath: (name: s
   await page.screenshot({ path: info.outputPath(name), clip: (await page.locator(selector).first().boundingBox())!, scale: 'css' })
 }
 
-test('search focus, list hover, compact nav and stats, and dropdowns follow the rounded layout', async ({}, info) => {
+test('search focus, aligned lists and dropdowns follow the compact desktop layout', async ({}, info) => {
   const navButtons = page.locator('.nav button')
   const navBox = await navButtons.evaluateAll(buttons => buttons.map(button => button.getBoundingClientRect().height))
   for (const height of navBox) expect(height).toBeLessThanOrEqual(42)
   await clip('.nav', 'nav.png', info)
 
-  const statHeight = await page.locator('.stat-grid').evaluate(grid => grid.getBoundingClientRect().height)
-  expect(statHeight).toBeLessThanOrEqual(72)
-  await clip('.stat-grid', 'stats.png', info)
-
   await page.keyboard.press('Control+k')
   const search = page.getByRole('searchbox', { name: '搜索项目或客户' })
   await expect(search).toBeFocused()
   await expect(search).toHaveCSS('outline-style', 'none')
-  await expect(page.locator('.global-search')).toHaveCSS('border-color', 'rgb(172, 69, 38)')
+  await expect(page.locator('.global-search')).toHaveCSS('border-color', 'rgb(80, 91, 199)')
   await clip('.topbar', 'search-focus.png', info)
 
   const parent = path.join(root, 'projects'); fs.mkdirSync(parent)
@@ -58,8 +54,13 @@ test('search focus, list hover, compact nav and stats, and dropdowns follow the 
   const recent = page.locator('.project-mini').first()
   await recent.hover()
   await expect(recent).toHaveCSS('border-top-left-radius', '8px')
-  await expect(recent).toHaveCSS('background-color', 'rgb(236, 231, 223)')
+  await expect(recent).toHaveCSS('background-color', 'rgb(233, 233, 237)')
   await clip('.recent-panel', 'recent-hover.png', info)
+
+  await nav('项目').click()
+  const headerPositions = await page.locator('.project-columns > span').evaluateAll(cells => cells.map(cell => cell.getBoundingClientRect().left))
+  const rowPositions = await page.locator('.project-card-main > span').evaluateAll(cells => cells.map(cell => cell.getBoundingClientRect().left))
+  expect(rowPositions).toEqual(headerPositions.slice(0, -1))
 
   await nav('待处理').click()
   const filter = page.locator('.pending-filters .filter-search input')

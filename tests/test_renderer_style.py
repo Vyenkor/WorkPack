@@ -44,11 +44,10 @@ class RendererStyleTest(unittest.TestCase):
 
     def test_target_pages_use_spacing_tokens_for_layout(self):
         selectors = [
-            ".stat-grid",
-            ".stat-card",
             ".home-grid",
             ".attention-panel, .recent-panel",
             ".attention-row",
+            ".attention-columns, .attention-row",
             ".project-mini",
             ".project-list",
             ".project-card-main",

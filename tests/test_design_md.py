@@ -97,39 +97,37 @@ class DesignMdTest(unittest.TestCase):
                 with self.subTest(indicator=indicator, background=background):
                     self.assertGreaterEqual(contrast(COLORS[indicator], COLORS[background]), 3)
 
-    def test_palette_matches_approved_warm_reference(self):
-        self.assertEqual(COLORS["primary"], "#ac4526")
-        self.assertEqual(COLORS["canvas"], "#faf9f5")
+    def test_palette_matches_linear_light_direction(self):
+        self.assertEqual(COLORS["primary"], "#505bc7")
+        self.assertEqual(COLORS["canvas"], "#ededee")
         self.assertNotEqual(COLORS["primary"], COLORS["status-done"])
         colors = CONTENT.split("## Colors\n", 1)[1].split("\n## Typography\n", 1)[0]
-        for phrase in ("Accent", "status-done", "primary-soft", "surface-hover"):
+        for phrase in ("蓝紫色", "status-done", "primary-soft", "surface-hover"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, colors)
-        self.assertNotEqual(COLORS["primary"][:3], COLORS["status-done"][:3])
 
-    def test_shell_is_flush_and_has_no_floating_gutters(self):
-        self.assertEqual(TOKENS["rounded"]["shell"], "0px")
+    def test_shell_uses_one_rounded_work_surface(self):
+        self.assertEqual(TOKENS["rounded"]["shell"], "12px")
         layout = CONTENT.split("### 一级布局\n", 1)[1].split("\n### ", 1)[0]
-        for phrase in ("Level 0", "Level 1", "rounded.shell",  "不加阴影", "Level 2"):
+        for phrase in ("Level 0", "Level 1", "rounded.shell", "单一浅色工作面板", "Level 2"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, layout)
 
-    def test_brand_logo_is_an_image_outside_the_palette(self):
+    def test_brand_wordmark_and_emblem_have_separate_positions(self):
         self.assertIn("src/renderer/src/assets/workpack-logo.png", CONTENT)
-        self.assertIn("不进入界面色板", CONTENT)
-        self.assertIn("在侧边栏内水平居中，左右留白相等", CONTENT)
-        self.assertNotIn("`.brand strong` 仍有负字距", CONTENT)
+        self.assertIn("侧栏顶部居中显示 WorkPack 字标", CONTENT)
+        self.assertIn("左下角单独显示", CONTENT)
 
     def test_library_identity_uses_one_shared_visual_treatment(self):
-        self.assertIn("模板文件统一使用文件图标和主色", CONTENT)
+        self.assertIn("使用文件图标及主色区分模板文件", CONTENT)
 
-    def test_typography_uses_chinese_system_font(self):
+    def test_typography_uses_linear_variable_font_and_system_fallbacks(self):
         typography = CONTENT.split("## Typography\n", 1)[1].split("\n## Layout\n", 1)[0]
-        for family in ("Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Segoe UI"):
+        for family in ("Inter Variable", "SF Pro Display", "Segoe UI", "CJK"):
             with self.subTest(family=family):
                 self.assertIn(family, typography)
         self.assertRegex(typography, r"12\s*px")
-        self.assertRegex(typography, r"负字间距")
+        self.assertIn("中文保留默认字距", typography)
 
     def test_layout_rules_for_dense_desktop(self):
         layout = CONTENT.split("## Layout\n", 1)[1].split("\n## Elevation & Depth\n", 1)[0]
@@ -139,9 +137,7 @@ class DesignMdTest(unittest.TestCase):
         rows = layout.split("### 行高与垂直密度\n", 1)[1].split("\n### ", 1)[0]
         priority = layout.split("### 主次信息\n", 1)[1].split("\n### ", 1)[0]
 
-        self.assertRegex(structure, r"1440\s*px")
-        self.assertRegex(structure, r"spacing\.xxl")
-        for marker in ("1180", "1050", "272", "216"):
+        for marker in ("44px", "1050px", "192px", "232px"):
             with self.subTest(marker=marker):
                 self.assertIn(marker, structure)
         self.assertRegex(spacing, r"4\s*px")
@@ -152,20 +148,15 @@ class DesignMdTest(unittest.TestCase):
         for control in ("页面标题", "搜索", "筛选", "排序", "主要操作"):
             with self.subTest(control=control):
                 self.assertIn(control, toolbar)
-        self.assertIn("44px", toolbar)
+        self.assertIn("34px", toolbar)
         self.assertIn("换行", toolbar)
-        self.assertIn("88px", rows)
-        self.assertIn("100px", rows)
-        self.assertIn("裁切", rows)
-        self.assertIn("Badge", rows)
+        self.assertIn("48px", rows)
+        self.assertIn("46px", rows)
         self.assertIn("垂直空间", rows)
-        self.assertIn("卡片套卡片", layout)
-        for term in ("文件名称", "状态", "修改时间", "类型", "大小", "辅助信息"):
+        for term in ("项目和文件名称", "状态", "进度", "用户录入的备注"):
             with self.subTest(term=term):
                 self.assertIn(term, priority)
         self.assertLess(priority.index("文件名称"), priority.index("状态"))
-        self.assertLess(priority.index("状态"), priority.index("类型"))
-        self.assertLess(priority.index("类型"), priority.index("辅助信息"))
         self.assertNotIn("密度适中", CONTENT)
 
     def test_documents_required_sections(self):
@@ -176,7 +167,7 @@ class DesignMdTest(unittest.TestCase):
     def test_parser_matches_front_matter_shape(self):
         self.assertEqual(TOKENS["name"], "WorkPack")
         self.assertEqual(TOKENS["components"]["button-primary"]["backgroundColor"], "{colors.primary}")
-        self.assertEqual(TOKENS["typography"]["body"]["fontSize"], "16px")
+        self.assertEqual(TOKENS["typography"]["body"]["fontSize"], "15px")
 
     def test_parser_rejects_unsupported_yaml(self):
         for snippet in ["colors:\n  - primary\n", "description: |\n  text\n", "colors: [a, b]\n"]:

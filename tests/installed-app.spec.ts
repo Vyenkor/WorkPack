@@ -23,7 +23,7 @@ test.afterEach(() => {
 async function launch(dataDir: string): Promise<[ElectronApplication, Page]> {
   const application = await _electron.launch({ executablePath: installedExe!, env: { ...process.env, WORKPACK_TEST_DATA: dataDir } })
   const page = await application.firstWindow()
-  await expect(page.getByRole('heading', { name: '让工作，有条不紊。' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
   return [application, page]
 }
 

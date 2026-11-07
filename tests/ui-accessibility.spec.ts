@@ -39,6 +39,9 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
     await expect(page.locator('.workspace-popover > button')).toHaveCount(2)
     await expect(page.getByRole('heading', { name: '最近更新' })).toHaveCount(0)
     const compactMenu = (await page.locator('.workspace-popover').boundingBox())!
+    const triggerBox = (await workspace.boundingBox())!
+    expect(compactMenu.x).toBeCloseTo(triggerBox.x + triggerBox.width + 8, 3)
+    expect(compactMenu.y).toBeCloseTo(triggerBox.y, 3)
     expect(compactMenu.width).toBe(184)
     expect(compactMenu.height).toBeLessThanOrEqual(80)
     await page.screenshot({ path: info.outputPath('workspace-menu.png'), scale: 'css' })
@@ -61,7 +64,7 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
     await expect(workspace).toHaveAttribute('aria-expanded', 'false')
     await workspace.click()
     await news.click()
-    await page.getByRole('heading', { name: '工作台', exact: true }).click()
+    await page.getByRole('searchbox', { name: '搜索项目或客户' }).click()
     await expect(workspace).toHaveAttribute('aria-expanded', 'false')
     await workspace.click()
     await expect(news).toBeVisible()
@@ -83,5 +86,20 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1050, 700))
     const width = await page.evaluate(() => document.documentElement.scrollWidth)
     expect(width).toBeLessThanOrEqual(1050)
+    for (const [width, height] of [[1050, 700], [1280, 800], [1600, 1000]]) {
+      await application.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setContentSize(...size as [number, number]), [width, height])
+      await workspace.click()
+      const trigger = (await workspace.boundingBox())!
+      for (const level of ['menu', 'news']) {
+        if (level === 'news') await news.click()
+        const popup = (await page.locator('.workspace-popover').boundingBox())!
+        expect(popup.x).toBeCloseTo(trigger.x + trigger.width + 8, 3)
+        expect(popup.y).toBeCloseTo(trigger.y, 3)
+        expect(popup.x + popup.width).toBeLessThan(width)
+        expect(popup.y + popup.height).toBeLessThan(height)
+      }
+      await page.keyboard.press('Escape')
+      await page.keyboard.press('Escape')
+    }
   } finally { await application.close(); fs.rmSync(root, { recursive: true, force: true }) }
 })

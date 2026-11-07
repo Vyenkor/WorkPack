@@ -107,7 +107,13 @@ async function flushPendingView() {
     do {
       pendingViewDirty = false
       const requested = currentPendingView()
-      const saved = await window.workpack.savePendingView(requested)
+      let saved: PendingViewState
+      try { saved = await window.workpack.savePendingView(requested) }
+      catch {
+        // Drain edits queued during a failed write, but do not retry an unchanged failure.
+        if (pendingViewDirty) continue
+        break
+      }
       if (pendingViewDirty) continue
       const projectChanged = saved.filter.projectId !== pendingFilter.projectId
       if (!projectChanged) continue
@@ -254,6 +260,8 @@ function trapTab(event: KeyboardEvent, root: HTMLElement | null) {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
 }
 function handleModalKeydown(event: KeyboardEvent) {
+  // Let the native picker consume Escape before the containing dialog handles it.
+  if (event.key === 'Escape' && modalCard.value?.querySelector('select:open')) { event.stopPropagation(); return }
   if (event.key === 'Escape') { event.preventDefault(); requestCloseModal(); return }
   if (event.key !== 'Tab') return
   trapTab(event, modalCard.value)
@@ -300,6 +308,7 @@ function closeDrawer(restoreFocus = false) {
   if (restoreFocus) restoreDrawerFocus(origin)
 }
 function requestCloseDrawer() {
+  if (busy.value) return
   if (modal.value) { requestCloseModal(); return }
   clearToast()
   closeDrawer(true)

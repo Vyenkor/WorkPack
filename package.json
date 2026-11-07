@@ -1,6 +1,6 @@
 {
   "name": "workpack",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "WorkPack 项目业务文件管理",
   "main": "out/main/index.js",
   "author": "WorkPack",

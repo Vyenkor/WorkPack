@@ -5,6 +5,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 README = (ROOT / "README.md").read_text(encoding="utf-8")
+DEVELOPMENT = (ROOT / "docs/DEVELOPMENT.md").read_text(encoding="utf-8")
 LOCKFILE_NAMES = {
     "package-lock.json",
     "pnpm-lock.yaml",
@@ -66,15 +67,16 @@ class CiWorkflowTest(unittest.TestCase):
         self.assertIn("--verify-tag", text)
 
     def test_readme_documents_the_ci_gate_and_leaves_e2e_local(self):
-        self.assertIn(".github/workflows/ci.yml", README)
+        self.assertIn("docs/DEVELOPMENT.md", README)
+        self.assertIn(".github/workflows/ci.yml", DEVELOPMENT)
         self.assertIn("npm ci", README)
         self.assertIn("npm run typecheck", README)
         self.assertIn("npm test", README)
         self.assertIn("npm run test:e2e", README)
         self.assertIn("Node.js 26", README)
-        self.assertIn("scripts/installer-smoke.ps1", README)
-        self.assertIn(".github/workflows/release.yml", README)
-        self.assertIn("git tag v", README)
+        self.assertIn("scripts/installer-smoke.ps1", DEVELOPMENT)
+        self.assertIn(".github/workflows/release.yml", DEVELOPMENT)
+        self.assertIn("git tag v", DEVELOPMENT)
 
 
 if __name__ == "__main__":

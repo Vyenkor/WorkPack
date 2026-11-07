@@ -33,10 +33,24 @@ const snapshot = ref<Snapshot>(emptySnapshot())
 const view = ref<MainView>('home')
 const sidebarCollapsed = ref(false)
 const workspaceMenu = ref(false)
+const workspaceNews = ref(false)
 const workspaceTrigger = ref<HTMLButtonElement | null>(null)
+const newsTrigger = ref<HTMLButtonElement | null>(null)
+const newsBack = ref<HTMLButtonElement | null>(null)
+let changingWorkspaceNews = false
+function toggleWorkspaceMenu() { workspaceNews.value = false; workspaceMenu.value = !workspaceMenu.value }
 function closeWorkspaceMenu() { workspaceMenu.value = false; workspaceTrigger.value?.focus() }
+async function showWorkspaceNews(show: boolean) {
+  changingWorkspaceNews = true
+  workspaceNews.value = show
+  await nextTick()
+  const target = show ? newsBack.value : newsTrigger.value
+  target?.focus()
+  changingWorkspaceNews = false
+}
+function workspaceEscape() { if (workspaceNews.value) void showWorkspaceNews(false); else closeWorkspaceMenu() }
 function workspaceFocusOut(event: FocusEvent) {
-  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) workspaceMenu.value = false
+  if (!changingWorkspaceNews && !(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) workspaceMenu.value = false
 }
 const storageLocations = ref<StorageLocations>({ project: '', template: '', workspace: '' })
 const storageNotice = ref('')
@@ -565,7 +579,20 @@ onBeforeUnmount(() => {
       <button class="icon-button" type="button" aria-label="前进一步" title="前进一步（Alt+→）" :disabled="nextPageIndex < 0 || busy || loading" @click="travelPage(1)"><UiIcon name="forward" /></button>
     </nav>
     <aside v-show="!sidebarCollapsed" id="workspace-sidebar" class="sidebar" :inert="drawerOpen || Boolean(modal)">
-      <div class="workspace-control" @focusout="workspaceFocusOut"><button ref="workspaceTrigger" type="button" class="workspace-switch" aria-controls="workspace-menu" :aria-expanded="workspaceMenu" @click="workspaceMenu = !workspaceMenu" @keydown.esc.stop.prevent="closeWorkspaceMenu"><span class="workspace-avatar">W</span><span>我的工作空间</span><UiIcon name="chevron-down" /></button><div v-if="workspaceMenu" id="workspace-menu" class="workspace-popover" @keydown.esc.stop.prevent="closeWorkspaceMenu"><section class="whats-new" aria-label="这次更新了什么"><h3>这次更新了什么</h3><ul><li>浅色工作区与紧凑列表</li><li>文件库新增搜索与分类筛选</li><li>待处理默认显示未完成文件</li><li>存储路径支持一键复制</li></ul></section><button type="button" @click="go('settings')"><UiIcon name="settings" />设置</button></div></div>
+      <div class="workspace-control" @focusout="workspaceFocusOut">
+        <button ref="workspaceTrigger" type="button" class="workspace-switch" aria-controls="workspace-menu" :aria-expanded="workspaceMenu" @click="toggleWorkspaceMenu" @keydown.esc.stop.prevent="closeWorkspaceMenu"><span class="workspace-avatar">W</span><span>我的工作空间</span><UiIcon name="chevron-down" /></button>
+        <div v-if="workspaceMenu" id="workspace-menu" class="workspace-popover" :class="{ 'news-view': workspaceNews }" @click.stop @keydown.esc.stop.prevent="workspaceEscape">
+          <template v-if="!workspaceNews">
+            <button ref="newsTrigger" type="button" @click="showWorkspaceNews(true)"><UiIcon name="file" /><span>News</span><UiIcon name="forward" class="submenu-arrow" /></button>
+            <button type="button" @click="go('settings')"><UiIcon name="settings" />设置</button>
+          </template>
+          <section v-else class="whats-new" aria-label="最近更新">
+            <div class="news-heading"><button ref="newsBack" type="button" class="icon-button" aria-label="返回工作空间菜单" @click="showWorkspaceNews(false)"><UiIcon name="back" /></button><h3>最近更新</h3></div>
+            <time datetime="2026-11-07">2026年11月7日</time>
+            <ul><li>浅色工作区与紧凑列表</li><li>侧栏支持折叠、返回与前进</li><li>统一字体、图标及控件尺寸</li><li>减淡分隔线，精简页面布局</li></ul>
+          </section>
+        </div>
+      </div>
       <nav class="nav" aria-label="主导航">
         <button type="button" :aria-current="(view === 'home') ? 'page' : undefined" @click="go('home')"><NavIcon class="nav-icon" name="home" />工作台</button>
         <button type="button" :aria-current="(view === 'projects' || view === 'project') ? 'page' : undefined" @click="go('projects')"><NavIcon class="nav-icon" name="projects" />项目</button>

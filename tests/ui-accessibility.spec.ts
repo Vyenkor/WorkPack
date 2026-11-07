@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 const electronExecutable = require('electron') as string
 
-test('navigation, workspace menu, and storage settings follow the desktop layout', async () => {
+test('navigation, workspace menu, and storage settings follow the desktop layout', async ({}, info) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-accessibility-'))
   const application = await _electron.launch({ executablePath: electronExecutable, args: ['.'], env: { ...process.env, WORKPACK_TEST_DATA: path.join(root, 'data') } })
   try {
@@ -36,13 +36,36 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
     const workspace = page.getByRole('button', { name: '我的工作空间' })
     await workspace.click()
     await expect(workspace).toHaveAttribute('aria-expanded', 'true')
-    await expect(page.getByRole('heading', { name: '这次更新了什么' })).toBeVisible()
+    await expect(page.locator('.workspace-popover > button')).toHaveCount(2)
+    await expect(page.getByRole('heading', { name: '最近更新' })).toHaveCount(0)
+    const compactMenu = (await page.locator('.workspace-popover').boundingBox())!
+    expect(compactMenu.width).toBe(184)
+    expect(compactMenu.height).toBeLessThanOrEqual(80)
+    await page.screenshot({ path: info.outputPath('workspace-menu.png'), scale: 'css' })
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('button', { name: '设置', exact: true })).toBeFocused()
+    const news = page.getByRole('button', { name: 'News', exact: true })
+    await expect(news).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('heading', { name: '最近更新' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '返回工作空间菜单' })).toBeFocused()
+    await expect(page.locator('.whats-new li')).toHaveCount(4)
+    await page.screenshot({ path: info.outputPath('workspace-news.png'), scale: 'css' })
+    await page.keyboard.press('Escape')
+    await expect(news).toBeFocused()
+    await expect(workspace).toHaveAttribute('aria-expanded', 'true')
+    await news.click()
+    await page.getByRole('button', { name: '返回工作空间菜单' }).click()
+    await expect(news).toBeFocused()
     await page.keyboard.press('Escape')
     await expect(workspace).toBeFocused()
     await expect(workspace).toHaveAttribute('aria-expanded', 'false')
     await workspace.click()
+    await news.click()
+    await page.getByRole('heading', { name: '工作台', exact: true }).click()
+    await expect(workspace).toHaveAttribute('aria-expanded', 'false')
+    await workspace.click()
+    await expect(news).toBeVisible()
+    await expect(page.getByRole('heading', { name: '最近更新' })).toHaveCount(0)
     await page.getByRole('button', { name: '设置', exact: true }).click()
     await expect(page.getByRole('heading', { name: '设置' })).toBeVisible()
     await expect(page.locator('.storage-row')).toHaveCount(3)

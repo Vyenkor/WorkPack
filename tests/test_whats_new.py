@@ -8,10 +8,13 @@ STYLE = (ROOT / "src" / "renderer" / "src" / "style.css").read_text(encoding="ut
 
 
 class WhatsNewTest(unittest.TestCase):
-    def test_workspace_menu_lists_only_this_release_changes(self):
+    def test_workspace_menu_keeps_release_changes_in_news(self):
         menu = APP.split('id="workspace-menu"', 1)[1].split('</aside>', 1)[0]
-        self.assertIn("这次更新了什么", menu)
-        for item in ("浅色工作区与紧凑列表", "文件库新增搜索与分类筛选", "待处理默认显示未完成文件", "存储路径支持一键复制"):
+        self.assertIn('v-if="!workspaceNews"', menu)
+        self.assertIn('<span>News</span>', menu)
+        self.assertIn('v-else class="whats-new"', menu)
+        self.assertIn("最近更新", menu)
+        for item in ("浅色工作区与紧凑列表", "侧栏支持折叠、返回与前进", "统一字体、图标及控件尺寸", "减淡分隔线，精简页面布局"):
             self.assertIn(f"<li>{item}</li>", menu)
         self.assertEqual(menu.count("<li>"), 4)
         self.assertIn('go(\'settings\')', menu)

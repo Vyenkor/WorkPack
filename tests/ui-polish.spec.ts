@@ -56,7 +56,7 @@ test('empty messages, plain breadcrumbs and selection feedback stay consistent a
   await expect(nav('项目')).toHaveCSS('background-color', hoveringFill)
   await expect(nav('文件库')).toHaveCSS('background-color', selectedFill)
   await page.keyboard.press('Control+k')
-  await expect(page.getByRole('searchbox', { name: '搜索项目或客户' })).toBeFocused()
+  await expect(page.getByRole('searchbox', { name: '搜索项目或任意内容' })).toBeFocused()
   await page.screenshot({ path: info.outputPath('library-empty-polish.png'), scale: 'css' })
   await nav('项目').click()
   await expect(page.locator('.projects-page .empty-icon')).toHaveAttribute('data-icon', 'cube')
@@ -72,7 +72,8 @@ test('search focus, aligned lists and dropdowns follow the compact desktop layou
   await clip('.nav', 'nav.png', info)
 
   await page.keyboard.press('Control+k')
-  const search = page.getByRole('searchbox', { name: '搜索项目或客户' })
+  const search = page.getByRole('searchbox', { name: '搜索项目或任意内容' })
+  await expect(search).toHaveAttribute('placeholder', '搜索项目或任意内容')
   await expect(search).toBeFocused()
   await expect(search).toHaveCSS('outline-style', 'none')
   await expect(page.locator('.global-search')).toHaveCSS('border-color', 'rgb(80, 91, 199)')

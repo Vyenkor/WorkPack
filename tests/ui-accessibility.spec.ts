@@ -64,7 +64,7 @@ test('navigation, workspace menu, and storage settings follow the desktop layout
     await expect(workspace).toHaveAttribute('aria-expanded', 'false')
     await workspace.click()
     await news.click()
-    await page.getByRole('searchbox', { name: '搜索项目或客户' }).click()
+    await page.getByRole('searchbox', { name: '搜索项目或任意内容' }).click()
     await expect(workspace).toHaveAttribute('aria-expanded', 'false')
     await workspace.click()
     await expect(news).toBeVisible()

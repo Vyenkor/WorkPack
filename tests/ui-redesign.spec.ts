@@ -48,7 +48,7 @@ test('Linear light empty pages, six dialogs and minimum desktop window', async (
   const shell = await page.evaluate(() => ({ color: getComputedStyle(document.body).color, background: getComputedStyle(document.querySelector('.app-shell')!).backgroundColor, left: document.querySelector('.sidebar')!.getBoundingClientRect().left, radius: getComputedStyle(document.querySelector('.sidebar')!).borderRadius }))
   expect(shell).toMatchObject({ background: 'rgb(237, 237, 238)', left: 0, radius: '0px' })
   await expect(page.locator('.view')).toHaveCSS('border-top-left-radius', '12px')
-  await page.keyboard.press('Control+k'); await expect(page.getByRole('searchbox', { name: '搜索项目或客户' })).toBeFocused()
+  await page.keyboard.press('Control+k'); await expect(page.getByRole('searchbox', { name: '搜索项目或任意内容' })).toBeFocused()
   await nav('待处理').click(); await expect(page.getByRole('heading', { name: '暂无事项' })).toBeVisible()
   await page.screenshot({ path: info.outputPath('02-pending.png'), scale: 'css' })
   await nav('文件库').click(); await page.screenshot({ path: info.outputPath('03-library-empty.png'), scale: 'css' })

@@ -19,7 +19,7 @@ function selectedDirectory(value: string) {
 }
 function isDirectory(value: string) { try { return fs.statSync(value).isDirectory() } catch { return false } }
 function isFile(value: string) { try { return fs.statSync(value).isFile() } catch { return false } }
-const templateManifestSchema = z.object({ source: z.string(), files: z.array(z.object({ path: z.string(), sha256: z.string() })) })
+const templateManifestSchema = z.object({ source: z.string(), files: z.array(z.object({ path: z.string(), sha256: z.string(), staging: z.string().optional() })) })
 type TemplateManifest = z.infer<typeof templateManifestSchema>
 /** Streams in fixed-size chunks so memory stays bounded and the main process keeps handling events however large a template is. */
 export async function fileDigest(file: string) {
@@ -262,16 +262,22 @@ export class StorageManager {
       return parsed.success ? parsed.data : null
     } catch { return null }
   }
-  /** Removes copies left by an interrupted move from the same source. Files that differ from the recorded copy are kept. */
+  /**
+   * Removes copies left by an interrupted move from the same source. A staging file has a name no one else uses and is
+   * always ours; a file at its final name is ours only when it matches the recorded copy.
+   */
   private async clearTemplateResidue(directory: string, sourceRoot: string) {
     const manifest = this.readTemplateManifest(directory)
     if (manifest?.source !== sourceRoot) return
     for (const file of manifest.files) {
-      let target: string
-      try { target = inside(directory, file.path, '模板') } catch { continue }
-      if (!isFile(target) || await fileDigest(target) !== file.sha256) continue
-      fs.rmSync(target)
-      for (let dir = path.dirname(target); dir !== directory && isSameOrInside(dir, directory) && !fs.readdirSync(dir).length; dir = path.dirname(dir)) fs.rmdirSync(dir)
+      let target: string, staging: string | undefined
+      try {
+        target = inside(directory, file.path, '模板')
+        if (file.staging) staging = inside(directory, file.staging, '模板')
+      } catch { continue }
+      if (staging && isFile(staging)) fs.rmSync(staging)
+      if (isFile(target) && await fileDigest(target) === file.sha256) fs.rmSync(target)
+      for (let dir = path.dirname(target); dir !== directory && isSameOrInside(dir, directory) && isDirectory(dir) && !fs.readdirSync(dir).length; dir = path.dirname(dir)) fs.rmdirSync(dir)
     }
     fs.rmSync(this.templateManifestPath(directory), { force: true })
   }
@@ -286,21 +292,24 @@ export class StorageManager {
       this.locations = next
       return this.result(warning)
     }
-    const plan: Array<{ asset: { name: string; path: string }; source: string; target: string; sha256: string }> = []
+    const plan: Array<{ asset: { name: string; path: string }; source: string; target: string; staging: string; sha256: string }> = []
     for (const asset of this.service.snapshot().templates.flatMap(template => template.assets)) {
       const source = inside(sourceRoot, asset.path, '模板')
       if (!asset.exists) throw new Error(`模板文件已失效：${asset.name}`)
-      plan.push({ asset, source, target: inside(directory, asset.path, '模板'), sha256: await fileDigest(source) })
+      const target = inside(directory, asset.path, '模板')
+      const staging = inside(directory, path.join(path.dirname(asset.path), `.workpack-${randomUUID()}.tmp`), '模板')
+      plan.push({ asset, source, target, staging, sha256: await fileDigest(source) })
     }
     await this.clearTemplateResidue(directory, sourceRoot)
     // The manifest must never list a file that was there before the move, or a retry would delete it as residue.
     const taken = plan.find(file => fs.existsSync(file.target))
     if (taken) throw new Error(`目标目录已有同名文件：${taken.asset.name}`)
-    this.writeTemplateManifest(directory, { source: sourceRoot, files: plan.map(file => ({ path: file.asset.path, sha256: file.sha256 })) })
+    this.writeTemplateManifest(directory, { source: sourceRoot, files: plan.map(file => ({ path: file.asset.path, sha256: file.sha256, staging: path.relative(directory, file.staging) })) })
     const createdFiles: string[] = []
     const createdDirs: string[] = []
     try {
-      for (const { asset, source, target, sha256 } of plan) {
+      // A copy is written under its staging name and takes its final name only once verified, so a final name never holds a partial file.
+      for (const { asset, source, target, staging, sha256 } of plan) {
         if (fs.existsSync(target)) throw new Error(`目标目录已有同名文件：${asset.name}`)
         const parts = path.relative(directory, path.dirname(target)).split(path.sep)
         let current = directory
@@ -310,13 +319,16 @@ export class StorageManager {
           if (!fs.existsSync(current)) { fs.mkdirSync(current); createdDirs.push(current) }
           else if (!fs.statSync(current).isDirectory() || fs.lstatSync(current).isSymbolicLink()) throw new Error('目标目录包含非普通文件夹')
         }
-        try { await fs.promises.copyFile(source, target, fs.constants.COPYFILE_EXCL) }
+        try { await fs.promises.copyFile(source, staging, fs.constants.COPYFILE_EXCL) }
         catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'EEXIST' && fs.existsSync(target)) createdFiles.push(target)
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST' && fs.existsSync(staging)) createdFiles.push(staging)
           throw error
         }
-        createdFiles.push(target)
-        if (await fileDigest(target) !== sha256) throw new Error(`模板文件校验失败：${asset.name}`)
+        createdFiles.push(staging)
+        if (await fileDigest(staging) !== sha256) throw new Error(`模板文件校验失败：${asset.name}`)
+        if (fs.existsSync(target)) throw new Error(`目标目录已有同名文件：${asset.name}`)
+        await fs.promises.rename(staging, target)
+        createdFiles[createdFiles.length - 1] = target
       }
       this.write(next)
     } catch (error) {

@@ -358,6 +358,32 @@ describe('#44 template move interrupted before the pointer is written', () => {
       expect(w.manager.locations.template).toBe(fs.realpathSync(path.join(w.system, 'templates')))
     } finally { w.cleanup() }
   })
+  it('retries after the process stopped halfway through copying a file', async () => {
+    const w = workspace()
+    try {
+      const templates = seedTemplates(w)
+      const target = path.join(w.root, 'nas-templates')
+      fs.mkdirSync(target)
+      const finalNames = templates.map(t => path.join(target, t.assets[0].path))
+      const copy = vi.spyOn(fs.promises, 'copyFile').mockImplementation(async (_source, destination) => {
+        fs.writeFileSync(destination, '半')
+        throw new Error('进程中断')
+      })
+      const remove = vi.spyOn(fs, 'rmSync').mockImplementation(() => { throw new Error('进程中断') })
+      try { await expect(w.manager.change('template', target)).rejects.toThrow('进程中断') }
+      finally { copy.mockRestore(); remove.mockRestore() }
+      for (const name of finalNames) expect(fs.existsSync(name)).toBe(false)
+      expect(fs.readdirSync(path.dirname(finalNames[0])).filter(name => name.endsWith('.tmp'))).toHaveLength(1)
+
+      w.manager.close()
+      w.manager = new StorageManager(w.system, w.projects)
+      await w.manager.change('template', target)
+      expect(w.manager.locations.template).toBe(fs.realpathSync(target))
+      expect(finalNames.map(name => fs.readFileSync(name, 'utf8'))).toEqual(['甲内容', '乙内容'])
+      for (const name of finalNames) expect(fs.readdirSync(path.dirname(name))).toEqual([path.basename(name)])
+      expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(false)
+    } finally { w.cleanup() }
+  })
   it('drops a manifest left in the folder the pointer already names', async () => {
     const w = workspace()
     try {

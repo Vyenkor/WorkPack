@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { StorageManager, WorkspaceMissingError } from '../src/main/storage'
 import { numberedFileName, safeFileName } from '../src/main/service'
 import { findSearchTarget, localDateInput, type BusinessEvent, type Project } from '../src/shared/model'
@@ -73,6 +73,32 @@ describe('#50 configured workspace without its database', () => {
         expect(created.service.snapshot().templates).toEqual([])
       } finally { created.close() }
     } finally { fs.rmSync(w.root, { recursive: true, force: true }) }
+  })
+})
+
+describe('#56 project rename that only changes letter case', () => {
+  it('renames Alpha to ALPHA, still rejects a folder owned by something else, and rolls back on failure', () => {
+    const w = workspace()
+    try {
+      const service = w.manager.service
+      const input = { customer: '客户', contact: '', owner: '张三', note: '' }
+      const id = service.saveProject({ name: 'Alpha', ...input })
+      service.saveProject({ id, name: 'ALPHA', ...input })
+      expect(fs.readdirSync(w.projects)).toEqual(['ALPHA'])
+      expect(service.snapshot().projects[0]).toMatchObject({ name: 'ALPHA', folderExists: true })
+      expect(path.basename(service.projectPath(id))).toBe('ALPHA')
+
+      fs.mkdirSync(path.join(w.projects, 'Beta'))
+      expect(() => service.saveProject({ id, name: 'Beta', ...input })).toThrow('目标目录已存在')
+      service.saveProject({ id, name: 'Gamma', ...input })
+      expect(fs.readdirSync(w.projects).sort()).toEqual(['Beta', 'Gamma'])
+
+      const failing = vi.spyOn(service as unknown as { atomic: () => never }, 'atomic').mockImplementation(() => { throw new Error('写入失败') })
+      try { expect(() => service.saveProject({ id, name: 'GAMMA', ...input })).toThrow('写入失败') }
+      finally { failing.mockRestore() }
+      expect(fs.readdirSync(w.projects).sort()).toEqual(['Beta', 'Gamma'])
+      expect(service.snapshot().projects[0]).toMatchObject({ name: 'Gamma', folderExists: true })
+    } finally { w.cleanup() }
   })
 })
 

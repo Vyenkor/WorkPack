@@ -56,6 +56,12 @@ export function isSameOrInside(child: string, parent: string) {
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
 }
 function real(value: string) { try { return fs.realpathSync(value) } catch { return path.resolve(value) } }
+function sameEntry(a: string, b: string) {
+  try {
+    const left = fs.statSync(a, { bigint: true }), right = fs.statSync(b, { bigint: true })
+    return left.dev === right.dev && left.ino === right.ino
+  } catch { return false }
+}
 function present(file: string) { try { return fs.statSync(file).isFile() } catch { return false } }
 function folderPresent(file: string) { try { return fs.statSync(file).isDirectory() } catch { return false } }
 export const libraryDatabaseFile = 'workpack-v3.sqlite'
@@ -306,7 +312,8 @@ export class WorkPackService {
       let renamed = false
       try {
         if (newRoot !== oldRoot) {
-          if (fs.existsSync(newRoot)) throw new Error('目标目录已存在，请使用其他项目名称')
+          // A case-only change on a case-insensitive disk resolves to the project's own folder.
+          if (fs.existsSync(newRoot) && !sameEntry(newRoot, oldRoot)) throw new Error('目标目录已存在，请使用其他项目名称')
           fs.renameSync(oldRoot, newRoot); renamed = true
         }
         this.atomic((files, dirs) => {

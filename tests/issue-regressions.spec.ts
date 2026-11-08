@@ -165,6 +165,36 @@ test('issue 51: a rejected task toggle leaves each checkbox matching the saved s
   expect(await savedTasks()).toEqual([false, true])
 })
 
+test('issue 54: closed action menus register no global listeners', async () => {
+  await page.addInitScript(() => {
+    const live = { pointerdown: 0, scroll: 0, resize: 0 } as Record<string, number>
+    ;(window as unknown as { menuListeners: typeof live }).menuListeners = live
+    const add = EventTarget.prototype.addEventListener, remove = EventTarget.prototype.removeEventListener
+    const tracked = (target: EventTarget, type: string) => (target === document || target === window) && type in live
+    EventTarget.prototype.addEventListener = function (type: string, ...rest: any[]) { if (tracked(this, type)) live[type]++; return add.call(this, type, ...rest as [any, any]) }
+    EventTarget.prototype.removeEventListener = function (type: string, ...rest: any[]) { if (tracked(this, type)) live[type]--; return remove.call(this, type, ...rest as [any, any]) }
+  })
+  await page.evaluate(async () => { for (let n = 1; n <= 30; n++) await window.workpack.saveLibraryFile({ name: `模板${n}`, purpose: '' }) })
+  await page.reload()
+  const listeners = () => page.evaluate(() => (window as unknown as { menuListeners: Record<string, number> }).menuListeners)
+  await nav('文件库').click()
+  await expect(page.locator('.library-table tbody tr')).toHaveCount(30)
+  expect(await listeners()).toEqual({ pointerdown: 0, scroll: 0, resize: 0 })
+  const trigger = page.getByRole('button', { name: '模板1操作', exact: true })
+  await trigger.click()
+  await expect(page.locator('.action-menu-panel')).toBeVisible()
+  expect(await listeners()).toEqual({ pointerdown: 1, scroll: 1, resize: 1 })
+  await page.getByRole('heading', { name: '文件库', exact: true }).click()
+  await expect(page.locator('.action-menu-panel')).toHaveCount(0)
+  expect(await listeners()).toEqual({ pointerdown: 0, scroll: 0, resize: 0 })
+  await trigger.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.action-menu-panel button').first()).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(trigger).toBeFocused()
+  expect(await listeners()).toEqual({ pointerdown: 0, scroll: 0, resize: 0 })
+})
+
 test('issue 37: Escape dismisses the open category picker before the dirty template dialog', async () => {
   const confirmations: string[] = []
   page.on('dialog', async dialog => { confirmations.push(dialog.message()); await dialog.dismiss() })

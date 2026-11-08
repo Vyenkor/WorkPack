@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import UiIcon from './UiIcon.vue'
 withDefaults(defineProps<{ label?: string; disabled?: boolean }>(), { label: '更多操作' })
 const open = ref(false)
@@ -50,8 +50,15 @@ function reposition(event: Event) {
     left: `${Math.max(8, Math.min(box.right - 224, innerWidth - 232))}px`
   }
 }
-onMounted(() => { document.addEventListener('pointerdown', outside); window.addEventListener('resize', reposition); document.addEventListener('scroll', reposition, true) })
-onBeforeUnmount(() => { document.removeEventListener('pointerdown', outside); window.removeEventListener('resize', reposition); document.removeEventListener('scroll', reposition, true) })
+function listen(active: boolean) {
+  const method = active ? 'addEventListener' : 'removeEventListener'
+  document[method]('pointerdown', outside)
+  window[method]('resize', reposition)
+  document[method]('scroll', reposition, true)
+}
+// Lists can hold hundreds of closed menus; only the open one listens globally.
+watch(open, listen)
+onBeforeUnmount(() => { if (open.value) listen(false) })
 </script>
 <template>
   <div ref="root" class="action-menu" @keydown="keys" @focusout="focusOut" @click.stop>

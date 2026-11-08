@@ -34,6 +34,11 @@ export function inside(root: string, relative: string, area = '项目'): string 
   }
   return target
 }
+export function isSameOrInside(child: string, parent: string) {
+  const relative = path.relative(parent, child)
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+}
+function real(value: string) { try { return fs.realpathSync(value) } catch { return path.resolve(value) } }
 function present(file: string) { try { return fs.statSync(file).isFile() } catch { return false } }
 function folderPresent(file: string) { try { return fs.statSync(file).isDirectory() } catch { return false } }
 export const libraryDatabaseFile = 'workpack-v3.sqlite'
@@ -102,6 +107,13 @@ export class WorkPackService {
     })()
   }
   close() { this.db.close() }
+  projectFolders(): string[] { return (this.db.prepare('SELECT folder FROM projects').all() as Array<{ folder: string }>).map(row => real(row.folder)) }
+  /** A recursive delete under `directory` must not reach a storage root or another project. */
+  private assertNothingManagedInside(directory: string, ownProject: string) {
+    const roots = [this.dataDirectory, this.templateRoot, ...(this.projectRoot ? [this.projectRoot] : []), ...this.projectFolders()]
+    const target = real(directory)
+    if (roots.map(real).some(root => root !== real(ownProject) && isSameOrInside(root, target))) throw new Error('事项文件夹中包含存储位置或其他项目，已停止删除。请先在设置中把相关位置移出该事项文件夹')
+  }
   private get(table: string, value: string): Row {
     id.parse(value)
     const result = this.db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(value) as Row | undefined
@@ -353,6 +365,7 @@ export class WorkPackService {
     const trash = eventDir ? inside(eventsDir!, `.deleting_${event.id}`) : null
     let moved = false
     if (eventDir && trash && fs.existsSync(eventDir)) {
+      this.assertNothingManagedInside(eventDir, root!)
       try { fs.renameSync(eventDir, trash); moved = true }
       catch { throw new Error('事项文件夹中有文件正在使用，请关闭相关文件后重试') }
     }

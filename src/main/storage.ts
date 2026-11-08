@@ -4,7 +4,7 @@ import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import type { StorageChangeResult } from '../shared/model'
-import { inside, libraryDatabaseFile, WorkPackService } from './service'
+import { inside, isSameOrInside, libraryDatabaseFile, WorkPackService } from './service'
 
 export type StorageKind = 'project' | 'template' | 'workspace'
 export interface StorageLocations { project: string; template: string; workspace: string }
@@ -18,10 +18,6 @@ function selectedDirectory(value: string) {
   return fs.realpathSync(value)
 }
 function digest(file: string) { return createHash('sha256').update(fs.readFileSync(file)).digest('hex') }
-function isSameOrInside(child: string, parent: string) {
-  const relative = path.relative(parent, child)
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
-}
 function isDriveRoot(directory: string) {
   if (path.parse(directory).root === directory) return true
   try {
@@ -246,6 +242,7 @@ export class StorageManager {
     const directory = selectedDirectory(selected)
     if (directory === this.locations[kind]) return this.result()
     const warning = rejectUnsuitable(kind, directory)
+    if (this.service.projectFolders().some(folder => isSameOrInside(directory, folder))) throw new Error('不能选择项目文件夹或其中的目录，删除事项时会一并删除其中的文件')
     const next = { ...this.locations, [kind]: directory }
     if (kind === 'project') {
       this.write(next)

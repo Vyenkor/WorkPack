@@ -55,9 +55,13 @@ export function progress(items: Item[]) {
 export function unfinished(items: Item[]): number { return items.filter(item => gaps(item).length > 0).length }
 export type CompletionFilter = 'all' | 'open' | 'done'
 export interface PendingFilterQuery { keyword: string; projectId: string; customer: string; owner: string; status: CompletionFilter }
-export function matchesCompletionFilter(percent: number, hasWork: boolean, status: CompletionFilter) {
+/** Uses the same gaps as the pending page; the rounded percentage is for display only. */
+export function projectComplete(project: Project) {
+  const items = project.events.flatMap(event => event.items)
+  return items.length > 0 && items.every(item => gaps(item).length === 0)
+}
+export function matchesCompletionFilter(complete: boolean, status: CompletionFilter) {
   if (status === 'all') return true
-  const complete = percent === 100 && hasWork
   return status === 'done' ? complete : !complete
 }
 export function gaps(item: Item): string[] {

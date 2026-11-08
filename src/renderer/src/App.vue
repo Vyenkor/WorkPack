@@ -12,6 +12,7 @@ import {
   matchesCompletionFilter,
   matchesPendingQuery,
   progress,
+  projectComplete,
   type CompletionFilter,
   type PendingFilterQuery,
   type PendingGroupBy,
@@ -194,8 +195,7 @@ const filteredProjects = computed(() => {
   const keyword = projectFilter.keyword.trim().toLowerCase()
   return snapshot.value.projects.filter(project => {
     const matchesKeyword = !keyword || [project.name, project.customer, project.owner].some(value => value.toLowerCase().includes(keyword))
-    const percent = projectProgress(project).percent
-    return matchesKeyword && matchesCompletionFilter(percent, project.events.length > 0, projectFilter.status)
+    return matchesKeyword && matchesCompletionFilter(projectComplete(project), projectFilter.status)
   })
 })
 function sortedUnique(values: string[]) {

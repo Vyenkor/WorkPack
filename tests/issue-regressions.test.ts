@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { StorageManager, WorkspaceMissingError } from '../src/main/storage'
+import { numberedFileName, safeFileName } from '../src/main/service'
 
 function workspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-issues-'))
@@ -71,6 +72,41 @@ describe('#50 configured workspace without its database', () => {
         expect(created.service.snapshot().templates).toEqual([])
       } finally { created.close() }
     } finally { fs.rmSync(w.root, { recursive: true, force: true }) }
+  })
+})
+
+describe('#55 file names produced for duplicates', () => {
+  it('keeps numbered names within the file name limit and keeps the extension', () => {
+    expect(numberedFileName('报价.docx', 2)).toBe('报价 (2).docx')
+    const longest = `${'a'.repeat(251)}.txt`
+    expect(safeFileName(longest)).toBe(longest)
+    expect(() => safeFileName(`a${longest}`)).toThrow('255')
+    const numbered = numberedFileName(longest, 12)
+    expect(numbered).toHaveLength(255)
+    expect(numbered.endsWith(' (12).txt')).toBe(true)
+    expect(numberedFileName(`${'名'.repeat(240)}. .pdf`, 1).length).toBeLessThanOrEqual(255)
+    expect(() => safeFileName(numbered)).not.toThrow()
+  })
+  it('re-imports a 100-character file name and can still create matters and export from the numbered copy', () => {
+    const w = workspace()
+    try {
+      const service = w.manager.service
+      service.saveLibraryFile({ name: '长文件名', purpose: '', categoryId: null })
+      const template = service.snapshot().templates[0]
+      const source = file(w.root, `${'a'.repeat(96)}.txt`)
+      service.importLibraryFile(template.id, [source])
+      service.removeTemplateAsset(service.snapshot().templates[0].assets[0].id)
+      service.importLibraryFile(template.id, [source])
+      const asset = service.snapshot().templates[0].assets[0]
+      expect(path.basename(asset.path)).toBe(`${'a'.repeat(96)} (1).txt`)
+      const projectId = service.saveProject({ name: '项目甲', customer: '客户', contact: '', owner: '张三', note: '' })
+      service.createLibraryEvent({ projectId, templateIds: [template.id], name: '借用', date: '2026-11-07', owner: '张三' })
+      expect(service.snapshot().projects[0].events[0].items[0].attachments[0].exists).toBe(true)
+      const exported = path.join(w.root, 'exported')
+      fs.mkdirSync(exported)
+      expect(service.exportTemplates([asset.id], exported)).toBe(1)
+      expect(fs.readdirSync(exported)).toEqual([`${'a'.repeat(96)} (1).txt`])
+    } finally { w.cleanup() }
   })
 })
 

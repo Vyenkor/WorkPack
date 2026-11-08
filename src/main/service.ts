@@ -14,10 +14,27 @@ const eventUpdateSchema = z.object({ id, projectId: id, name, date: dateSchema, 
 const itemSchema = z.object({ id: id.optional(), eventId: id, name, note: text })
 type Row = Record<string, any>
 
-export function safeName(value: string): string {
-  const result = name.parse(value)
+/** Windows limits one path component to 255 UTF-16 code units. */
+const maxFileName = 255
+function windowsSafe(result: string) {
   if (/[<>:"/\\|?*\x00-\x1f]/.test(result) || /[. ]$/.test(result) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(result) || result === '.' || result === '..') throw new Error('名称不能包含 Windows 保留名称、特殊字符或末尾句点')
   return result
+}
+export function safeName(value: string): string { return windowsSafe(name.parse(value)) }
+export function safeFileName(value: string): string {
+  if (!value.trim()) throw new Error('文件名不能为空')
+  if (value.length > maxFileName) throw new Error(`文件名不能超过 ${maxFileName} 个字符`)
+  return windowsSafe(value)
+}
+/** `name (n).ext`, shortening the name rather than the extension so the result stays a valid file name. */
+export function numberedFileName(original: string, n: number): string {
+  const { name: stem, ext } = path.parse(original), suffix = ` (${n})`
+  const room = maxFileName - suffix.length - ext.length
+  if (room < 1) throw new Error('文件扩展名过长，无法生成不重名的文件名')
+  const chars = Array.from(stem)
+  while (chars.join('').length > room) chars.pop()
+  const shortened = chars.join('').replace(/[. ]+$/, '')
+  return `${shortened || '_'}${suffix}${ext}`
 }
 function directory(value: string) {
   if (!path.isAbsolute(value) || !fs.statSync(value).isDirectory()) throw new Error('目录不存在，请重新选择')
@@ -155,9 +172,9 @@ export class WorkPackService {
   }
   private copy(source: string, targetDir: string, files: string[]): string {
     if (!present(source)) throw new Error(`来源文件不存在：${path.basename(source)}`)
-    const original = safeName(path.basename(source)), parsed = path.parse(original)
+    const original = safeFileName(path.basename(source))
     for (let n = 0; n < 10000; n++) {
-      const target = path.join(targetDir, n ? `${parsed.name} (${n})${parsed.ext}` : original)
+      const target = path.join(targetDir, n ? numberedFileName(original, n) : original)
       if (fs.existsSync(target)) continue
       try { this.copyFile(source, target, fs.constants.COPYFILE_EXCL) }
       catch (error) {

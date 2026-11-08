@@ -9,6 +9,7 @@ import {
   gaps,
   defaultPendingFilter,
   groupPendingRows,
+  localDateInput,
   matchesCompletionFilter,
   matchesPendingQuery,
   progress,
@@ -134,7 +135,7 @@ const modalCard = ref<HTMLElement | null>(null)
 const modalBaseline = ref('')
 
 const projectForm = reactive({ id: '', name: '', customer: '', contact: '', owner: '', note: '', directoryPath: '' })
-const eventForm = reactive({ id: '', projectId: '', templateIds: [] as string[], name: '', date: new Date().toISOString().slice(0, 10), owner: '' })
+const eventForm = reactive({ id: '', projectId: '', templateIds: [] as string[], name: '', date: localDateInput(), owner: '' })
 const templateForm = reactive({ id: '', name: '', purpose: '', categoryId: '' })
 const categoryForm = reactive({ id: '', name: '' })
 const taskForm = reactive({ itemId: '', name: '' })
@@ -455,7 +456,7 @@ async function saveProject() {
   if (project) openProject(project)
 }
 
-function resetEventForm(project: Project, event?: BusinessEvent) { Object.assign(eventForm, event ? { id: event.id, projectId: project.id, templateIds: [...event.templateIds], name: event.name, date: event.date, owner: event.owner } : { id: '', projectId: project.id, templateIds: [], name: '', date: new Date().toISOString().slice(0, 10), owner: project.owner }) }
+function resetEventForm(project: Project, event?: BusinessEvent) { Object.assign(eventForm, event ? { id: event.id, projectId: project.id, templateIds: [...event.templateIds], name: event.name, date: event.date, owner: event.owner } : { id: '', projectId: project.id, templateIds: [], name: '', date: localDateInput(), owner: project.owner }) }
 function openEventModal(project = activeProject.value, event?: BusinessEvent) { if (!project) return; clearToast(); resetEventForm(project, event); modal.value = 'event'; markModalClean() }
 async function saveEvent() {
   if (!eventForm.name.trim() || (!eventForm.id && !eventForm.templateIds.length) || !eventForm.owner.trim()) { showToast('请填写事项名称、选择文件并填写经办人', 'error'); return }

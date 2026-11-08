@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { StorageManager, WorkspaceMissingError } from '../src/main/storage'
 import { numberedFileName, safeFileName } from '../src/main/service'
+import { localDateInput } from '../src/shared/model'
 
 function workspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-issues-'))
@@ -72,6 +73,20 @@ describe('#50 configured workspace without its database', () => {
         expect(created.service.snapshot().templates).toEqual([])
       } finally { created.close() }
     } finally { fs.rmSync(w.root, { recursive: true, force: true }) }
+  })
+})
+
+describe('#45 default matter date', () => {
+  it('uses the local calendar date around midnight and year boundaries', () => {
+    expect(localDateInput(new Date(2026, 10, 7, 0, 30))).toBe('2026-11-07')
+    expect(localDateInput(new Date(2026, 10, 7, 23, 59))).toBe('2026-11-07')
+    expect(localDateInput(new Date(2027, 0, 1, 0, 0))).toBe('2027-01-01')
+    expect(localDateInput(new Date(2026, 1, 28, 7, 59))).toBe('2026-02-28')
+  })
+  it('differs from the UTC date when local time is ahead of UTC', () => {
+    const early = new Date(2026, 10, 7, 0, 30)
+    if (early.getTimezoneOffset() < 0) expect(early.toISOString().slice(0, 10)).toBe('2026-11-06')
+    expect(localDateInput(early)).toBe('2026-11-07')
   })
 })
 

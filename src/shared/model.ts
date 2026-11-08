@@ -44,6 +44,10 @@ export interface WorkPackAPI {
   unavailableStorage(): Promise<(keyof StorageLocations)[]>
   chooseStorageLocation(kind: keyof StorageLocations): Promise<StorageChangeResult | null>
 }
+/** `YYYY-MM-DD` on the user's calendar. `toISOString()` gives the UTC date instead. */
+export function localDateInput(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
 export function progress(items: Item[]) {
   let total = 0, done = 0
   for (const item of items) for (const task of item.tasks) {

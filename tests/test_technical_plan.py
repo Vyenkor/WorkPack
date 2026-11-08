@@ -46,6 +46,17 @@ class TechnicalPlanTest(unittest.TestCase):
             self.assertNotIn("选择流程", content)
             self.assertNotIn("不适用的步骤", content)
 
+    def test_acceptance_plan_references_the_published_release_and_final_review(self):
+        content = (BASELINE / "MVP实施与验收计划.md").read_text(encoding="utf-8")
+        for reference in [
+            "https://github.com/Vyenkor/WorkPack/releases/tag/v0.3.1",
+            "https://github.com/Vyenkor/WorkPack/commit/ae7c9afd87e67d2b33b0d16aad0f177e055e9a59",
+            "https://github.com/Vyenkor/WorkPack/commit/98e66b6594d90083f60d6c47c9c0e2b0094f4db1",
+        ]:
+            self.assertIn(reference, content)
+        self.assertNotIn("709fc3c", content)
+        self.assertNotIn("5b02b97", content)
+
     def test_plan_covers_local_data_and_file_handling_boundaries(self):
         content = PLAN.read_text(encoding="utf-8")
 

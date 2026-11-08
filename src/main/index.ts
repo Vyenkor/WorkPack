@@ -66,6 +66,7 @@ function registerIPC() {
   handle('setDocumentTaskDone', value => service.setDocumentTaskDone(value))
   handle('deleteDocumentTask', value => service.deleteDocumentTask(stringId.parse(value)))
   handle('storageLocations', () => ({ ...storage.locations }))
+  handle('unavailableStorage', () => storage.unavailable())
   handle('chooseStorageLocation', async value => {
     const kind = z.enum(['project', 'template', 'workspace']).parse(value) as StorageKind
     const folder = await selectFolder()

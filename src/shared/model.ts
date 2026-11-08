@@ -8,7 +8,7 @@ export interface BusinessEvent { id: string; projectId: string; templateId: stri
 export interface Project { id: string; name: string; customer: string; contact: string; owner: string; note: string; folder: string; folderExists: boolean; events: BusinessEvent[] }
 export interface Snapshot { projects: Project[]; templates: Template[]; categories: LibraryCategory[]; pendingView: PendingViewState }
 export interface StorageLocations { project: string; template: string; workspace: string }
-export interface StorageChangeResult { locations: StorageLocations; warning?: string }
+export interface StorageChangeResult { locations: StorageLocations; unavailable: (keyof StorageLocations)[]; warning?: string }
 export interface ProjectInput { id?: string; name: string; customer: string; contact: string; owner: string; note: string }
 export interface EventInput { projectId: string; templateIds: string[]; name: string; date: string; owner: string }
 export interface EventUpdateInput { id: string; projectId: string; name: string; date: string; owner: string }
@@ -41,6 +41,7 @@ export interface WorkPackAPI {
   setDocumentTaskDone(input: { id: string; done: boolean }): Promise<void>
   deleteDocumentTask(id: string): Promise<void>
   storageLocations(): Promise<StorageLocations>
+  unavailableStorage(): Promise<(keyof StorageLocations)[]>
   chooseStorageLocation(kind: keyof StorageLocations): Promise<StorageChangeResult | null>
 }
 export function progress(items: Item[]) {

@@ -17,6 +17,7 @@ function selectedDirectory(value: string) {
   if (!path.isAbsolute(value) || !fs.existsSync(value) || !fs.statSync(value).isDirectory()) throw new Error('请选择已存在的目录')
   return fs.realpathSync(value)
 }
+function isDirectory(value: string) { try { return fs.statSync(value).isDirectory() } catch { return false } }
 function digest(file: string) { return createHash('sha256').update(fs.readFileSync(file)).digest('hex') }
 function isDriveRoot(directory: string) {
   if (path.parse(directory).root === directory) return true
@@ -118,6 +119,10 @@ export class StorageManager {
       if (!path.isAbsolute(next[key])) throw new Error('存储配置中的路径必须是绝对路径')
       if (key === 'workspace' && workspaceMustExist) {
         if (!fs.existsSync(this.databasePath(next[key]))) throw new WorkspaceMissingError(next[key])
+      } else if (key !== 'workspace' && !isDirectory(next[key]) && path.resolve(next[key]) !== path.resolve(this.defaults[key])) {
+        // An offline drive or share stays configured and is reported as unavailable.
+        next[key] = path.resolve(next[key])
+        continue
       } else fs.mkdirSync(next[key], { recursive: true })
       next[key] = fs.realpathSync(next[key])
       if (!fs.statSync(next[key]).isDirectory()) throw new Error('存储位置必须是文件夹')
@@ -134,8 +139,8 @@ export class StorageManager {
     catch (error) { fs.rmSync(temp, { force: true }); throw error }
   }
   private result(warning?: string): StorageChangeResult {
-    const locations = { ...this.locations }
-    return warning ? { locations, warning } : { locations }
+    const locations = { ...this.locations }, unavailable = this.unavailable()
+    return warning ? { locations, unavailable, warning } : { locations, unavailable }
   }
   private databasePath(workspace: string) { return path.join(workspace, libraryDatabaseFile) }
   private markerPath(destination: string) { return path.join(path.dirname(destination), `.${path.basename(destination)}.migrating`) }
@@ -224,8 +229,17 @@ export class StorageManager {
     try { fs.rmSync(this.markerPath(destination), { force: true }) } catch { /* The next launch removes a marker in the committed directory. */ }
     return this.result(warning)
   }
+  /** Project and template folders that cannot be reached right now, such as a disconnected drive. */
+  unavailable(): StorageKind[] { return (['project', 'template'] as const).filter(kind => !isDirectory(this.locations[kind])) }
   private changeTemplates(directory: string, next: StorageLocations, warning?: string): StorageChangeResult {
     const sourceRoot = this.locations.template
+    if (!isDirectory(sourceRoot)) {
+      // Nothing can be copied from an unreachable folder; point at the folder the user chose instead.
+      this.write(next)
+      this.service.templateRoot = directory
+      this.locations = next
+      return this.result(warning)
+    }
     const assets = this.service.snapshot().templates.flatMap(template => template.assets)
     const createdFiles: string[] = []
     const createdDirs: string[] = []

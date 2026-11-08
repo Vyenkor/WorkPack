@@ -54,6 +54,7 @@ function workspaceFocusOut(event: FocusEvent) {
 }
 const storageLocations = ref<StorageLocations>({ project: '', template: '', workspace: '' })
 const storageNotice = ref('')
+const unavailableStorage = ref<(keyof StorageLocations)[]>([])
 const activeProjectId = ref<string | null>(null)
 const activeEventId = ref<string | null>(null)
 const drawerOpen = ref(false)
@@ -544,6 +545,7 @@ async function chooseStorage(kind: keyof StorageLocations) {
     const result = await window.workpack.chooseStorageLocation(kind)
     if (!result) return
     storageLocations.value = result.locations
+    unavailableStorage.value = result.unavailable
     storageNotice.value = result.warning ?? ''
     await refresh(false)
     showToast('存储位置已更新')
@@ -568,6 +570,11 @@ watch(drawerOpen, open => { if (open) focusDrawer() })
 onMounted(() => {
   refresh()
   window.workpack.storageLocations().then(value => { storageLocations.value = value }).catch(() => {})
+  window.workpack.unavailableStorage().then(kinds => {
+    unavailableStorage.value = kinds
+    const labels = storageKinds.filter(kind => kinds.includes(kind.key)).map(kind => kind.label)
+    if (labels.length) showToast(`${labels.join('、')}当前不可用，请连接所在磁盘或在设置中重新选择`, 'error')
+  }).catch(() => {})
   document.addEventListener('click', handleModalClick, true)
   document.addEventListener('click', handleWorkspaceOutside)
   document.addEventListener('keydown', searchShortcut)
@@ -678,7 +685,7 @@ onBeforeUnmount(() => {
 
           <section v-else-if="view === 'settings'" class="page-section settings-page">
             <div class="page-heading"><h1>设置</h1></div><nav class="status-tabs settings-nav" aria-label="设置分类"><span class="active">存储</span></nav>
-            <div class="settings-content"><div v-if="storageNotice" class="warning-banner" role="status"><UiIcon name="warning" /><span>{{ storageNotice }}</span></div><div v-for="location in storageKinds" :key="location.key" class="storage-row"><h2>{{ location.label }}</h2><div class="storage-control"><div class="path-field"><span :title="storageLocations[location.key]">{{ storageLocations[location.key] }}</span><button class="icon-button" :aria-label="`复制${location.label}`" :disabled="!storageLocations[location.key]" @click="copyPath(storageLocations[location.key])"><UiIcon name="copy" /></button></div><button class="button secondary" :disabled="busy" @click="chooseStorage(location.key)">更改位置</button></div></div>
+            <div class="settings-content"><div v-if="storageNotice" class="warning-banner" role="status"><UiIcon name="warning" /><span>{{ storageNotice }}</span></div><div v-for="location in storageKinds" :key="location.key" class="storage-row"><h2>{{ location.label }}<span v-if="unavailableStorage.includes(location.key)" class="availability warning"><i></i>当前不可用</span></h2><div class="storage-control"><div class="path-field"><span :title="storageLocations[location.key]">{{ storageLocations[location.key] }}</span><button class="icon-button" :aria-label="`复制${location.label}`" :disabled="!storageLocations[location.key]" @click="copyPath(storageLocations[location.key])"><UiIcon name="copy" /></button></div><button class="button secondary" :disabled="busy" @click="chooseStorage(location.key)">更改位置</button></div></div>
               <div class="migration-notice"><UiIcon name="info" /><div><strong>更换位置前请留意</strong><p>更换后，原目录仍会保留数据文件。迁回原目录前，需要先处理旧数据文件。</p><details><summary>查看迁移说明<UiIcon name="back" /></summary><p>更换位置后会保留原目录中的 workpack-v3.sqlite。迁回原目录前，请先备份并移走该文件及同名的 -wal、-shm 文件，再选择原目录。</p></details></div></div>
             </div>
           </section>

@@ -52,7 +52,7 @@ export class WorkPackService {
     if (!locations.databaseMustExist) fs.mkdirSync(dataDirectory, { recursive: true })
     this.templateRoot = locations.templateRoot ?? path.join(dataDirectory, 'templates')
     this.projectRoot = locations.projectRoot
-    fs.mkdirSync(this.templateRoot, { recursive: true })
+    if (!locations.templateRoot) fs.mkdirSync(this.templateRoot, { recursive: true })
     this.db = new Database(path.join(dataDirectory, libraryDatabaseFile), { fileMustExist: Boolean(locations.databaseMustExist) })
     this.db.pragma('foreign_keys = ON')
     // WAL keeps recent commits in workpack-v3.sqlite-wal. Copying only the main file while this connection is open can miss them.
@@ -251,6 +251,7 @@ export class WorkPackService {
     this.get('templates', value)
     if (sources.length !== 1) throw new Error('每个文件模板只能导入一份文件')
     if (this.db.prepare('SELECT 1 FROM assets WHERE template_id=? LIMIT 1').get(value)) throw new Error('请先移除原模板文件记录，再导入新文件')
+    if (!folderPresent(this.templateRoot)) throw new Error('模板存储位置当前不可用，请连接所在磁盘或在设置中重新选择')
     this.atomic((files, dirs) => {
       const target = this.mkdir(this.templateRoot, value, dirs)
       for (const source of sources) {
@@ -273,6 +274,7 @@ export class WorkPackService {
     if (!data.id) {
       const projectParent = this.projectRoot
       if (!projectParent) throw new Error('请先选择项目上级文件夹')
+      if (!folderPresent(projectParent)) throw new Error('项目存储位置当前不可用，请连接所在磁盘或在设置中重新选择')
       const root = path.join(directory(projectParent), projectName), projectId = randomUUID()
       this.atomic((files, dirs) => {
         fs.mkdirSync(root); dirs.push(root)

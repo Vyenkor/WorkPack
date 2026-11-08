@@ -34,6 +34,7 @@ const api: WorkPackAPI = {
   setDocumentTaskDone: input => call('setDocumentTaskDone', input),
   deleteDocumentTask: id => call('deleteDocumentTask', id),
   storageLocations: () => call('storageLocations'),
+  unavailableStorage: () => call('unavailableStorage'),
   chooseStorageLocation: kind => call('chooseStorageLocation', kind)
 }
 contextBridge.exposeInMainWorld('workpack', Object.freeze(api))

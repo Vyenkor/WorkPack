@@ -74,6 +74,42 @@ describe('#50 configured workspace without its database', () => {
   })
 })
 
+describe('#43 offline project and template locations', () => {
+  it('starts with the database when configured folders are offline, creates nothing there, and can be pointed elsewhere', () => {
+    const w = workspace()
+    const nas = path.join(w.root, 'nas'), drive = path.join(w.root, 'drive')
+    for (const dir of [nas, drive]) fs.mkdirSync(dir)
+    const service = w.manager.service
+    service.saveLibraryFile({ name: '借用单', purpose: '', categoryId: null })
+    const template = service.snapshot().templates[0]
+    service.importLibraryFile(template.id, [file(w.root, '借用单.docx')])
+    w.manager.change('template', nas)
+    w.manager.change('project', drive)
+    const projectId = w.manager.service.saveProject({ name: '项目甲', customer: '客户', contact: '', owner: '张三', note: '' })
+    w.manager.close()
+    const offlineNas = `${nas}-offline`
+    fs.renameSync(nas, offlineNas)
+    fs.renameSync(drive, `${drive}-offline`)
+    const reopened = new StorageManager(w.system, w.projects)
+    try {
+      expect(fs.existsSync(nas)).toBe(false)
+      expect(fs.existsSync(drive)).toBe(false)
+      expect(reopened.locations.template).toBe(path.resolve(nas))
+      expect(reopened.unavailable()).toEqual(['project', 'template'])
+      const snapshot = reopened.service.snapshot()
+      expect(snapshot.templates[0].assets[0].exists).toBe(false)
+      expect(snapshot.projects.find(p => p.id === projectId)?.folderExists).toBe(false)
+      expect(() => reopened.service.saveProject({ name: '项目乙', customer: '客户', contact: '', owner: '张三', note: '' })).toThrow('项目存储位置当前不可用')
+      reopened.service.removeTemplateAsset(snapshot.templates[0].assets[0].id)
+      expect(() => reopened.service.importLibraryFile(template.id, [file(w.root, '新借用单.docx')])).toThrow('模板存储位置当前不可用')
+      const relocated = reopened.change('template', offlineNas)
+      expect(relocated.unavailable).toEqual(['project'])
+      reopened.service.importLibraryFile(template.id, [file(w.root, '新借用单.docx')])
+      expect(reopened.service.snapshot().templates[0].assets[0].exists).toBe(true)
+    } finally { reopened.close(); fs.rmSync(w.root, { recursive: true, force: true }) }
+  })
+})
+
 describe('#49 storage locations nested in managed folders', () => {
   it('rejects storage locations inside a project folder', () => {
     const w = workspace()

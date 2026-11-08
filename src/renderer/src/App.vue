@@ -610,8 +610,8 @@ onBeforeUnmount(() => {
           </template>
           <section v-else class="whats-new" aria-label="最近更新">
             <div class="news-heading"><button ref="newsBack" type="button" class="icon-button" aria-label="返回工作空间菜单" @click="showWorkspaceNews(false)"><UiIcon name="back" /></button><h3>最近更新</h3></div>
-            <time datetime="2026-11-07">2026年11月7日</time>
-            <ul><li>浅色工作区与紧凑列表</li><li>侧栏支持折叠、返回与前进</li><li>统一字体、图标及控件尺寸</li><li>减淡分隔线，精简页面布局</li></ul>
+            <time datetime="2026-11-08">2026年11月8日</time>
+            <ul><li>模板迁移支持中断后重试</li><li>工作空间丢失时可重新定位</li><li>修复文件进度与待办状态</li><li>加快列表加载与文件操作</li></ul>
           </section>
         </div>
       </div>

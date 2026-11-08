@@ -86,6 +86,19 @@ export function matchesPendingQuery(row: { project: Project; event: BusinessEven
   const keyword = query.keyword.trim().toLowerCase()
   return !keyword || [row.project.name, row.project.customer, row.project.owner, row.event.name, row.event.owner, row.item.name].some(value => value.toLowerCase().includes(keyword))
 }
+export type SearchTarget = { project: Project; event?: BusinessEvent }
+/** Projects first, then matters by name (including empty ones), then file and attachment names. */
+export function findSearchTarget(projects: readonly Project[], keyword: string): SearchTarget | null {
+  const value = keyword.trim().toLowerCase()
+  if (!value) return null
+  const matches = (text: string) => text.toLowerCase().includes(value)
+  const project = projects.find(item => [item.name, item.customer, item.owner].some(matches))
+  if (project) return { project }
+  const events = projects.flatMap(project => project.events.map(event => ({ project, event })))
+  return events.find(({ event }) => matches(event.name))
+    ?? events.find(({ event }) => event.items.some(item => [item.name, ...item.attachments.map(file => file.name)].some(matches)))
+    ?? null
+}
 export type PendingGroupBy = 'project' | 'owner' | 'none'
 export interface PendingGroup<T> { key: string; label: string; rows: T[] }
 export interface PendingViewState { filter: PendingFilterQuery; groupBy: PendingGroupBy }

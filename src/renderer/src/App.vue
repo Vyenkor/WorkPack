@@ -8,6 +8,7 @@ import workpackLogo from './assets/workpack-logo.png'
 import {
   gaps,
   defaultPendingFilter,
+  findSearchTarget,
   groupPendingRows,
   localDateInput,
   matchesCompletionFilter,
@@ -433,12 +434,10 @@ function openEvent(project: Project, event: BusinessEvent, options?: { projectPa
 }
 function runGlobalSearch() {
   clearToast()
-  const keyword = search.value.trim().toLowerCase()
-  if (!keyword) { go('projects'); return }
-  const project = snapshot.value.projects.find(item => [item.name, item.customer, item.owner].some(value => value.toLowerCase().includes(keyword)))
-  if (project) { openProject(project); return }
-  const row = itemRows.value.find(item => [item.event.name, item.item.name, ...item.item.attachments.map(attachment => attachment.name)].some(value => value.toLowerCase().includes(keyword)))
-  if (row) { openEvent(row.project, row.event, { projectPage: true }); return }
+  if (!search.value.trim()) { go('projects'); return }
+  const target = findSearchTarget(snapshot.value.projects, search.value)
+  if (target?.event) { openEvent(target.project, target.event, { projectPage: true }); return }
+  if (target) { openProject(target.project); return }
   showToast('没有找到匹配的项目或文件', 'error')
 }
 

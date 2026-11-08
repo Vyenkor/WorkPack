@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { StorageManager, WorkspaceMissingError } from '../src/main/storage'
 import { numberedFileName, safeFileName } from '../src/main/service'
-import { localDateInput } from '../src/shared/model'
+import { findSearchTarget, localDateInput, type BusinessEvent, type Project } from '../src/shared/model'
 
 function workspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-issues-'))
@@ -73,6 +73,26 @@ describe('#50 configured workspace without its database', () => {
         expect(created.service.snapshot().templates).toEqual([])
       } finally { created.close() }
     } finally { fs.rmSync(w.root, { recursive: true, force: true }) }
+  })
+})
+
+describe('#53 global search', () => {
+  const event = (id: string, name: string, items: BusinessEvent['items'] = []): BusinessEvent => ({ id, projectId: 'p', templateId: '', templateIds: [], name, date: '2026-11-07', owner: '经办人', items })
+  const project = (id: string, name: string, events: BusinessEvent[]): Project => ({ id, name, customer: '客户', contact: '', owner: '负责人', note: '', folder: '', folderExists: true, events })
+  const withFile = event('e2', '发货', [{ id: 'i', eventId: 'e2', name: '装箱单', note: '', templateId: null, tasks: [], attachments: [{ id: 'a', itemId: 'i', name: '装箱-终版.xlsx', path: 'x', exists: true, createdAt: '' }] }])
+  const projects = [project('p1', '项目甲', [event('e1', '测试事项'), withFile]), project('p2', '验收', [])]
+  it('finds a matter that has no files left', () => {
+    expect(findSearchTarget(projects, '测试事项')?.event?.id).toBe('e1')
+  })
+  it('finds matters by file and attachment names', () => {
+    expect(findSearchTarget(projects, '装箱单')?.event?.id).toBe('e2')
+    expect(findSearchTarget(projects, '终版')?.event?.id).toBe('e2')
+  })
+  it('prefers a project with the same name and reports no match', () => {
+    const named = [...projects, project('p3', '测试事项', [])]
+    expect(findSearchTarget(named, '测试事项')).toEqual({ project: named[2] })
+    expect(findSearchTarget(projects, '不存在')).toBeNull()
+    expect(findSearchTarget(projects, '  ')).toBeNull()
   })
 })
 

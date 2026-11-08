@@ -40,7 +40,7 @@ class EventDrawerTest(unittest.TestCase):
         self.assertNotIn("每份文件都有独立的待办清单。", drawer)
         self.assertIn('class="drawer-scrim"', APP)
         self.assertIn("view.value === 'pending'", APP)
-        self.assertIn("openEvent(row.project, row.event, { projectPage: true })", APP)
+        self.assertIn("openEvent(target.project, target.event, { projectPage: true })", APP)
         self.assertIn('@click="openEvent(row.project, row.event)"', APP)
         self.assertIn("closeDrawer(true)", APP)
         self.assertIn("restoreDrawerFocus", APP)

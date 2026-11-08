@@ -27,6 +27,9 @@ export async function fileDigest(file: string) {
   for await (const chunk of fs.createReadStream(file, { highWaterMark: 1 << 20 })) hash.update(chunk as Buffer)
   return hash.digest('hex')
 }
+function createdDirectory(directory: string) {
+  try { fs.mkdirSync(directory, { recursive: true }); return isDirectory(directory) } catch { return false }
+}
 function isDriveRoot(directory: string) {
   if (path.parse(directory).root === directory) return true
   try {
@@ -130,10 +133,12 @@ export class StorageManager {
       if (!path.isAbsolute(next[key])) throw new Error('存储配置中的路径必须是绝对路径')
       if (key === 'workspace' && workspaceMustExist) {
         if (!fs.existsSync(this.databasePath(next[key]))) throw new WorkspaceMissingError(next[key])
-      } else if (key !== 'workspace' && !isDirectory(next[key]) && path.resolve(next[key]) !== path.resolve(this.defaults[key])) {
-        // An offline drive or share stays configured and is reported as unavailable.
-        next[key] = path.resolve(next[key])
-        continue
+      } else if (key !== 'workspace') {
+        // An offline drive or share stays configured and is reported as unavailable. Only a default folder is created.
+        if (!isDirectory(next[key]) && (path.resolve(next[key]) !== path.resolve(this.defaults[key]) || !createdDirectory(next[key]))) {
+          next[key] = path.resolve(next[key])
+          continue
+        }
       } else fs.mkdirSync(next[key], { recursive: true })
       next[key] = fs.realpathSync(next[key])
       if (!fs.statSync(next[key]).isDirectory()) throw new Error('存储位置必须是文件夹')

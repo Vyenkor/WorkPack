@@ -551,6 +551,23 @@ describe('#43 offline project and template locations', () => {
       expect(reopened.service.snapshot().templates[0].assets[0].exists).toBe(true)
     } finally { reopened.close(); fs.rmSync(w.root, { recursive: true, force: true }) }
   })
+  it('starts when the default project folder cannot be reached or created', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-issues-'))
+    const system = path.join(root, 'system'), documents = path.join(root, 'documents')
+    // A file where the documents folder should be makes creating the default project folder fail, as an offline redirected folder does.
+    fs.writeFileSync(documents, '')
+    const projects = path.join(documents, 'WorkPack', '项目')
+    const manager = new StorageManager(system, projects)
+    try {
+      expect(manager.locations.project).toBe(path.resolve(projects))
+      expect(manager.unavailable()).toEqual(['project'])
+      expect(() => manager.service.saveProject({ name: '项目甲', customer: '客户', contact: '', owner: '张三', note: '' })).toThrow('项目存储位置当前不可用')
+      const other = path.join(root, 'other-projects')
+      fs.mkdirSync(other)
+      expect((await manager.change('project', other)).unavailable).toEqual([])
+      expect(manager.service.saveProject({ name: '项目甲', customer: '客户', contact: '', owner: '张三', note: '' })).toBeTruthy()
+    } finally { manager.close(); fs.rmSync(root, { recursive: true, force: true }) }
+  })
 })
 
 describe('#49 storage locations nested in managed folders', () => {

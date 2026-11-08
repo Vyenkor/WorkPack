@@ -56,6 +56,18 @@
 ; 放在 customHeader 里，是因为本文件被引入时 LogicLib 和 isUpdated 还没有定义。
 !macro customHeader
   !ifdef BUILD_UNINSTALLER
+    ; 为所有用户安装时 $APPDATA 指向公共目录，而 userData 在发起卸载的用户的 Roaming 目录。
+    ; 与 electron-builder 自带清理一致：读写前切到当前用户，结束后恢复。
+    !macro WorkPackUseUserAppData
+      ${If} $installMode == "all"
+        SetShellVarContext current
+      ${EndIf}
+    !macroend
+    !macro WorkPackRestoreAppData
+      ${If} $installMode == "all"
+        SetShellVarContext all
+      ${EndIf}
+    !macroend
     Function un.onUninstSuccess
       ${If} ${isUpdated}
         Return
@@ -63,12 +75,14 @@
       ; 仅清理默认 userData 中的记录。模板目录、项目目录和自选数据库目录均不递归删除。
       ${IfNot} ${Silent}
       ${AndIf} $WorkPackDeleteWorkspaceData == "1"
+        !insertmacro WorkPackUseUserAppData
         Delete "$APPDATA\WorkPack\workpack-v3.sqlite"
         Delete "$APPDATA\WorkPack\workpack-v3.sqlite-wal"
         Delete "$APPDATA\WorkPack\workpack-v3.sqlite-shm"
         Delete "$APPDATA\WorkPack\workpack-v3.sqlite-journal"
         Delete "$APPDATA\WorkPack\storage.json"
         RMDir "$APPDATA\WorkPack"
+        !insertmacro WorkPackRestoreAppData
       ${EndIf}
       ${GetParent} "$INSTDIR" $0
       ${If} $0 == ""
@@ -91,8 +105,10 @@
     ${EndIf}
     ${NSD_CreateCheckbox} 0 0 100% 16u "删除工作空间记录（默认不删除）"
     Pop $WorkPackDeleteWorkspaceDataCheckbox
+    !insertmacro WorkPackUseUserAppData
     ${NSD_CreateLabel} 0 24u 100% 42u "仅删除 $APPDATA\WorkPack 中的工作空间数据库和设置。项目文件、模板文件和自选位置的数据保留。"
     Pop $0
+    !insertmacro WorkPackRestoreAppData
     nsDialogs::Show
   FunctionEnd
 

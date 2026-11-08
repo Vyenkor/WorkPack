@@ -72,6 +72,23 @@ class InstallerConfigTest(unittest.TestCase):
         self.assertNotIn('templates', cleanup.lower())
         self.assertNotIn('$INSTDIR', cleanup)
 
+    def test_workspace_cleanup_targets_the_uninstalling_users_appdata(self):
+        text = INCLUDE.read_text(encoding="utf-8-sig")
+        header = text[text.index("!macro customHeader"):]
+        use = header[header.index("!macro WorkPackUseUserAppData"):header.index("!macroend", header.index("!macro WorkPackUseUserAppData"))]
+        restore = header[header.index("!macro WorkPackRestoreAppData"):header.index("!macroend", header.index("!macro WorkPackRestoreAppData"))]
+        self.assertIn('$installMode == "all"', use)
+        self.assertIn("SetShellVarContext current", use)
+        self.assertIn("SetShellVarContext all", restore)
+        for function in ["Function un.onUninstSuccess", "Function un.WorkPackDataPageCreate"]:
+            with self.subTest(function=function):
+                body = header[header.index(function):header.index("FunctionEnd", header.index(function))]
+                switch = body.index("!insertmacro WorkPackUseUserAppData")
+                first_use = body.index("$APPDATA\\WorkPack")
+                back = body.index("!insertmacro WorkPackRestoreAppData")
+                self.assertLess(switch, first_use)
+                self.assertGreater(back, body.rindex("$APPDATA\\WorkPack"))
+
     def test_package_only_ships_what_the_installed_app_needs(self):
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
         self.assertEqual(sorted(package["dependencies"]), ["better-sqlite3", "zod"],

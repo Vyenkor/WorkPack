@@ -384,6 +384,64 @@ describe('#44 template move interrupted before the pointer is written', () => {
       expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(false)
     } finally { w.cleanup() }
   })
+  it('never overwrites a destination created by another writer during publication', async () => {
+    const w = workspace()
+    try {
+      const templates = seedTemplates(w), target = path.join(w.root, 'destination')
+      fs.mkdirSync(target)
+      const userFile = path.join(target, templates[0].assets[0].path), link = fs.promises.link
+      const publish = vi.spyOn(fs.promises, 'link').mockImplementation(async (from, to) => {
+        if (String(to) === userFile) fs.writeFileSync(userFile, 'user file', { flag: 'wx' })
+        return link(from, to)
+      })
+      try { await expect(w.manager.change('template', target)).rejects.toMatchObject({ code: 'EEXIST' }) }
+      finally { publish.mockRestore() }
+      expect(fs.readFileSync(userFile, 'utf8')).toBe('user file')
+      expect(fs.readdirSync(path.dirname(userFile))).toEqual([path.basename(userFile)])
+      expect(w.manager.locations.template).not.toBe(fs.realpathSync(target))
+      expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(false)
+    } finally { w.cleanup() }
+  })
+  it('keeps an identical concurrent file across a crash before publication', async () => {
+    const w = workspace()
+    try {
+      const templates = seedTemplates(w), target = path.join(w.root, 'destination')
+      fs.mkdirSync(target)
+      const userFile = path.join(target, templates[0].assets[0].path)
+      const publish = vi.spyOn(fs.promises, 'link').mockImplementation(async () => {
+        fs.writeFileSync(userFile, '甲内容', { flag: 'wx' })
+        throw new Error('interrupted')
+      })
+      const remove = vi.spyOn(fs, 'rmSync').mockImplementation(() => { throw new Error('interrupted') })
+      try { await expect(w.manager.change('template', target)).rejects.toThrow('interrupted') }
+      finally { publish.mockRestore(); remove.mockRestore() }
+      const identity = fs.statSync(userFile, { bigint: true }).ino
+      reopen(w)
+      await expect(w.manager.change('template', target)).rejects.toThrow('已有同名文件')
+      expect(fs.statSync(userFile, { bigint: true }).ino).toBe(identity)
+      expect(fs.readFileSync(userFile, 'utf8')).toBe('甲内容')
+    } finally { w.cleanup() }
+  })
+  it('finishes staging cleanup after a committed migration is reopened', async () => {
+    const w = workspace()
+    try {
+      const templates = seedTemplates(w), target = path.join(w.root, 'destination')
+      fs.mkdirSync(target)
+      const remove = fs.rmSync
+      const failure = vi.spyOn(fs, 'rmSync').mockImplementation((file, options) => {
+        if (String(file).endsWith('.tmp')) throw new Error('temporarily locked')
+        return remove(file, options)
+      })
+      try { await w.manager.change('template', target) } finally { failure.mockRestore() }
+      expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(true)
+      reopen(w)
+      for (const t of templates) {
+        const file = path.join(target, t.assets[0].path)
+        expect(fs.readdirSync(path.dirname(file))).toEqual([path.basename(file)])
+      }
+      expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(false)
+    } finally { w.cleanup() }
+  })
   it('drops a manifest left in the folder the pointer already names', async () => {
     const w = workspace()
     try {

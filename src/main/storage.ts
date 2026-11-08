@@ -19,7 +19,7 @@ function selectedDirectory(value: string) {
 }
 function isDirectory(value: string) { try { return fs.statSync(value).isDirectory() } catch { return false } }
 function isFile(value: string) { try { return fs.statSync(value).isFile() } catch { return false } }
-const templateManifestSchema = z.object({ source: z.string(), files: z.array(z.object({ path: z.string(), sha256: z.string(), staging: z.string().optional() })) })
+const templateManifestSchema = z.object({ source: z.string(), publication: z.literal('link').optional(), files: z.array(z.object({ path: z.string(), sha256: z.string(), staging: z.string().optional() })) })
 type TemplateManifest = z.infer<typeof templateManifestSchema>
 /** Streams in fixed-size chunks so memory stays bounded and the main process keeps handling events however large a template is. */
 export async function fileDigest(file: string) {
@@ -122,7 +122,7 @@ export class StorageManager {
     this.locations = this.canonicalize(stored, mustExist)
     this.clearCommittedMarker(this.locations.workspace)
     // A manifest in the folder the pointer already names belongs to a move that committed.
-    try { fs.rmSync(this.templateManifestPath(this.locations.template), { force: true }) } catch { /* An offline folder is checked on a later launch. */ }
+    this.clearCommittedTemplateManifest(this.locations.template)
     this.service = this.open(this.locations, mustExist)
     if (!initialized) try { fs.writeFileSync(initializedPath, '') } catch { /* Launch goes on; the next one writes the marker again. */ }
     if (recovery && 'locate' in recovery) {
@@ -262,6 +262,21 @@ export class StorageManager {
       return parsed.success ? parsed.data : null
     } catch { return null }
   }
+  private clearCommittedTemplateManifest(directory: string) {
+    try {
+      const manifest = this.readTemplateManifest(directory)
+      if (manifest?.publication === 'link') for (const file of manifest.files) {
+        if (file.staging) fs.rmSync(inside(directory, file.staging, '模板'), { force: true })
+      }
+      fs.rmSync(this.templateManifestPath(directory), { force: true })
+    } catch { /* Keep the manifest so the next launch can finish cleaning its staging files. */ }
+  }
+  private sameFile(left: string, right: string) {
+    try {
+      const a = fs.statSync(left, { bigint: true }), b = fs.statSync(right, { bigint: true })
+      return a.dev === b.dev && a.ino === b.ino
+    } catch { return false }
+  }
   /**
    * Removes copies left by an interrupted move from the same source. A staging file has a name no one else uses and is
    * always ours; a file at its final name is ours only when it matches the recorded copy.
@@ -275,8 +290,11 @@ export class StorageManager {
         target = inside(directory, file.path, '模板')
         if (file.staging) staging = inside(directory, file.staging, '模板')
       } catch { continue }
+      const owned = manifest.publication === 'link'
+        ? Boolean(staging && this.sameFile(staging, target)) && await fileDigest(target) === file.sha256
+        : isFile(target) && await fileDigest(target) === file.sha256
+      if (owned) fs.rmSync(target)
       if (staging && isFile(staging)) fs.rmSync(staging)
-      if (isFile(target) && await fileDigest(target) === file.sha256) fs.rmSync(target)
       for (let dir = path.dirname(target); dir !== directory && isSameOrInside(dir, directory) && isDirectory(dir) && !fs.readdirSync(dir).length; dir = path.dirname(dir)) fs.rmdirSync(dir)
     }
     fs.rmSync(this.templateManifestPath(directory), { force: true })
@@ -304,7 +322,7 @@ export class StorageManager {
     // The manifest must never list a file that was there before the move, or a retry would delete it as residue.
     const taken = plan.find(file => fs.existsSync(file.target))
     if (taken) throw new Error(`目标目录已有同名文件：${taken.asset.name}`)
-    this.writeTemplateManifest(directory, { source: sourceRoot, files: plan.map(file => ({ path: file.asset.path, sha256: file.sha256, staging: path.relative(directory, file.staging) })) })
+    this.writeTemplateManifest(directory, { source: sourceRoot, publication: 'link', files: plan.map(file => ({ path: file.asset.path, sha256: file.sha256, staging: path.relative(directory, file.staging) })) })
     const createdFiles: string[] = []
     const createdDirs: string[] = []
     try {
@@ -327,19 +345,21 @@ export class StorageManager {
         createdFiles.push(staging)
         if (await fileDigest(staging) !== sha256) throw new Error(`模板文件校验失败：${asset.name}`)
         if (fs.existsSync(target)) throw new Error(`目标目录已有同名文件：${asset.name}`)
-        await fs.promises.rename(staging, target)
-        createdFiles[createdFiles.length - 1] = target
+        // link publishes atomically and fails with EEXIST instead of replacing another writer's file.
+        // Keep staging until the pointer commits: its file identity proves which final files we own after a crash.
+        await fs.promises.link(staging, target)
+        createdFiles.push(target)
       }
       this.write(next)
     } catch (error) {
       for (const file of createdFiles.reverse()) fs.rmSync(file, { force: true })
-      for (const folder of createdDirs.reverse()) fs.rmdirSync(folder)
+      for (const folder of createdDirs.reverse()) if (!fs.readdirSync(folder).length) fs.rmdirSync(folder)
       fs.rmSync(this.templateManifestPath(directory), { force: true })
       throw error
     }
-    try { fs.rmSync(this.templateManifestPath(directory), { force: true }) } catch { /* The next launch removes it from the committed folder. */ }
     this.service.templateRoot = directory
     this.locations = next
+    this.clearCommittedTemplateManifest(directory)
     return this.result(warning)
   }
   async change(kind: StorageKind, selected: string): Promise<StorageChangeResult> {

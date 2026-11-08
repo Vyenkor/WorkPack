@@ -133,6 +133,11 @@ export class WorkPackService {
     return operation
   }
   private endOperation(operation: string) { this.db.prepare('DELETE FROM pending_operations WHERE id=?').run(operation) }
+  /** Ends every record of a move to `to`, including one left by an earlier attempt whose folder could not be put back. */
+  private endMoves(kind: 'rename-project' | 'move-event', id: string, to: string) {
+    const key = kind === 'rename-project' ? '$.projectId' : '$.eventId'
+    this.db.prepare(`DELETE FROM pending_operations WHERE kind=? AND json_extract(payload, ?)=? AND json_extract(payload, '$.to')=?`).run(kind, key, id, to)
+  }
   /** Settles folder moves interrupted by a crash. Each step can be repeated; an unreachable folder keeps its record for the next launch. */
   private recoverOperations() {
     for (const operation of this.all('pending_operations')) {
@@ -151,10 +156,14 @@ export class WorkPackService {
       fs.renameSync(p.trash, p.eventDir)
       return true
     }
-    // An open rename record means its transaction never committed: the records still name `from`.
+    // An open rename record means its transaction never committed and the records still name `from`,
+    // unless a later save committed `to`.
     if (kind === 'rename-project' || kind === 'move-event') {
       const table = kind === 'rename-project' ? 'projects' : 'events'
-      if (!this.db.prepare(`SELECT 1 FROM ${table} WHERE id=?`).get(p.projectId ?? p.eventId)) return true
+      const row = this.db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(p.projectId ?? p.eventId) as Row | undefined
+      if (!row) return true
+      const committed = kind === 'rename-project' ? row.folder : path.join(p.root, '事项', `${row.date}_${row.id}`)
+      if (committed === p.to) return true
       if (!fs.existsSync(p.to)) return true
       if (fs.existsSync(p.from) && !sameEntry(p.from, p.to)) return false
       fs.renameSync(p.to, p.from)
@@ -372,7 +381,7 @@ export class WorkPackService {
         }
         this.atomic(() => {
           this.db.prepare('UPDATE projects SET name=?, customer=?, contact=?, owner=?, note=?, folder=? WHERE id=?').run(projectName, data.customer, data.contact, data.owner, data.note, newRoot, data.id)
-          if (operation) this.endOperation(operation)
+          this.endMoves('rename-project', previous.id, newRoot)
         })
       } catch (error) {
         if (renamed) {
@@ -433,7 +442,7 @@ export class WorkPackService {
           }
         }
         this.db.prepare('UPDATE events SET name=?, date=?, owner=? WHERE id=?').run(data.name, data.date, data.owner, data.id)
-        if (operation) this.endOperation(operation)
+        this.endMoves('move-event', data.id, newDir)
       })()
     } catch (error) {
       if (renamed) {

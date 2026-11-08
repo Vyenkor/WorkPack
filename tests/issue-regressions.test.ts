@@ -232,6 +232,47 @@ describe('#47 renames interrupted before the records are saved', () => {
       expect(saved.items[0].attachments[0].exists).toBe(true)
     } finally { w.cleanup() }
   })
+  it('keeps the new date across a restart after a retry succeeds where the first save could not roll back', () => {
+    const w = workspace()
+    try {
+      const { projectId, eventId, eventDir, project } = seedEvent(w.manager, w.root)
+      const update = { id: eventId, projectId, name: '借用', owner: '张三', date: '2026-11-09' }
+      const db = w.manager.service.db
+      crashDuring(() => w.manager.service.updateEvent(update), eventDir, {
+        mock: () => vi.spyOn(db, 'transaction').mockImplementation(() => (() => { throw new Error('写入失败') }) as never)
+      })
+      const moved = path.join(project.folder, '事项', `2026-11-09_${eventId}`)
+      const [record] = db.prepare('SELECT * FROM pending_operations').all() as Array<{ id: string; kind: string; payload: string }>
+      expect(record.kind).toBe('move-event')
+
+      w.manager.service.updateEvent(update)
+      expect(pendingOperations(w.manager)).toEqual([])
+      // A record that outlived its committed save, as an earlier build left it.
+      db.prepare('INSERT INTO pending_operations VALUES (?, ?, ?)').run(record.id, record.kind, record.payload)
+
+      const service = reopen(w)
+      expect(pendingOperations(w.manager)).toEqual([])
+      expect(fs.existsSync(moved)).toBe(true)
+      expect(fs.existsSync(eventDir)).toBe(false)
+      const saved = service.snapshot().projects[0].events[0]
+      expect(saved.date).toBe('2026-11-09')
+      expect(saved.items[0].attachments[0].exists).toBe(true)
+    } finally { w.cleanup() }
+  })
+  it('keeps a renamed project folder across a restart when a stale record outlived the committed rename', () => {
+    const w = workspace()
+    try {
+      const { projectId, project } = seedEvent(w.manager, w.root)
+      const parent = path.dirname(project.folder), renamed = path.join(parent, '项目乙')
+      w.manager.service.saveProject({ id: projectId, name: '项目乙', customer: '客户', contact: '', owner: '张三', note: '' })
+      w.manager.service.db.prepare('INSERT INTO pending_operations VALUES (?, ?, ?)')
+        .run('00000000-0000-4000-8000-000000000001', 'rename-project', JSON.stringify({ projectId, root: parent, from: project.folder, to: renamed }))
+      const service = reopen(w)
+      expect(pendingOperations(w.manager)).toEqual([])
+      expect(fs.readdirSync(w.projects)).toEqual(['项目乙'])
+      expect(service.snapshot().projects[0]).toMatchObject({ name: '项目乙', folderExists: true })
+    } finally { w.cleanup() }
+  })
   it('repairs attachment paths when the folder already carries the new date without a recovery record', () => {
     const w = workspace()
     try {

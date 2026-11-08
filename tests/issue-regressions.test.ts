@@ -76,6 +76,26 @@ describe('#50 configured workspace without its database', () => {
   })
 })
 
+function plan(manager: StorageManager, sql: string, ...params: unknown[]) {
+  return (manager.service.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as Array<{ detail: string }>).map(row => row.detail).join('\n')
+}
+
+describe('#46 document_tasks lookups by item', () => {
+  it('uses an index for cascading deletes and the next task position, including in an existing database', () => {
+    const w = workspace()
+    try {
+      w.manager.service.db.exec('DROP INDEX document_tasks_item')
+      w.manager.close()
+      const reopened = new StorageManager(w.system, w.projects)
+      try {
+        const id = '00000000-0000-4000-8000-000000000000'
+        expect(plan(reopened, 'DELETE FROM items WHERE id=?', id)).not.toMatch(/SCAN document_tasks/)
+        expect(plan(reopened, 'SELECT COALESCE(MAX(position), -1) + 1 FROM document_tasks WHERE item_id=?', id)).toMatch(/document_tasks_item/)
+      } finally { reopened.close() }
+    } finally { fs.rmSync(w.root, { recursive: true, force: true }) }
+  })
+})
+
 describe('#56 project rename that only changes letter case', () => {
   it('renames Alpha to ALPHA, still rejects a folder owned by something else, and rolls back on failure', () => {
     const w = workspace()

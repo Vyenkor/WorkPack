@@ -1,12 +1,24 @@
 from pathlib import Path
+import re
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PLAN = ROOT / "技术方案_MVP.md"
+BASELINE = ROOT / "Agent" / "Codex" / "产品规划" / "01_MVP基线"
+PLAN = BASELINE / "技术方案_MVP.md"
 
 
 class TechnicalPlanTest(unittest.TestCase):
+    def test_planning_documents_have_valid_relative_links(self):
+        planning = BASELINE.parent
+        documents = list(planning.rglob("*.md"))
+        self.assertTrue(documents)
+        for document in documents:
+            for link in re.findall(r"\]\(([^)#]+)\)", document.read_text(encoding="utf-8")):
+                if "://" not in link:
+                    with self.subTest(document=document.name, link=link):
+                        self.assertTrue((document.parent / link).is_file())
+
     def test_plan_exists_and_covers_the_selected_local_stack(self):
         self.assertTrue(PLAN.is_file())
         content = PLAN.read_text(encoding="utf-8")
@@ -25,7 +37,7 @@ class TechnicalPlanTest(unittest.TestCase):
                 self.assertIn(technology, content)
 
     def test_current_documents_describe_library_tasks_instead_of_retired_workflows(self):
-        product = (ROOT / "产品设计文档_MVP.md").read_text(encoding="utf-8")
+        product = (BASELINE / "产品设计文档_MVP.md").read_text(encoding="utf-8")
         technical = PLAN.read_text(encoding="utf-8")
         for content in (product, technical):
             self.assertIn("文件库", content)

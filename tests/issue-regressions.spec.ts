@@ -109,6 +109,62 @@ test('issue 36: failed preference write drains a newer queued change and persist
   await expect(page.getByRole('group', { name: '分组', exact: true }).getByRole('button', { name: '经办人', exact: true })).toHaveAttribute('aria-pressed', 'true')
 })
 
+test('issue 51: a rejected task toggle leaves each checkbox matching the saved state', async () => {
+  const projects = path.join(root, 'projects'), source = path.join(root, '借用单.txt')
+  fs.mkdirSync(projects)
+  fs.writeFileSync(source, 'template')
+  await app.evaluate(({ dialog }, picks) => {
+    const queue = [...picks]
+    Object.defineProperty(dialog, 'showOpenDialog', { configurable: true, value: async () => ({ canceled: false, filePaths: [queue.shift()] }) })
+  }, [projects, source])
+  const attachment = await page.evaluate(async () => {
+    await window.workpack.chooseStorageLocation('project')
+    const projectId = await window.workpack.saveProject({ name: '勾选失败', customer: '测试客户', owner: '负责人', contact: '', note: '' })
+    await window.workpack.saveLibraryFile({ name: '借用单', purpose: '' })
+    const template = (await window.workpack.snapshot()).templates[0]
+    await window.workpack.importLibraryFile(template.id)
+    await window.workpack.createLibraryEvent({ projectId, templateIds: [template.id], name: '借用设备', date: '2026-11-07', owner: '经办人' })
+    const project = (await window.workpack.snapshot()).projects[0], item = project.events[0].items[0]
+    await window.workpack.saveDocumentTask({ itemId: item.id, name: '签字' })
+    return { folder: project.folder, path: item.attachments[0].path }
+  })
+  const savedTasks = () => page.evaluate(async () => (await window.workpack.snapshot()).projects[0].events[0].items[0].tasks.map(task => task.done))
+  await page.reload()
+  await nav('项目').click()
+  await page.locator('.project-card-main').click()
+  await page.locator('.event-card').click()
+  const drawer = page.locator('.event-drawer')
+  const prepare = drawer.getByRole('checkbox', { name: '准备文件', exact: true })
+  const sign = drawer.getByRole('checkbox', { name: '签字', exact: true })
+  await expect(prepare).toBeEnabled()
+
+  fs.rmSync(path.join(attachment.folder, attachment.path))
+  await prepare.click()
+  await expect(page.locator('.toast.error')).toContainText('请先添加文件')
+  await expect(prepare).not.toBeChecked()
+  await expect(drawer.getByText('文件失效', { exact: true })).toBeVisible()
+  expect(await savedTasks()).toEqual([false, false])
+
+  await app.evaluate(({ ipcMain }) => {
+    const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: any[]) => unknown> })._invokeHandlers
+    ;(globalThis as unknown as { setDone: unknown }).setDone = handlers.get('workpack:setDocumentTaskDone')
+    ipcMain.removeHandler('workpack:setDocumentTaskDone')
+    ipcMain.handle('workpack:setDocumentTaskDone', async () => ({ ok: false, error: '测试写入失败' }))
+  })
+  await sign.click()
+  await expect(page.locator('.toast.error')).toContainText('测试写入失败')
+  await expect(sign).not.toBeChecked()
+  expect(await savedTasks()).toEqual([false, false])
+
+  await app.evaluate(({ ipcMain }) => {
+    ipcMain.removeHandler('workpack:setDocumentTaskDone')
+    ipcMain.handle('workpack:setDocumentTaskDone', (globalThis as unknown as { setDone: (...args: any[]) => unknown }).setDone)
+  })
+  await sign.click()
+  await expect(sign).toBeChecked()
+  expect(await savedTasks()).toEqual([false, true])
+})
+
 test('issue 37: Escape dismisses the open category picker before the dirty template dialog', async () => {
   const confirmations: string[] = []
   page.on('dialog', async dialog => { confirmations.push(dialog.message()); await dialog.dismiss() })

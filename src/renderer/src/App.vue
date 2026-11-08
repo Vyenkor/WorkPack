@@ -511,7 +511,11 @@ async function saveItem() {
 }
 function openTaskModal(item: Item) { Object.assign(taskForm,{itemId:item.id,name:''}); modal.value='task'; markModalClean() }
 async function saveTask() { const result=await run(() => window.workpack.saveDocumentTask({...taskForm}),'已添加'); if(result) modal.value=null }
-async function toggleTask(id:string,done:boolean,control:HTMLElement) { await keepFocus(() => run(() => window.workpack.setDocumentTaskDone({id,done})),control) }
+async function toggleTask(id:string,done:boolean,control:HTMLElement) {
+  const saved = await keepFocus(() => run(() => window.workpack.setDocumentTaskDone({id,done})),control)
+  // A rejected "准备文件" usually means the attachment went missing on disk.
+  if (saved === false) await refresh(false)
+}
 async function removeTask(id:string) { await run(() => window.workpack.deleteDocumentTask(id),'已删除') }
 async function removeItem(item: Item) {
   if (!window.confirm(`删除清单项“${item.name}”？附件记录也会移除。`)) return

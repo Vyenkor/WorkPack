@@ -265,6 +265,27 @@ describe('#44 template move interrupted before the pointer is written', () => {
       expect(fs.existsSync(path.join(target, templates[1].assets[0].path))).toBe(false)
     } finally { w.cleanup() }
   })
+  it('never records a file that was already in the destination, even one identical to the template', async () => {
+    const w = workspace()
+    try {
+      const templates = seedTemplates(w)
+      const target = path.join(w.root, 'nas-templates')
+      const own = path.join(target, templates[1].assets[0].path)
+      fs.mkdirSync(path.dirname(own), { recursive: true })
+      fs.writeFileSync(own, '乙内容')
+      const original = fs.statSync(own, { bigint: true }).ino
+      await interruptMove(w, target, '已有同名文件')
+      expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(false)
+
+      w.manager.close()
+      w.manager = new StorageManager(w.system, w.projects)
+      await expect(w.manager.change('template', target)).rejects.toThrow('已有同名文件')
+      expect(fs.statSync(own, { bigint: true }).ino).toBe(original)
+      expect(fs.readFileSync(own, 'utf8')).toBe('乙内容')
+      expect(fs.existsSync(path.join(target, templates[0].assets[0].path))).toBe(false)
+      expect(w.manager.locations.template).toBe(fs.realpathSync(path.join(w.system, 'templates')))
+    } finally { w.cleanup() }
+  })
   it('drops a manifest left in the folder the pointer already names', async () => {
     const w = workspace()
     try {

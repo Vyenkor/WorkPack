@@ -285,6 +285,9 @@ export class StorageManager {
       plan.push({ asset, source, target: inside(directory, asset.path, '模板'), sha256: await fileDigest(source) })
     }
     await this.clearTemplateResidue(directory, sourceRoot)
+    // The manifest must never list a file that was there before the move, or a retry would delete it as residue.
+    const taken = plan.find(file => fs.existsSync(file.target))
+    if (taken) throw new Error(`目标目录已有同名文件：${taken.asset.name}`)
     this.writeTemplateManifest(directory, { source: sourceRoot, files: plan.map(file => ({ path: file.asset.path, sha256: file.sha256 })) })
     const createdFiles: string[] = []
     const createdDirs: string[] = []

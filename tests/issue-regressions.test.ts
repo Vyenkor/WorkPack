@@ -216,6 +216,70 @@ describe('#47 renames interrupted before the records are saved', () => {
   })
 })
 
+describe('#44 template move interrupted before the pointer is written', () => {
+  function seedTemplates(w: ReturnType<typeof workspace>) {
+    const service = w.manager.service
+    for (const name of ['甲', '乙']) {
+      service.saveLibraryFile({ name, purpose: '', categoryId: null })
+      const template = service.snapshot().templates.find(t => t.name === name)!
+      service.importLibraryFile(template.id, [file(w.root, `${name}.docx`, `${name}内容`)])
+    }
+    return service.snapshot().templates
+  }
+  function interruptMove(w: ReturnType<typeof workspace>, target: string) {
+    const write = vi.spyOn(w.manager as unknown as { write: () => void }, 'write').mockImplementation(() => { throw new Error('进程中断') })
+    const remove = vi.spyOn(fs, 'rmSync').mockImplementation(() => { throw new Error('进程中断') })
+    try { expect(() => w.manager.change('template', target)).toThrow('进程中断') }
+    finally { write.mockRestore(); remove.mockRestore() }
+  }
+  it('retries the same destination by removing only its own copies', () => {
+    const w = workspace()
+    try {
+      const templates = seedTemplates(w)
+      const target = path.join(w.root, 'nas-templates')
+      fs.mkdirSync(target)
+      interruptMove(w, target)
+      expect(w.manager.locations.template).toBe(fs.realpathSync(path.join(w.system, 'templates')))
+      expect(fs.existsSync(path.join(target, templates[0].assets[0].path))).toBe(true)
+      expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(true)
+
+      w.manager.close()
+      w.manager = new StorageManager(w.system, w.projects)
+      w.manager.change('template', target)
+      expect(w.manager.locations.template).toBe(fs.realpathSync(target))
+      expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(false)
+      for (const template of w.manager.service.snapshot().templates) expect(template.assets[0].exists).toBe(true)
+    } finally { w.cleanup() }
+  })
+  it('keeps a file the user put in place of a copy and reports the conflict', () => {
+    const w = workspace()
+    try {
+      const templates = seedTemplates(w)
+      const target = path.join(w.root, 'nas-templates')
+      fs.mkdirSync(target)
+      interruptMove(w, target)
+      const own = path.join(target, templates[0].assets[0].path)
+      fs.writeFileSync(own, '用户自己的文件')
+      expect(() => w.manager.change('template', target)).toThrow('已有同名文件')
+      expect(fs.readFileSync(own, 'utf8')).toBe('用户自己的文件')
+      expect(fs.existsSync(path.join(target, templates[1].assets[0].path))).toBe(false)
+    } finally { w.cleanup() }
+  })
+  it('drops a manifest left in the folder the pointer already names', () => {
+    const w = workspace()
+    try {
+      seedTemplates(w)
+      const target = path.join(w.root, 'nas-templates')
+      fs.mkdirSync(target)
+      w.manager.change('template', target)
+      fs.writeFileSync(path.join(target, '.workpack-templates.migrating'), JSON.stringify({ source: w.system, files: [] }))
+      w.manager.close()
+      w.manager = new StorageManager(w.system, w.projects)
+      expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(false)
+    } finally { w.cleanup() }
+  })
+})
+
 describe('#41 bounded-memory template verification', () => {
   it('hashes files larger than one chunk correctly', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-digest-'))

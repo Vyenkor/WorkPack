@@ -18,6 +18,9 @@ function selectedDirectory(value: string) {
   return fs.realpathSync(value)
 }
 function isDirectory(value: string) { try { return fs.statSync(value).isDirectory() } catch { return false } }
+function isFile(value: string) { try { return fs.statSync(value).isFile() } catch { return false } }
+const templateManifestSchema = z.object({ source: z.string(), files: z.array(z.object({ path: z.string(), sha256: z.string() })) })
+type TemplateManifest = z.infer<typeof templateManifestSchema>
 /** Hashes in fixed-size chunks so memory stays bounded however large a template is. */
 export function fileDigest(file: string) {
   const hash = createHash('sha256'), chunk = Buffer.alloc(1 << 20), fd = fs.openSync(file, 'r')
@@ -114,6 +117,8 @@ export class StorageManager {
     const mustExist = configured && !(recovery && 'create' in recovery)
     this.locations = this.canonicalize(stored, mustExist)
     this.clearCommittedMarker(this.locations.workspace)
+    // A manifest in the folder the pointer already names belongs to a move that committed.
+    try { fs.rmSync(this.templateManifestPath(this.locations.template), { force: true }) } catch { /* An offline folder is checked on a later launch. */ }
     this.service = this.open(this.locations, mustExist)
     if (recovery && 'locate' in recovery) {
       try { this.write(this.locations) }
@@ -236,6 +241,33 @@ export class StorageManager {
     try { fs.rmSync(this.markerPath(destination), { force: true }) } catch { /* The next launch removes a marker in the committed directory. */ }
     return this.result(warning)
   }
+  /** Lists the copies a template move is about to create, so an interrupted move can recognise its own files. */
+  private templateManifestPath(directory: string) { return path.join(directory, '.workpack-templates.migrating') }
+  private writeTemplateManifest(directory: string, manifest: TemplateManifest) {
+    const target = this.templateManifestPath(directory), temp = `${target}.${randomUUID()}.tmp`
+    fs.writeFileSync(temp, JSON.stringify(manifest), { flag: 'wx' })
+    try { fs.renameSync(temp, target) }
+    catch (error) { fs.rmSync(temp, { force: true }); throw error }
+  }
+  private readTemplateManifest(directory: string): TemplateManifest | null {
+    try {
+      const parsed = templateManifestSchema.safeParse(JSON.parse(fs.readFileSync(this.templateManifestPath(directory), 'utf8')))
+      return parsed.success ? parsed.data : null
+    } catch { return null }
+  }
+  /** Removes copies left by an interrupted move from the same source. Files that differ from the recorded copy are kept. */
+  private clearTemplateResidue(directory: string, sourceRoot: string) {
+    const manifest = this.readTemplateManifest(directory)
+    if (manifest?.source !== sourceRoot) return
+    for (const file of manifest.files) {
+      let target: string
+      try { target = inside(directory, file.path, '模板') } catch { continue }
+      if (!isFile(target) || fileDigest(target) !== file.sha256) continue
+      fs.rmSync(target)
+      for (let dir = path.dirname(target); dir !== directory && isSameOrInside(dir, directory) && !fs.readdirSync(dir).length; dir = path.dirname(dir)) fs.rmdirSync(dir)
+    }
+    fs.rmSync(this.templateManifestPath(directory), { force: true })
+  }
   /** Project and template folders that cannot be reached right now, such as a disconnected drive. */
   unavailable(): StorageKind[] { return (['project', 'template'] as const).filter(kind => !isDirectory(this.locations[kind])) }
   private changeTemplates(directory: string, next: StorageLocations, warning?: string): StorageChangeResult {
@@ -247,14 +279,17 @@ export class StorageManager {
       this.locations = next
       return this.result(warning)
     }
-    const assets = this.service.snapshot().templates.flatMap(template => template.assets)
+    const plan = this.service.snapshot().templates.flatMap(template => template.assets).map(asset => {
+      const source = inside(sourceRoot, asset.path, '模板')
+      if (!asset.exists) throw new Error(`模板文件已失效：${asset.name}`)
+      return { asset, source, target: inside(directory, asset.path, '模板'), sha256: fileDigest(source) }
+    })
+    this.clearTemplateResidue(directory, sourceRoot)
+    this.writeTemplateManifest(directory, { source: sourceRoot, files: plan.map(file => ({ path: file.asset.path, sha256: file.sha256 })) })
     const createdFiles: string[] = []
     const createdDirs: string[] = []
     try {
-      for (const asset of assets) {
-        const source = inside(sourceRoot, asset.path, '模板')
-        const target = inside(directory, asset.path, '模板')
-        if (!asset.exists) throw new Error(`模板文件已失效：${asset.name}`)
+      for (const { asset, source, target, sha256 } of plan) {
         if (fs.existsSync(target)) throw new Error(`目标目录已有同名文件：${asset.name}`)
         const parts = path.relative(directory, path.dirname(target)).split(path.sep)
         let current = directory
@@ -266,14 +301,16 @@ export class StorageManager {
         }
         fs.copyFileSync(source, target, fs.constants.COPYFILE_EXCL)
         createdFiles.push(target)
-        if (fileDigest(source) !== fileDigest(target)) throw new Error(`模板文件校验失败：${asset.name}`)
+        if (fileDigest(target) !== sha256) throw new Error(`模板文件校验失败：${asset.name}`)
       }
       this.write(next)
     } catch (error) {
       for (const file of createdFiles.reverse()) fs.rmSync(file, { force: true })
       for (const folder of createdDirs.reverse()) fs.rmdirSync(folder)
+      fs.rmSync(this.templateManifestPath(directory), { force: true })
       throw error
     }
+    try { fs.rmSync(this.templateManifestPath(directory), { force: true }) } catch { /* The next launch removes it from the committed folder. */ }
     this.service.templateRoot = directory
     this.locations = next
     return this.result(warning)

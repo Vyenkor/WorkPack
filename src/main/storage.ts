@@ -18,7 +18,14 @@ function selectedDirectory(value: string) {
   return fs.realpathSync(value)
 }
 function isDirectory(value: string) { try { return fs.statSync(value).isDirectory() } catch { return false } }
-function digest(file: string) { return createHash('sha256').update(fs.readFileSync(file)).digest('hex') }
+/** Hashes in fixed-size chunks so memory stays bounded however large a template is. */
+export function fileDigest(file: string) {
+  const hash = createHash('sha256'), chunk = Buffer.alloc(1 << 20), fd = fs.openSync(file, 'r')
+  try {
+    for (let read; (read = fs.readSync(fd, chunk, 0, chunk.length, null)) > 0;) hash.update(chunk.subarray(0, read))
+  } finally { fs.closeSync(fd) }
+  return hash.digest('hex')
+}
 function isDriveRoot(directory: string) {
   if (path.parse(directory).root === directory) return true
   try {
@@ -259,7 +266,7 @@ export class StorageManager {
         }
         fs.copyFileSync(source, target, fs.constants.COPYFILE_EXCL)
         createdFiles.push(target)
-        if (digest(source) !== digest(target)) throw new Error(`模板文件校验失败：${asset.name}`)
+        if (fileDigest(source) !== fileDigest(target)) throw new Error(`模板文件校验失败：${asset.name}`)
       }
       this.write(next)
     } catch (error) {

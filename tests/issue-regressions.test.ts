@@ -2,7 +2,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { StorageManager, WorkspaceMissingError } from '../src/main/storage'
+import { createHash } from 'node:crypto'
+import { fileDigest, StorageManager, WorkspaceMissingError } from '../src/main/storage'
 import { numberedFileName, safeFileName } from '../src/main/service'
 import { findSearchTarget, localDateInput, type BusinessEvent, type Project } from '../src/shared/model'
 
@@ -79,6 +80,36 @@ describe('#50 configured workspace without its database', () => {
 function plan(manager: StorageManager, sql: string, ...params: unknown[]) {
   return (manager.service.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as Array<{ detail: string }>).map(row => row.detail).join('\n')
 }
+
+describe('#41 bounded-memory template verification', () => {
+  it('hashes files larger than one chunk correctly', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-digest-'))
+    try {
+      for (const size of [0, 1, (1 << 20) - 1, 1 << 20, (3 << 20) + 17]) {
+        const content = Buffer.alloc(size, size % 251)
+        const target = path.join(root, `${size}.bin`)
+        fs.writeFileSync(target, content)
+        expect(fileDigest(target)).toBe(createHash('sha256').update(content).digest('hex'))
+      }
+    } finally { fs.rmSync(root, { recursive: true, force: true }) }
+  })
+  it('moves a large template without reading it whole into memory', () => {
+    const w = workspace()
+    const read = vi.spyOn(fs, 'readFileSync')
+    try {
+      const service = w.manager.service
+      service.saveLibraryFile({ name: '大文件', purpose: '', categoryId: null })
+      const template = service.snapshot().templates[0]
+      service.importLibraryFile(template.id, [file(w.root, '大文件.bin', 'x'.repeat((2 << 20) + 5))])
+      const target = path.join(w.root, 'templates-next')
+      fs.mkdirSync(target)
+      read.mockClear()
+      w.manager.change('template', target)
+      expect(read.mock.calls.filter(([name]) => String(name).endsWith('大文件.bin'))).toEqual([])
+      expect(fs.statSync(path.join(target, template.id, '大文件.bin')).size).toBe((2 << 20) + 5)
+    } finally { read.mockRestore(); w.cleanup() }
+  })
+})
 
 describe('#40 grouped snapshot assembly', () => {
   it('attaches every row to its own parent and keeps table and task order', () => {

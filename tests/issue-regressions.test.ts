@@ -152,6 +152,70 @@ describe('#39 deleting a matter across a crash', () => {
   })
 })
 
+describe('#47 renames interrupted before the records are saved', () => {
+  function crashDuring(action: () => void, restoreTarget: string, commit: { mock: () => void }) {
+    const rename = fs.renameSync
+    const renames = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => { if (String(to) === restoreTarget) throw new Error('进程中断'); rename(from, to) })
+    try { commit.mock(); expect(action).toThrow() }
+    finally { renames.mockRestore(); vi.restoreAllMocks() }
+  }
+  it('restores the project folder name on the next launch', () => {
+    const w = workspace()
+    try {
+      const { projectId, project } = seedEvent(w.manager, w.root)
+      const input = { customer: '客户', contact: '', owner: '张三', note: '' }
+      crashDuring(() => w.manager.service.saveProject({ id: projectId, name: '项目乙', ...input }), project.folder, {
+        mock: () => vi.spyOn(w.manager.service as unknown as { atomic: () => never }, 'atomic').mockImplementation(() => { throw new Error('进程中断') })
+      })
+      expect(fs.existsSync(path.join(w.projects, '项目乙'))).toBe(true)
+      expect(pendingOperations(w.manager)).toEqual(['rename-project'])
+
+      const service = reopen(w)
+      expect(fs.readdirSync(w.projects)).toEqual(['项目甲'])
+      expect(service.snapshot().projects[0]).toMatchObject({ name: '项目甲', folderExists: true })
+      expect(service.snapshot().projects[0].events[0].items[0].attachments[0].exists).toBe(true)
+      service.saveProject({ id: projectId, name: '项目乙', ...input })
+      expect(fs.readdirSync(w.projects)).toEqual(['项目乙'])
+      expect(pendingOperations(w.manager)).toEqual([])
+    } finally { w.cleanup() }
+  })
+  it('restores the matter folder date on the next launch', () => {
+    const w = workspace()
+    try {
+      const { projectId, eventId, eventDir, project } = seedEvent(w.manager, w.root)
+      const update = { id: eventId, projectId, name: '借用', owner: '张三', date: '2026-11-09' }
+      const db = w.manager.service.db
+      crashDuring(() => w.manager.service.updateEvent(update), eventDir, {
+        mock: () => vi.spyOn(db, 'transaction').mockImplementation(() => (() => { throw new Error('进程中断') }) as never)
+      })
+      const moved = path.join(project.folder, '事项', `2026-11-09_${eventId}`)
+      expect(fs.existsSync(moved)).toBe(true)
+
+      const service = reopen(w)
+      expect(fs.existsSync(eventDir)).toBe(true)
+      expect(fs.existsSync(moved)).toBe(false)
+      expect(service.snapshot().projects[0].events[0].items[0].attachments[0].exists).toBe(true)
+      service.updateEvent(update)
+      const saved = service.snapshot().projects[0].events[0]
+      expect(saved.date).toBe('2026-11-09')
+      expect(saved.items[0].attachments[0].exists).toBe(true)
+    } finally { w.cleanup() }
+  })
+  it('repairs attachment paths when the folder already carries the new date without a recovery record', () => {
+    const w = workspace()
+    try {
+      const { projectId, eventId, eventDir, project } = seedEvent(w.manager, w.root)
+      const moved = path.join(project.folder, '事项', `2026-11-09_${eventId}`)
+      fs.renameSync(eventDir, moved)
+      expect(w.manager.service.snapshot().projects[0].events[0].items[0].attachments[0].exists).toBe(false)
+      w.manager.service.updateEvent({ id: eventId, projectId, name: '借用', owner: '张三', date: '2026-11-09' })
+      const attachment = w.manager.service.snapshot().projects[0].events[0].items[0].attachments[0]
+      expect(attachment.exists).toBe(true)
+      expect(attachment.path.startsWith(path.join('事项', `2026-11-09_${eventId}`))).toBe(true)
+    } finally { w.cleanup() }
+  })
+})
+
 describe('#41 bounded-memory template verification', () => {
   it('hashes files larger than one chunk correctly', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-digest-'))

@@ -150,6 +150,15 @@ export class WorkPackService {
       fs.renameSync(p.trash, p.eventDir)
       return true
     }
+    // An open rename record means its transaction never committed: the records still name `from`.
+    if (kind === 'rename-project' || kind === 'move-event') {
+      const table = kind === 'rename-project' ? 'projects' : 'events'
+      if (!this.db.prepare(`SELECT 1 FROM ${table} WHERE id=?`).get(p.projectId ?? p.eventId)) return true
+      if (!fs.existsSync(p.to)) return true
+      if (fs.existsSync(p.from) && !sameEntry(p.from, p.to)) return false
+      fs.renameSync(p.to, p.from)
+      return true
+    }
     return false
   }
   /** Items created before the file link existed are matched once by name within the matter. */
@@ -351,21 +360,24 @@ export class WorkPackService {
     } else {
       const previous = this.get('projects', data.id), oldRoot = this.root(previous)
       const newRoot = path.join(path.dirname(oldRoot), projectName)
-      let renamed = false
+      let renamed = false, operation: string | null = null
       try {
         if (newRoot !== oldRoot) {
           // A case-only change on a case-insensitive disk resolves to the project's own folder.
           if (fs.existsSync(newRoot) && !sameEntry(newRoot, oldRoot)) throw new Error('目标目录已存在，请使用其他项目名称')
+          operation = this.beginOperation('rename-project', { projectId: data.id, root: path.dirname(oldRoot), from: oldRoot, to: newRoot })
           fs.renameSync(oldRoot, newRoot); renamed = true
         }
-        this.atomic((files, dirs) => {
+        this.atomic(() => {
           this.db.prepare('UPDATE projects SET name=?, customer=?, contact=?, owner=?, note=?, folder=? WHERE id=?').run(projectName, data.customer, data.contact, data.owner, data.note, newRoot, data.id)
+          if (operation) this.endOperation(operation)
         })
       } catch (error) {
         if (renamed) {
           try { fs.renameSync(newRoot, oldRoot) }
-          catch { throw new Error(`保存失败且目录名称未能还原，请将 ${newRoot} 重新定位到本项目`) }
+          catch { throw new Error(`保存失败且目录名称未能还原，下次启动时会自动还原：${newRoot}`) }
         }
+        if (operation) this.endOperation(operation)
         throw error
       }
       return data.id
@@ -399,28 +411,34 @@ export class WorkPackService {
     const project = this.get('projects', data.projectId), root = this.root(project)
     const oldDir = inside(root, path.join('事项', `${event.date}_${event.id}`))
     const newDir = inside(root, path.join('事项', `${data.date}_${event.id}`))
-    let renamed = false
+    // The folder can already carry the new date when an earlier save stopped before its records were written.
+    const movedEarlier = oldDir !== newDir && !fs.existsSync(oldDir) && folderPresent(newDir)
+    let renamed = false, operation: string | null = null
     try {
       if (oldDir !== newDir && fs.existsSync(oldDir)) {
         if (fs.existsSync(newDir)) throw new Error('新的事项日期目录已存在，请使用其他日期')
+        operation = this.beginOperation('move-event', { eventId: event.id, root, from: oldDir, to: newDir })
         fs.renameSync(oldDir, newDir)
         renamed = true
       }
       this.db.transaction(() => {
-        if (renamed) {
+        if (renamed || movedEarlier) {
           const attachments = this.db.prepare('SELECT a.* FROM attachments a JOIN items i ON i.id=a.item_id WHERE i.event_id=?').all(data.id) as Row[]
           for (const attachment of attachments) {
-            const current = inside(root, attachment.path), relative = path.relative(oldDir, current)
-            this.db.prepare('UPDATE attachments SET path=? WHERE id=?').run(path.relative(root, inside(newDir, relative)), attachment.id)
+            const current = path.resolve(root, attachment.path)
+            if (!isSameOrInside(current, oldDir)) continue
+            this.db.prepare('UPDATE attachments SET path=? WHERE id=?').run(path.relative(root, inside(newDir, path.relative(oldDir, current))), attachment.id)
           }
         }
         this.db.prepare('UPDATE events SET name=?, date=?, owner=? WHERE id=?').run(data.name, data.date, data.owner, data.id)
+        if (operation) this.endOperation(operation)
       })()
     } catch (error) {
       if (renamed) {
         try { fs.renameSync(newDir, oldDir) }
-        catch { throw new Error(`事项保存失败且附件目录未能还原，请检查：${newDir}`) }
+        catch { throw new Error(`事项保存失败且附件目录未能还原，下次启动时会自动还原：${newDir}`) }
       }
+      if (operation) this.endOperation(operation)
       throw error
     }
   }

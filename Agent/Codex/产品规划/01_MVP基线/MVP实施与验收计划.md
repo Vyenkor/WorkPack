@@ -28,7 +28,7 @@
 - 验收记录绑定提交、安装包版本及测试结果。
 - 所有用户安装后的交互式卸载清理需有专项证据。
 
-2026-11-08 的检查基线为[发布版提交 5b02b97](https://github.com/Vyenkor/WorkPack/commit/5b02b97e1c4c057e953cbde325097bb6c6ba6266)，修复复核对象为 [PR 57](https://github.com/Vyenkor/WorkPack/pull/57) 的提交 709fc3c。是否进入正式发布以合入后的提交和安装包复验为准。
+2026-11-08 的检查基线为已发布的 [v0.3.1](https://github.com/Vyenkor/WorkPack/releases/tag/v0.3.1)，对应合入提交 [ae7c9af](https://github.com/Vyenkor/WorkPack/commit/ae7c9afd87e67d2b33b0d16aad0f177e055e9a59)。[PR 57](https://github.com/Vyenkor/WorkPack/pull/57) 的最终复核对象为头提交 [98e66b6](https://github.com/Vyenkor/WorkPack/commit/98e66b6594d90083f60d6c47c9c0e2b0094f4db1)，包含其前序提交 [43d5733](https://github.com/Vyenkor/WorkPack/commit/43d5733) 对并发文件不覆盖保护的修复。验收记录以该发布版提交、安装包版本及复验结果为准。
 
 ## 后续衔接
 

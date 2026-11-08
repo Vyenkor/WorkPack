@@ -80,6 +80,33 @@ function plan(manager: StorageManager, sql: string, ...params: unknown[]) {
   return (manager.service.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as Array<{ detail: string }>).map(row => row.detail).join('\n')
 }
 
+describe('#40 grouped snapshot assembly', () => {
+  it('attaches every row to its own parent and keeps table and task order', () => {
+    const w = workspace()
+    try {
+      const service = w.manager.service
+      for (const name of ['甲模板', '乙模板']) service.saveLibraryFile({ name, purpose: `${name}用途`, categoryId: null })
+      const [a, b] = service.snapshot().templates
+      service.importLibraryFile(b.id, [file(w.root, '乙.docx')])
+      const input = { customer: '客户', contact: '', owner: '张三', note: '' }
+      const p1 = service.saveProject({ name: '项目一', ...input }), p2 = service.saveProject({ name: '项目二', ...input })
+      const e1 = service.createLibraryEvent({ projectId: p1, templateIds: [a.id, b.id], name: '一号', date: '2026-11-01', owner: '张三' })
+      const e2 = service.createLibraryEvent({ projectId: p2, templateIds: [b.id], name: '二号', date: '2026-11-02', owner: '李四' })
+      const first = service.snapshot().projects.find(p => p.id === p1)!.events[0].items[0]
+      for (const task of ['归档', '签字']) service.saveDocumentTask({ itemId: first.id, name: task })
+      const snapshot = service.snapshot()
+      expect(snapshot.templates.map(t => [t.name, t.purpose, t.assets.length])).toEqual([['甲模板', '甲模板用途', 0], ['乙模板', '乙模板用途', 1]])
+      const one = snapshot.projects.find(p => p.id === p1)!, two = snapshot.projects.find(p => p.id === p2)!
+      expect(one.events.map(e => e.id)).toEqual([e1])
+      expect(two.events.map(e => e.id)).toEqual([e2])
+      expect(one.events[0].templateIds).toEqual([a.id, b.id])
+      expect(one.events[0].items.map(i => [i.name, i.attachments.length])).toEqual([['甲模板', 0], ['乙模板', 1]])
+      expect(one.events[0].items[0].tasks.map(t => t.name)).toEqual(['准备文件', '归档', '签字'])
+      expect(two.events[0].items.map(i => [i.name, i.attachments.length, i.tasks.length])).toEqual([['乙模板', 1, 1]])
+    } finally { w.cleanup() }
+  })
+})
+
 describe('#46 document_tasks lookups by item', () => {
   it('uses an index for cascading deletes and the next task position, including in an existing database', () => {
     const w = workspace()

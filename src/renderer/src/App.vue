@@ -376,7 +376,8 @@ async function refresh(showLoading: boolean | Event = true) {
     if (showLoading) loading.value = false
   }
 }
-async function run<T>(action: () => Promise<T>, success?: string): Promise<T | boolean> {
+/** `readOnly` actions such as opening a file change no data, so only a failure (e.g. a missing file) needs a refresh. */
+async function run<T>(action: () => Promise<T>, success?: string, options: { readOnly?: boolean } = {}): Promise<T | boolean> {
   if (busy.value) return false
   const drawerControl = drawerCard.value?.contains(document.activeElement) ? document.activeElement as HTMLElement : null
   const modalControl = modalCard.value?.contains(document.activeElement) ? document.activeElement as HTMLElement : null
@@ -384,11 +385,12 @@ async function run<T>(action: () => Promise<T>, success?: string): Promise<T | b
   busy.value = true
   try {
     const result = await action()
-    await refresh(false)
+    if (!options.readOnly) await refresh(false)
     const completed = result === undefined ? true : result === false || result === 0 ? false : result
     if (success && completed !== false) showToast(success)
     return completed
   } catch (error) {
+    if (options.readOnly) await refresh(false)
     showToast(error instanceof Error ? error.message : '操作失败', 'error')
     return false
   } finally {
@@ -533,10 +535,10 @@ async function keepFocus<T>(action: () => Promise<T>, control: HTMLElement | nul
   return result
 }
 async function importAttachments(id: string) { await run(() => window.workpack.importAttachments(id), '上传完成') }
-async function openAttachment(id: string) { await run(() => window.workpack.openAttachment(id)) }
+async function openAttachment(id: string) { await run(() => window.workpack.openAttachment(id), undefined, { readOnly: true }) }
 async function relocateAttachment(id: string) { await run(() => window.workpack.relocateAttachment(id), '已重新关联') }
 async function removeAttachment(id: string) { if (window.confirm('移除附件记录？原文件不会删除。')) await run(() => window.workpack.removeAttachment(id), '已移除') }
-async function openProjectFolder(project: Project) { await run(() => window.workpack.openProject(project.id)) }
+async function openProjectFolder(project: Project) { await run(() => window.workpack.openProject(project.id), undefined, { readOnly: true }) }
 async function relocateProject(project: Project) { const moved = await run(() => window.workpack.relocateProject(project.id), '已重新定位'); if (moved) await refresh() }
 
 function handleWorkspaceOutside(event: MouseEvent) {

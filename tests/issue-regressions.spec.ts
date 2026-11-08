@@ -195,6 +195,41 @@ test('issue 54: closed action menus register no global listeners', async () => {
   expect(await listeners()).toEqual({ pointerdown: 0, scroll: 0, resize: 0 })
 })
 
+test('issue 40: opening a project folder does not reload the whole workspace unless it fails', async () => {
+  const projects = path.join(root, 'projects')
+  fs.mkdirSync(projects)
+  await app.evaluate(({ dialog, ipcMain, shell }, folder) => {
+    Object.defineProperty(dialog, 'showOpenDialog', { configurable: true, value: async () => ({ canceled: false, filePaths: [folder] }) })
+    Object.defineProperty(shell, 'openPath', { configurable: true, value: async () => '' })
+    const handlers = (ipcMain as unknown as { _invokeHandlers: Map<string, (...args: any[]) => unknown> })._invokeHandlers
+    const snapshot = handlers.get('workpack:snapshot')!
+    const state = globalThis as unknown as { snapshots: number }
+    state.snapshots = 0
+    ipcMain.removeHandler('workpack:snapshot')
+    ipcMain.handle('workpack:snapshot', (...args) => { state.snapshots++; return snapshot(...args) })
+  }, projects)
+  const folder = await page.evaluate(async () => {
+    await window.workpack.chooseStorageLocation('project')
+    await window.workpack.saveProject({ name: '只读打开', customer: '测试客户', owner: '负责人', contact: '', note: '' })
+    return (await window.workpack.snapshot()).projects[0].folder
+  })
+  await page.reload()
+  await nav('项目').click()
+  await page.locator('.project-card-main').click()
+  const snapshots = () => app.evaluate(() => (globalThis as unknown as { snapshots: number }).snapshots)
+  await expect.poll(snapshots).toBeGreaterThan(0)
+  const before = await snapshots()
+  const open = page.locator('.project-folder').getByRole('button', { name: '打开文件夹', exact: true })
+  await open.click()
+  await expect(open).toBeEnabled()
+  expect(await snapshots()).toBe(before)
+  fs.rmSync(folder, { recursive: true, force: true })
+  await open.click()
+  await expect(page.locator('.toast.error')).toContainText('项目文件夹已失效')
+  expect(await snapshots()).toBe(before + 1)
+  await expect(page.locator('.project-folder .availability')).toHaveText('目录不可用')
+})
+
 test('issue 37: Escape dismisses the open category picker before the dirty template dialog', async () => {
   const confirmations: string[] = []
   page.on('dialog', async dialog => { confirmations.push(dialog.message()); await dialog.dismiss() })

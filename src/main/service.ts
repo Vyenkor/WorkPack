@@ -62,6 +62,16 @@ function sameEntry(a: string, b: string) {
     return left.dev === right.dev && left.ino === right.ino
   } catch { return false }
 }
+/** Rows keep their table order within each group. */
+function groupBy(rows: Row[], key: string) {
+  const groups = new Map<string, Row[]>()
+  for (const row of rows) {
+    const list = groups.get(row[key])
+    if (list) list.push(row)
+    else groups.set(row[key], [row])
+  }
+  return groups
+}
 function present(file: string) { try { return fs.statSync(file).isFile() } catch { return false } }
 function folderPresent(file: string) { try { return fs.statSync(file).isDirectory() } catch { return false } }
 export const libraryDatabaseFile = 'workpack-v3.sqlite'
@@ -197,26 +207,26 @@ export class WorkPackService {
     throw new Error('重名文件过多，请整理目标目录')
   }
   snapshot(): Snapshot {
-    const assets = this.all('assets')
-    const metadata = this.all('library_meta')
-    const templates = this.all('templates').map(t => ({ ...t, purpose: metadata.find(m => m.template_id === t.id)?.purpose ?? '', categoryId: metadata.find(m => m.template_id === t.id)?.category_id ?? null, assets: assets.filter(a => a.template_id === t.id).map(a => {
+    const assets = groupBy(this.all('assets'), 'template_id')
+    const metadata = new Map(this.all('library_meta').map(m => [m.template_id, m]))
+    const templates = this.all('templates').map(t => ({ ...t, purpose: metadata.get(t.id)?.purpose ?? '', categoryId: metadata.get(t.id)?.category_id ?? null, assets: (assets.get(t.id) ?? []).map(a => {
       let exists = false
       try { exists = present(inside(this.templateRoot, a.path)) } catch { /* Keep unavailable assets visible. */ }
       return { id: a.id, name: a.name, path: a.path, exists }
     }) })) as Template[]
-    const allEvents = this.all('events'), allItems = this.all('items'), attachments = this.all('attachments')
-    const tasks = this.all('document_tasks')
-    const eventTemplates = this.all('event_templates')
+    const allEvents = groupBy(this.all('events'), 'project_id'), allItems = groupBy(this.all('items'), 'event_id'), attachments = groupBy(this.all('attachments'), 'item_id')
+    const tasks = groupBy(this.all('document_tasks'), 'item_id')
+    const eventTemplates = groupBy(this.all('event_templates'), 'event_id')
     const projects = this.all('projects').map(p => {
       let folderExists = false
       try { this.root(p); folderExists = true } catch { /* A replaced directory is not the original project. */ }
       return {
       id: p.id, name: p.name, customer: p.customer, contact: p.contact, owner: p.owner, note: p.note, folder: p.folder, folderExists,
-      events: allEvents.filter(e => e.project_id === p.id).map(e => ({
-        id: e.id, projectId: p.id, templateId: e.template_id, templateIds: eventTemplates.filter(link => link.event_id === e.id).map(link => link.template_id), name: e.name, date: e.date, owner: e.owner,
-        items: allItems.filter(i => i.event_id === e.id).map(i => ({
-          id: i.id, eventId: e.id, name: i.name, note: i.note, templateId: i.template_id ?? null, tasks: tasks.filter(task => task.item_id === i.id).sort((a,b) => a.position - b.position).map(task => ({ id: task.id, itemId: i.id, name: task.name, done: Boolean(task.done), position: task.position })),
-          attachments: attachments.filter(a => a.item_id === i.id).map(a => {
+      events: (allEvents.get(p.id) ?? []).map(e => ({
+        id: e.id, projectId: p.id, templateId: e.template_id, templateIds: (eventTemplates.get(e.id) ?? []).map(link => link.template_id), name: e.name, date: e.date, owner: e.owner,
+        items: (allItems.get(e.id) ?? []).map(i => ({
+          id: i.id, eventId: e.id, name: i.name, note: i.note, templateId: i.template_id ?? null, tasks: (tasks.get(i.id) ?? []).sort((a,b) => a.position - b.position).map(task => ({ id: task.id, itemId: i.id, name: task.name, done: Boolean(task.done), position: task.position })),
+          attachments: (attachments.get(i.id) ?? []).map(a => {
             let exists = false
             try { exists = folderExists && present(inside(p.folder, a.path)) } catch { /* Invalid paths are shown as missing. */ }
             return { id: a.id, itemId: i.id, name: a.name, path: a.path, createdAt: a.created_at, exists }

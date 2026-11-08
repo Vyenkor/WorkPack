@@ -9,7 +9,8 @@ class SingleInstanceTest(unittest.TestCase):
     def test_second_instance_quits_before_opening_the_database(self):
         lock = INDEX.index("app.requestSingleInstanceLock()")
         quit_without_lock = INDEX.index("if (!hasInstanceLock)", lock)
-        database = INDEX.index("new StorageManager", quit_without_lock)
+        database = INDEX.index("openStorage()", quit_without_lock)
+        self.assertIn("new StorageManager", INDEX[INDEX.index("function openStorage"):lock])
         self.assertLess(lock, quit_without_lock)
         self.assertLess(quit_without_lock, database)
         self.assertIn("app.quit()", INDEX[quit_without_lock:database])

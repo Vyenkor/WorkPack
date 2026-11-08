@@ -8,7 +8,7 @@ export interface BusinessEvent { id: string; projectId: string; templateId: stri
 export interface Project { id: string; name: string; customer: string; contact: string; owner: string; note: string; folder: string; folderExists: boolean; events: BusinessEvent[] }
 export interface Snapshot { projects: Project[]; templates: Template[]; categories: LibraryCategory[]; pendingView: PendingViewState }
 export interface StorageLocations { project: string; template: string; workspace: string }
-export interface StorageChangeResult { locations: StorageLocations; warning?: string }
+export interface StorageChangeResult { locations: StorageLocations; unavailable: (keyof StorageLocations)[]; warning?: string }
 export interface ProjectInput { id?: string; name: string; customer: string; contact: string; owner: string; note: string }
 export interface EventInput { projectId: string; templateIds: string[]; name: string; date: string; owner: string }
 export interface EventUpdateInput { id: string; projectId: string; name: string; date: string; owner: string }
@@ -41,7 +41,12 @@ export interface WorkPackAPI {
   setDocumentTaskDone(input: { id: string; done: boolean }): Promise<void>
   deleteDocumentTask(id: string): Promise<void>
   storageLocations(): Promise<StorageLocations>
+  unavailableStorage(): Promise<(keyof StorageLocations)[]>
   chooseStorageLocation(kind: keyof StorageLocations): Promise<StorageChangeResult | null>
+}
+/** `YYYY-MM-DD` on the user's calendar. `toISOString()` gives the UTC date instead. */
+export function localDateInput(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 export function progress(items: Item[]) {
   let total = 0, done = 0
@@ -54,9 +59,13 @@ export function progress(items: Item[]) {
 export function unfinished(items: Item[]): number { return items.filter(item => gaps(item).length > 0).length }
 export type CompletionFilter = 'all' | 'open' | 'done'
 export interface PendingFilterQuery { keyword: string; projectId: string; customer: string; owner: string; status: CompletionFilter }
-export function matchesCompletionFilter(percent: number, hasWork: boolean, status: CompletionFilter) {
+/** Uses the same gaps as the pending page; the rounded percentage is for display only. */
+export function projectComplete(project: Project) {
+  const items = project.events.flatMap(event => event.items)
+  return items.length > 0 && items.every(item => gaps(item).length === 0)
+}
+export function matchesCompletionFilter(complete: boolean, status: CompletionFilter) {
   if (status === 'all') return true
-  const complete = percent === 100 && hasWork
   return status === 'done' ? complete : !complete
 }
 export function gaps(item: Item): string[] {
@@ -76,6 +85,19 @@ export function matchesPendingQuery(row: { project: Project; event: BusinessEven
   }
   const keyword = query.keyword.trim().toLowerCase()
   return !keyword || [row.project.name, row.project.customer, row.project.owner, row.event.name, row.event.owner, row.item.name].some(value => value.toLowerCase().includes(keyword))
+}
+export type SearchTarget = { project: Project; event?: BusinessEvent }
+/** Projects first, then matters by name (including empty ones), then file and attachment names. */
+export function findSearchTarget(projects: readonly Project[], keyword: string): SearchTarget | null {
+  const value = keyword.trim().toLowerCase()
+  if (!value) return null
+  const matches = (text: string) => text.toLowerCase().includes(value)
+  const project = projects.find(item => [item.name, item.customer, item.owner].some(matches))
+  if (project) return { project }
+  const events = projects.flatMap(project => project.events.map(event => ({ project, event })))
+  return events.find(({ event }) => matches(event.name))
+    ?? events.find(({ event }) => event.items.some(item => [item.name, ...item.attachments.map(file => file.name)].some(matches)))
+    ?? null
 }
 export type PendingGroupBy = 'project' | 'owner' | 'none'
 export interface PendingGroup<T> { key: string; label: string; rows: T[] }

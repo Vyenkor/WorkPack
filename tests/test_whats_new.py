@@ -14,7 +14,7 @@ class WhatsNewTest(unittest.TestCase):
         self.assertIn('<span>News</span>', menu)
         self.assertIn('v-else class="whats-new"', menu)
         self.assertIn("最近更新", menu)
-        for item in ("浅色工作区与紧凑列表", "侧栏支持折叠、返回与前进", "统一字体、图标及控件尺寸", "减淡分隔线，精简页面布局"):
+        for item in ("模板迁移支持中断后重试", "工作空间丢失时可重新定位", "修复文件进度与待办状态", "加快列表加载与文件操作"):
             self.assertIn(f"<li>{item}</li>", menu)
         self.assertEqual(menu.count("<li>"), 4)
         self.assertIn('go(\'settings\')', menu)

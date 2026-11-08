@@ -4,7 +4,7 @@ import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import type { StorageChangeResult } from '../shared/model'
-import { inside, libraryDatabaseFile, WorkPackService } from './service'
+import { inside, isSameOrInside, libraryDatabaseFile, WorkPackService } from './service'
 
 export type StorageKind = 'project' | 'template' | 'workspace'
 export interface StorageLocations { project: string; template: string; workspace: string }
@@ -17,10 +17,18 @@ function selectedDirectory(value: string) {
   if (!path.isAbsolute(value) || !fs.existsSync(value) || !fs.statSync(value).isDirectory()) throw new Error('请选择已存在的目录')
   return fs.realpathSync(value)
 }
-function digest(file: string) { return createHash('sha256').update(fs.readFileSync(file)).digest('hex') }
-function isSameOrInside(child: string, parent: string) {
-  const relative = path.relative(parent, child)
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative))
+function isDirectory(value: string) { try { return fs.statSync(value).isDirectory() } catch { return false } }
+function isFile(value: string) { try { return fs.statSync(value).isFile() } catch { return false } }
+const templateManifestSchema = z.object({ source: z.string(), publication: z.literal('link').optional(), files: z.array(z.object({ path: z.string(), sha256: z.string(), staging: z.string().optional() })) })
+type TemplateManifest = z.infer<typeof templateManifestSchema>
+/** Streams in fixed-size chunks so memory stays bounded and the main process keeps handling events however large a template is. */
+export async function fileDigest(file: string) {
+  const hash = createHash('sha256')
+  for await (const chunk of fs.createReadStream(file, { highWaterMark: 1 << 20 })) hash.update(chunk as Buffer)
+  return hash.digest('hex')
+}
+function createdDirectory(directory: string) {
+  try { fs.mkdirSync(directory, { recursive: true }); return isDirectory(directory) } catch { return false }
 }
 function isDriveRoot(directory: string) {
   if (path.parse(directory).root === directory) return true
@@ -84,33 +92,64 @@ function rejectUnsuitable(kind: StorageKind, directory: string): string | undefi
   return undefined
 }
 
+/** A configured workspace whose database is gone. Launch must not replace it with an empty one. */
+export class WorkspaceMissingError extends Error {
+  constructor(readonly workspace: string) { super(`找不到工作空间数据库：${path.join(workspace, libraryDatabaseFile)}`) }
+}
+/**
+ * `locate` points the configuration at a folder that already holds the database.
+ * `create` starts an empty database in the configured folder at the user's request.
+ */
+export type WorkspaceRecovery = { locate: string } | { create: true }
+
 /** The pointer remains in userData; the database and template files can live elsewhere. */
 export class StorageManager {
   readonly configPath: string
   readonly defaults: StorageLocations
   locations: StorageLocations
   service: WorkPackService
-  constructor(systemDirectory: string, defaultProjectDirectory: string) {
+  private changing = false
+  constructor(systemDirectory: string, defaultProjectDirectory: string, recovery?: WorkspaceRecovery) {
     fs.mkdirSync(systemDirectory, { recursive: true })
     this.configPath = path.join(systemDirectory, 'storage.json')
+    // Without a pointer file, this marker tells a missing default database apart from a first launch.
+    const initializedPath = path.join(systemDirectory, 'workspace.initialized')
     this.defaults = { project: defaultProjectDirectory, template: path.join(systemDirectory, 'templates'), workspace: systemDirectory }
-    const stored = fs.existsSync(this.configPath) ? locationsSchema.parse(JSON.parse(fs.readFileSync(this.configPath, 'utf8'))) : { ...this.defaults }
-    this.locations = this.canonicalize(stored)
+    const configured = fs.existsSync(this.configPath), initialized = fs.existsSync(initializedPath)
+    const stored = configured ? locationsSchema.parse(JSON.parse(fs.readFileSync(this.configPath, 'utf8'))) : { ...this.defaults }
+    if (recovery && 'locate' in recovery) stored.workspace = recovery.locate
+    const mustExist = (configured || initialized) && !(recovery && 'create' in recovery)
+    this.locations = this.canonicalize(stored, mustExist)
     this.clearCommittedMarker(this.locations.workspace)
-    this.service = this.open(this.locations)
+    // A manifest in the folder the pointer already names belongs to a move that committed.
+    this.clearCommittedTemplateManifest(this.locations.template)
+    this.service = this.open(this.locations, mustExist)
+    if (!initialized) try { fs.writeFileSync(initializedPath, '') } catch { /* Launch goes on; the next one writes the marker again. */ }
+    if (recovery && 'locate' in recovery) {
+      try { this.write(this.locations) }
+      catch (error) { this.service.close(); throw error }
+    }
   }
-  private canonicalize(locations: StorageLocations): StorageLocations {
+  private canonicalize(locations: StorageLocations, workspaceMustExist: boolean): StorageLocations {
     const next = { ...locations }
     for (const key of ['project', 'template', 'workspace'] as const) {
       if (!path.isAbsolute(next[key])) throw new Error('存储配置中的路径必须是绝对路径')
-      fs.mkdirSync(next[key], { recursive: true })
+      if (key === 'workspace' && workspaceMustExist) {
+        if (!fs.existsSync(this.databasePath(next[key]))) throw new WorkspaceMissingError(next[key])
+      } else if (key !== 'workspace') {
+        // An offline drive or share stays configured and is reported as unavailable. Only a default folder is created.
+        if (!isDirectory(next[key]) && (path.resolve(next[key]) !== path.resolve(this.defaults[key]) || !createdDirectory(next[key]))) {
+          next[key] = path.resolve(next[key])
+          continue
+        }
+      } else fs.mkdirSync(next[key], { recursive: true })
       next[key] = fs.realpathSync(next[key])
       if (!fs.statSync(next[key]).isDirectory()) throw new Error('存储位置必须是文件夹')
     }
     return next
   }
-  private open(locations: StorageLocations) {
-    return new WorkPackService(locations.workspace, undefined, { templateRoot: locations.template, projectRoot: locations.project })
+  private open(locations: StorageLocations, databaseMustExist = false) {
+    return new WorkPackService(locations.workspace, undefined, { templateRoot: locations.template, projectRoot: locations.project, databaseMustExist })
   }
   private write(locations: StorageLocations) {
     const temp = `${this.configPath}.${randomUUID()}.tmp`
@@ -119,8 +158,8 @@ export class StorageManager {
     catch (error) { fs.rmSync(temp, { force: true }); throw error }
   }
   private result(warning?: string): StorageChangeResult {
-    const locations = { ...this.locations }
-    return warning ? { locations, warning } : { locations }
+    const locations = { ...this.locations }, unavailable = this.unavailable()
+    return warning ? { locations, unavailable, warning } : { locations, unavailable }
   }
   private databasePath(workspace: string) { return path.join(workspace, libraryDatabaseFile) }
   private markerPath(destination: string) { return path.join(path.dirname(destination), `.${path.basename(destination)}.migrating`) }
@@ -209,16 +248,86 @@ export class StorageManager {
     try { fs.rmSync(this.markerPath(destination), { force: true }) } catch { /* The next launch removes a marker in the committed directory. */ }
     return this.result(warning)
   }
-  private changeTemplates(directory: string, next: StorageLocations, warning?: string): StorageChangeResult {
+  /** Lists the copies a template move is about to create, so an interrupted move can recognise its own files. */
+  private templateManifestPath(directory: string) { return path.join(directory, '.workpack-templates.migrating') }
+  private writeTemplateManifest(directory: string, manifest: TemplateManifest) {
+    const target = this.templateManifestPath(directory), temp = `${target}.${randomUUID()}.tmp`
+    fs.writeFileSync(temp, JSON.stringify(manifest), { flag: 'wx' })
+    try { fs.renameSync(temp, target) }
+    catch (error) { fs.rmSync(temp, { force: true }); throw error }
+  }
+  private readTemplateManifest(directory: string): TemplateManifest | null {
+    try {
+      const parsed = templateManifestSchema.safeParse(JSON.parse(fs.readFileSync(this.templateManifestPath(directory), 'utf8')))
+      return parsed.success ? parsed.data : null
+    } catch { return null }
+  }
+  private clearCommittedTemplateManifest(directory: string) {
+    try {
+      const manifest = this.readTemplateManifest(directory)
+      if (manifest?.publication === 'link') for (const file of manifest.files) {
+        if (file.staging) fs.rmSync(inside(directory, file.staging, '模板'), { force: true })
+      }
+      fs.rmSync(this.templateManifestPath(directory), { force: true })
+    } catch { /* Keep the manifest so the next launch can finish cleaning its staging files. */ }
+  }
+  private sameFile(left: string, right: string) {
+    try {
+      const a = fs.statSync(left, { bigint: true }), b = fs.statSync(right, { bigint: true })
+      return a.dev === b.dev && a.ino === b.ino
+    } catch { return false }
+  }
+  /**
+   * Removes copies left by an interrupted move from the same source. A staging file has a name no one else uses and is
+   * always ours; a file at its final name is ours only when it matches the recorded copy.
+   */
+  private async clearTemplateResidue(directory: string, sourceRoot: string) {
+    const manifest = this.readTemplateManifest(directory)
+    if (manifest?.source !== sourceRoot) return
+    for (const file of manifest.files) {
+      let target: string, staging: string | undefined
+      try {
+        target = inside(directory, file.path, '模板')
+        if (file.staging) staging = inside(directory, file.staging, '模板')
+      } catch { continue }
+      const owned = manifest.publication === 'link'
+        ? Boolean(staging && this.sameFile(staging, target)) && await fileDigest(target) === file.sha256
+        : isFile(target) && await fileDigest(target) === file.sha256
+      if (owned) fs.rmSync(target)
+      if (staging && isFile(staging)) fs.rmSync(staging)
+      for (let dir = path.dirname(target); dir !== directory && isSameOrInside(dir, directory) && isDirectory(dir) && !fs.readdirSync(dir).length; dir = path.dirname(dir)) fs.rmdirSync(dir)
+    }
+    fs.rmSync(this.templateManifestPath(directory), { force: true })
+  }
+  /** Project and template folders that cannot be reached right now, such as a disconnected drive. */
+  unavailable(): StorageKind[] { return (['project', 'template'] as const).filter(kind => !isDirectory(this.locations[kind])) }
+  private async changeTemplates(directory: string, next: StorageLocations, warning?: string): Promise<StorageChangeResult> {
     const sourceRoot = this.locations.template
-    const assets = this.service.snapshot().templates.flatMap(template => template.assets)
+    if (!isDirectory(sourceRoot)) {
+      // Nothing can be copied from an unreachable folder; point at the folder the user chose instead.
+      this.write(next)
+      this.service.templateRoot = directory
+      this.locations = next
+      return this.result(warning)
+    }
+    const plan: Array<{ asset: { name: string; path: string }; source: string; target: string; staging: string; sha256: string }> = []
+    for (const asset of this.service.snapshot().templates.flatMap(template => template.assets)) {
+      const source = inside(sourceRoot, asset.path, '模板')
+      if (!asset.exists) throw new Error(`模板文件已失效：${asset.name}`)
+      const target = inside(directory, asset.path, '模板')
+      const staging = inside(directory, path.join(path.dirname(asset.path), `.workpack-${randomUUID()}.tmp`), '模板')
+      plan.push({ asset, source, target, staging, sha256: await fileDigest(source) })
+    }
+    await this.clearTemplateResidue(directory, sourceRoot)
+    // The manifest must never list a file that was there before the move, or a retry would delete it as residue.
+    const taken = plan.find(file => fs.existsSync(file.target))
+    if (taken) throw new Error(`目标目录已有同名文件：${taken.asset.name}`)
+    this.writeTemplateManifest(directory, { source: sourceRoot, publication: 'link', files: plan.map(file => ({ path: file.asset.path, sha256: file.sha256, staging: path.relative(directory, file.staging) })) })
     const createdFiles: string[] = []
     const createdDirs: string[] = []
     try {
-      for (const asset of assets) {
-        const source = inside(sourceRoot, asset.path, '模板')
-        const target = inside(directory, asset.path, '模板')
-        if (!asset.exists) throw new Error(`模板文件已失效：${asset.name}`)
+      // A copy is written under its staging name and takes its final name only once verified, so a final name never holds a partial file.
+      for (const { asset, source, target, staging, sha256 } of plan) {
         if (fs.existsSync(target)) throw new Error(`目标目录已有同名文件：${asset.name}`)
         const parts = path.relative(directory, path.dirname(target)).split(path.sep)
         let current = directory
@@ -228,24 +337,42 @@ export class StorageManager {
           if (!fs.existsSync(current)) { fs.mkdirSync(current); createdDirs.push(current) }
           else if (!fs.statSync(current).isDirectory() || fs.lstatSync(current).isSymbolicLink()) throw new Error('目标目录包含非普通文件夹')
         }
-        fs.copyFileSync(source, target, fs.constants.COPYFILE_EXCL)
+        try { await fs.promises.copyFile(source, staging, fs.constants.COPYFILE_EXCL) }
+        catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST' && fs.existsSync(staging)) createdFiles.push(staging)
+          throw error
+        }
+        createdFiles.push(staging)
+        if (await fileDigest(staging) !== sha256) throw new Error(`模板文件校验失败：${asset.name}`)
+        if (fs.existsSync(target)) throw new Error(`目标目录已有同名文件：${asset.name}`)
+        // link publishes atomically and fails with EEXIST instead of replacing another writer's file.
+        // Keep staging until the pointer commits: its file identity proves which final files we own after a crash.
+        await fs.promises.link(staging, target)
         createdFiles.push(target)
-        if (digest(source) !== digest(target)) throw new Error(`模板文件校验失败：${asset.name}`)
       }
       this.write(next)
     } catch (error) {
       for (const file of createdFiles.reverse()) fs.rmSync(file, { force: true })
-      for (const folder of createdDirs.reverse()) fs.rmdirSync(folder)
+      for (const folder of createdDirs.reverse()) if (!fs.readdirSync(folder).length) fs.rmdirSync(folder)
+      fs.rmSync(this.templateManifestPath(directory), { force: true })
       throw error
     }
     this.service.templateRoot = directory
     this.locations = next
+    this.clearCommittedTemplateManifest(directory)
     return this.result(warning)
   }
-  change(kind: StorageKind, selected: string): StorageChangeResult {
+  async change(kind: StorageKind, selected: string): Promise<StorageChangeResult> {
+    if (this.changing) throw new Error('存储位置正在更改，请等待完成后再试')
+    this.changing = true
+    try { return await this.applyChange(kind, selected) }
+    finally { this.changing = false }
+  }
+  private async applyChange(kind: StorageKind, selected: string): Promise<StorageChangeResult> {
     const directory = selectedDirectory(selected)
     if (directory === this.locations[kind]) return this.result()
     const warning = rejectUnsuitable(kind, directory)
+    if (this.service.projectFolders().some(folder => isSameOrInside(directory, folder))) throw new Error('不能选择项目文件夹或其中的目录，删除事项时会一并删除其中的文件')
     const next = { ...this.locations, [kind]: directory }
     if (kind === 'project') {
       this.write(next)
@@ -254,7 +381,10 @@ export class StorageManager {
       return this.result(warning)
     }
     if (kind === 'workspace') return this.changeWorkspace(directory, next, warning)
-    return this.changeTemplates(directory, next, warning)
+    const service = this.service
+    service.templateMoveInProgress = true
+    try { return await this.changeTemplates(directory, next, warning) }
+    finally { service.templateMoveInProgress = false }
   }
   close() { this.service.close() }
 }

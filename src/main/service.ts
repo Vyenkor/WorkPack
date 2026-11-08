@@ -14,10 +14,27 @@ const eventUpdateSchema = z.object({ id, projectId: id, name, date: dateSchema, 
 const itemSchema = z.object({ id: id.optional(), eventId: id, name, note: text })
 type Row = Record<string, any>
 
-export function safeName(value: string): string {
-  const result = name.parse(value)
+/** Windows limits one path component to 255 UTF-16 code units. */
+const maxFileName = 255
+function windowsSafe(result: string) {
   if (/[<>:"/\\|?*\x00-\x1f]/.test(result) || /[. ]$/.test(result) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(result) || result === '.' || result === '..') throw new Error('名称不能包含 Windows 保留名称、特殊字符或末尾句点')
   return result
+}
+export function safeName(value: string): string { return windowsSafe(name.parse(value)) }
+export function safeFileName(value: string): string {
+  if (!value.trim()) throw new Error('文件名不能为空')
+  if (value.length > maxFileName) throw new Error(`文件名不能超过 ${maxFileName} 个字符`)
+  return windowsSafe(value)
+}
+/** `name (n).ext`, shortening the name rather than the extension so the result stays a valid file name. */
+export function numberedFileName(original: string, n: number): string {
+  const { name: stem, ext } = path.parse(original), suffix = ` (${n})`
+  const room = maxFileName - suffix.length - ext.length
+  if (room < 1) throw new Error('文件扩展名过长，无法生成不重名的文件名')
+  const chars = Array.from(stem)
+  while (chars.join('').length > room) chars.pop()
+  const shortened = chars.join('').replace(/[. ]+$/, '')
+  return `${shortened || '_'}${suffix}${ext}`
 }
 function directory(value: string) {
   if (!path.isAbsolute(value) || !fs.statSync(value).isDirectory()) throw new Error('目录不存在，请重新选择')
@@ -34,6 +51,27 @@ export function inside(root: string, relative: string, area = '项目'): string 
   }
   return target
 }
+export function isSameOrInside(child: string, parent: string) {
+  const relative = path.relative(parent, child)
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+}
+function real(value: string) { try { return fs.realpathSync(value) } catch { return path.resolve(value) } }
+function sameEntry(a: string, b: string) {
+  try {
+    const left = fs.statSync(a, { bigint: true }), right = fs.statSync(b, { bigint: true })
+    return left.dev === right.dev && left.ino === right.ino
+  } catch { return false }
+}
+/** Rows keep their table order within each group. */
+function groupBy(rows: Row[], key: string) {
+  const groups = new Map<string, Row[]>()
+  for (const row of rows) {
+    const list = groups.get(row[key])
+    if (list) list.push(row)
+    else groups.set(row[key], [row])
+  }
+  return groups
+}
 function present(file: string) { try { return fs.statSync(file).isFile() } catch { return false } }
 function folderPresent(file: string) { try { return fs.statSync(file).isDirectory() } catch { return false } }
 export const libraryDatabaseFile = 'workpack-v3.sqlite'
@@ -43,12 +81,13 @@ export class WorkPackService {
   db: Database.Database
   templateRoot: string
   projectRoot?: string
-  constructor(readonly dataDirectory: string, readonly copyFile = fs.copyFileSync, locations: { templateRoot?: string; projectRoot?: string } = {}) {
-    fs.mkdirSync(dataDirectory, { recursive: true })
+  templateMoveInProgress = false
+  constructor(readonly dataDirectory: string, readonly copyFile = fs.copyFileSync, locations: { templateRoot?: string; projectRoot?: string; databaseMustExist?: boolean } = {}) {
+    if (!locations.databaseMustExist) fs.mkdirSync(dataDirectory, { recursive: true })
     this.templateRoot = locations.templateRoot ?? path.join(dataDirectory, 'templates')
     this.projectRoot = locations.projectRoot
-    fs.mkdirSync(this.templateRoot, { recursive: true })
-    this.db = new Database(path.join(dataDirectory, libraryDatabaseFile))
+    if (!locations.templateRoot) fs.mkdirSync(this.templateRoot, { recursive: true })
+    this.db = new Database(path.join(dataDirectory, libraryDatabaseFile), { fileMustExist: Boolean(locations.databaseMustExist) })
     this.db.pragma('foreign_keys = ON')
     // WAL keeps recent commits in workpack-v3.sqlite-wal. Copying only the main file while this connection is open can miss them.
     this.db.pragma('journal_mode = WAL')
@@ -76,11 +115,61 @@ export class WorkPackService {
     this.db.exec(`CREATE TABLE IF NOT EXISTS library_categories (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE);
       CREATE TABLE IF NOT EXISTS library_meta (template_id TEXT PRIMARY KEY REFERENCES templates(id) ON DELETE CASCADE, category_id TEXT REFERENCES library_categories(id) ON DELETE SET NULL, purpose TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS event_templates (event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE, template_id TEXT NOT NULL, PRIMARY KEY(event_id, template_id));
-      CREATE TABLE IF NOT EXISTS document_tasks (id TEXT PRIMARY KEY, item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE, name TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL);`)
+      CREATE TABLE IF NOT EXISTS document_tasks (id TEXT PRIMARY KEY, item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE, name TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS document_tasks_item ON document_tasks(item_id, position);
+      CREATE INDEX IF NOT EXISTS assets_template ON assets(template_id);
+      CREATE INDEX IF NOT EXISTS event_templates_template ON event_templates(template_id);
+      CREATE TABLE IF NOT EXISTS pending_operations (id TEXT PRIMARY KEY, kind TEXT NOT NULL, payload TEXT NOT NULL);`)
     this.ensureItemTemplateLink()
     this.db.transaction(() => {
       for (const event of this.all('events')) this.reconcileEventTemplates(event.id)
     })()
+    this.recoverOperations()
+  }
+  /** Recorded before a folder is moved; removed in the same transaction that commits the records. */
+  private beginOperation(kind: string, payload: Record<string, string>) {
+    const operation = randomUUID()
+    this.db.prepare('INSERT INTO pending_operations VALUES (?, ?, ?)').run(operation, kind, JSON.stringify(payload))
+    return operation
+  }
+  private endOperation(operation: string) { this.db.prepare('DELETE FROM pending_operations WHERE id=?').run(operation) }
+  /** Ends every record of a move to `to`, including one left by an earlier attempt whose folder could not be put back. */
+  private endMoves(kind: 'rename-project' | 'move-event', id: string, to: string) {
+    const key = kind === 'rename-project' ? '$.projectId' : '$.eventId'
+    this.db.prepare(`DELETE FROM pending_operations WHERE kind=? AND json_extract(payload, ?)=? AND json_extract(payload, '$.to')=?`).run(kind, key, id, to)
+  }
+  /** Settles folder moves interrupted by a crash. Each step can be repeated; an unreachable folder keeps its record for the next launch. */
+  private recoverOperations() {
+    for (const operation of this.all('pending_operations')) {
+      let settled = false
+      try { settled = this.recover(operation.kind, JSON.parse(operation.payload)) } catch { /* The folder may be offline or in use. */ }
+      if (settled) this.endOperation(operation.id)
+    }
+  }
+  private recover(kind: string, p: Record<string, string>): boolean {
+    if (!folderPresent(p.root)) return false
+    if (kind === 'delete-event') {
+      const kept = this.db.prepare('SELECT 1 FROM events WHERE id=?').get(p.eventId)
+      if (!fs.existsSync(p.trash)) return true
+      if (!kept) { fs.rmSync(p.trash, { recursive: true, force: true }); return true }
+      if (fs.existsSync(p.eventDir)) return false
+      fs.renameSync(p.trash, p.eventDir)
+      return true
+    }
+    // An open rename record means its transaction never committed and the records still name `from`,
+    // unless a later save committed `to`.
+    if (kind === 'rename-project' || kind === 'move-event') {
+      const table = kind === 'rename-project' ? 'projects' : 'events'
+      const row = this.db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(p.projectId ?? p.eventId) as Row | undefined
+      if (!row) return true
+      const committed = kind === 'rename-project' ? row.folder : path.join(p.root, '事项', `${row.date}_${row.id}`)
+      if (committed === p.to) return true
+      if (!fs.existsSync(p.to)) return true
+      if (fs.existsSync(p.from) && !sameEntry(p.from, p.to)) return false
+      fs.renameSync(p.to, p.from)
+      return true
+    }
+    return false
   }
   /** Items created before the file link existed are matched once by name within the matter. */
   private ensureItemTemplateLink() {
@@ -102,6 +191,13 @@ export class WorkPackService {
     })()
   }
   close() { this.db.close() }
+  projectFolders(): string[] { return (this.db.prepare('SELECT folder FROM projects').all() as Array<{ folder: string }>).map(row => real(row.folder)) }
+  /** A recursive delete under `directory` must not reach a storage root or another project. */
+  private assertNothingManagedInside(directory: string, ownProject: string) {
+    const roots = [this.dataDirectory, this.templateRoot, ...(this.projectRoot ? [this.projectRoot] : []), ...this.projectFolders()]
+    const target = real(directory)
+    if (roots.map(real).some(root => root !== real(ownProject) && isSameOrInside(root, target))) throw new Error('事项文件夹中包含存储位置或其他项目，已停止删除。请先在设置中把相关位置移出该事项文件夹')
+  }
   private get(table: string, value: string): Row {
     id.parse(value)
     const result = this.db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(value) as Row | undefined
@@ -143,9 +239,9 @@ export class WorkPackService {
   }
   private copy(source: string, targetDir: string, files: string[]): string {
     if (!present(source)) throw new Error(`来源文件不存在：${path.basename(source)}`)
-    const original = safeName(path.basename(source)), parsed = path.parse(original)
+    const original = safeFileName(path.basename(source))
     for (let n = 0; n < 10000; n++) {
-      const target = path.join(targetDir, n ? `${parsed.name} (${n})${parsed.ext}` : original)
+      const target = path.join(targetDir, n ? numberedFileName(original, n) : original)
       if (fs.existsSync(target)) continue
       try { this.copyFile(source, target, fs.constants.COPYFILE_EXCL) }
       catch (error) {
@@ -159,26 +255,26 @@ export class WorkPackService {
     throw new Error('重名文件过多，请整理目标目录')
   }
   snapshot(): Snapshot {
-    const assets = this.all('assets')
-    const metadata = this.all('library_meta')
-    const templates = this.all('templates').map(t => ({ ...t, purpose: metadata.find(m => m.template_id === t.id)?.purpose ?? '', categoryId: metadata.find(m => m.template_id === t.id)?.category_id ?? null, assets: assets.filter(a => a.template_id === t.id).map(a => {
+    const assets = groupBy(this.all('assets'), 'template_id')
+    const metadata = new Map(this.all('library_meta').map(m => [m.template_id, m]))
+    const templates = this.all('templates').map(t => ({ ...t, purpose: metadata.get(t.id)?.purpose ?? '', categoryId: metadata.get(t.id)?.category_id ?? null, assets: (assets.get(t.id) ?? []).map(a => {
       let exists = false
       try { exists = present(inside(this.templateRoot, a.path)) } catch { /* Keep unavailable assets visible. */ }
       return { id: a.id, name: a.name, path: a.path, exists }
     }) })) as Template[]
-    const allEvents = this.all('events'), allItems = this.all('items'), attachments = this.all('attachments')
-    const tasks = this.all('document_tasks')
-    const eventTemplates = this.all('event_templates')
+    const allEvents = groupBy(this.all('events'), 'project_id'), allItems = groupBy(this.all('items'), 'event_id'), attachments = groupBy(this.all('attachments'), 'item_id')
+    const tasks = groupBy(this.all('document_tasks'), 'item_id')
+    const eventTemplates = groupBy(this.all('event_templates'), 'event_id')
     const projects = this.all('projects').map(p => {
       let folderExists = false
       try { this.root(p); folderExists = true } catch { /* A replaced directory is not the original project. */ }
       return {
       id: p.id, name: p.name, customer: p.customer, contact: p.contact, owner: p.owner, note: p.note, folder: p.folder, folderExists,
-      events: allEvents.filter(e => e.project_id === p.id).map(e => ({
-        id: e.id, projectId: p.id, templateId: e.template_id, templateIds: eventTemplates.filter(link => link.event_id === e.id).map(link => link.template_id), name: e.name, date: e.date, owner: e.owner,
-        items: allItems.filter(i => i.event_id === e.id).map(i => ({
-          id: i.id, eventId: e.id, name: i.name, note: i.note, templateId: i.template_id ?? null, tasks: tasks.filter(task => task.item_id === i.id).sort((a,b) => a.position - b.position).map(task => ({ id: task.id, itemId: i.id, name: task.name, done: Boolean(task.done), position: task.position })),
-          attachments: attachments.filter(a => a.item_id === i.id).map(a => {
+      events: (allEvents.get(p.id) ?? []).map(e => ({
+        id: e.id, projectId: p.id, templateId: e.template_id, templateIds: (eventTemplates.get(e.id) ?? []).map(link => link.template_id), name: e.name, date: e.date, owner: e.owner,
+        items: (allItems.get(e.id) ?? []).map(i => ({
+          id: i.id, eventId: e.id, name: i.name, note: i.note, templateId: i.template_id ?? null, tasks: (tasks.get(i.id) ?? []).sort((a,b) => a.position - b.position).map(task => ({ id: task.id, itemId: i.id, name: task.name, done: Boolean(task.done), position: task.position })),
+          attachments: (attachments.get(i.id) ?? []).map(a => {
             let exists = false
             try { exists = folderExists && present(inside(p.folder, a.path)) } catch { /* Invalid paths are shown as missing. */ }
             return { id: a.id, itemId: i.id, name: a.name, path: a.path, createdAt: a.created_at, exists }
@@ -239,6 +335,8 @@ export class WorkPackService {
     this.get('templates', value)
     if (sources.length !== 1) throw new Error('每个文件模板只能导入一份文件')
     if (this.db.prepare('SELECT 1 FROM assets WHERE template_id=? LIMIT 1').get(value)) throw new Error('请先移除原模板文件记录，再导入新文件')
+    if (!folderPresent(this.templateRoot)) throw new Error('模板存储位置当前不可用，请连接所在磁盘或在设置中重新选择')
+    if (this.templateMoveInProgress) throw new Error('模板正在迁移到新位置，请等待完成后再导入')
     this.atomic((files, dirs) => {
       const target = this.mkdir(this.templateRoot, value, dirs)
       for (const source of sources) {
@@ -261,6 +359,7 @@ export class WorkPackService {
     if (!data.id) {
       const projectParent = this.projectRoot
       if (!projectParent) throw new Error('请先选择项目上级文件夹')
+      if (!folderPresent(projectParent)) throw new Error('项目存储位置当前不可用，请连接所在磁盘或在设置中重新选择')
       const root = path.join(directory(projectParent), projectName), projectId = randomUUID()
       this.atomic((files, dirs) => {
         fs.mkdirSync(root); dirs.push(root)
@@ -272,20 +371,24 @@ export class WorkPackService {
     } else {
       const previous = this.get('projects', data.id), oldRoot = this.root(previous)
       const newRoot = path.join(path.dirname(oldRoot), projectName)
-      let renamed = false
+      let renamed = false, operation: string | null = null
       try {
         if (newRoot !== oldRoot) {
-          if (fs.existsSync(newRoot)) throw new Error('目标目录已存在，请使用其他项目名称')
+          // A case-only change on a case-insensitive disk resolves to the project's own folder.
+          if (fs.existsSync(newRoot) && !sameEntry(newRoot, oldRoot)) throw new Error('目标目录已存在，请使用其他项目名称')
+          operation = this.beginOperation('rename-project', { projectId: data.id, root: path.dirname(oldRoot), from: oldRoot, to: newRoot })
           fs.renameSync(oldRoot, newRoot); renamed = true
         }
-        this.atomic((files, dirs) => {
+        this.atomic(() => {
           this.db.prepare('UPDATE projects SET name=?, customer=?, contact=?, owner=?, note=?, folder=? WHERE id=?').run(projectName, data.customer, data.contact, data.owner, data.note, newRoot, data.id)
+          this.endMoves('rename-project', previous.id, newRoot)
         })
       } catch (error) {
         if (renamed) {
           try { fs.renameSync(newRoot, oldRoot) }
-          catch { throw new Error(`保存失败且目录名称未能还原，请将 ${newRoot} 重新定位到本项目`) }
+          catch { throw new Error(`保存失败且目录名称未能还原，下次启动时会自动还原：${newRoot}`) }
         }
+        if (operation) this.endOperation(operation)
         throw error
       }
       return data.id
@@ -319,28 +422,34 @@ export class WorkPackService {
     const project = this.get('projects', data.projectId), root = this.root(project)
     const oldDir = inside(root, path.join('事项', `${event.date}_${event.id}`))
     const newDir = inside(root, path.join('事项', `${data.date}_${event.id}`))
-    let renamed = false
+    // The folder can already carry the new date when an earlier save stopped before its records were written.
+    const movedEarlier = oldDir !== newDir && !fs.existsSync(oldDir) && folderPresent(newDir)
+    let renamed = false, operation: string | null = null
     try {
       if (oldDir !== newDir && fs.existsSync(oldDir)) {
         if (fs.existsSync(newDir)) throw new Error('新的事项日期目录已存在，请使用其他日期')
+        operation = this.beginOperation('move-event', { eventId: event.id, root, from: oldDir, to: newDir })
         fs.renameSync(oldDir, newDir)
         renamed = true
       }
       this.db.transaction(() => {
-        if (renamed) {
+        if (renamed || movedEarlier) {
           const attachments = this.db.prepare('SELECT a.* FROM attachments a JOIN items i ON i.id=a.item_id WHERE i.event_id=?').all(data.id) as Row[]
           for (const attachment of attachments) {
-            const current = inside(root, attachment.path), relative = path.relative(oldDir, current)
-            this.db.prepare('UPDATE attachments SET path=? WHERE id=?').run(path.relative(root, inside(newDir, relative)), attachment.id)
+            const current = path.resolve(root, attachment.path)
+            if (!isSameOrInside(current, oldDir)) continue
+            this.db.prepare('UPDATE attachments SET path=? WHERE id=?').run(path.relative(root, inside(newDir, path.relative(oldDir, current))), attachment.id)
           }
         }
         this.db.prepare('UPDATE events SET name=?, date=?, owner=? WHERE id=?').run(data.name, data.date, data.owner, data.id)
+        this.endMoves('move-event', data.id, newDir)
       })()
     } catch (error) {
       if (renamed) {
         try { fs.renameSync(newDir, oldDir) }
-        catch { throw new Error(`事项保存失败且附件目录未能还原，请检查：${newDir}`) }
+        catch { throw new Error(`事项保存失败且附件目录未能还原，下次启动时会自动还原：${newDir}`) }
       }
+      if (operation) this.endOperation(operation)
       throw error
     }
   }
@@ -351,10 +460,12 @@ export class WorkPackService {
     const eventsDir = root ? inside(root, '事项') : null
     const eventDir = eventsDir ? inside(eventsDir, `${event.date}_${event.id}`) : null
     const trash = eventDir ? inside(eventsDir!, `.deleting_${event.id}`) : null
-    let moved = false
+    let moved = false, operation: string | null = null
     if (eventDir && trash && fs.existsSync(eventDir)) {
+      this.assertNothingManagedInside(eventDir, root!)
+      operation = this.beginOperation('delete-event', { eventId: event.id, root: root!, eventDir, trash })
       try { fs.renameSync(eventDir, trash); moved = true }
-      catch { throw new Error('事项文件夹中有文件正在使用，请关闭相关文件后重试') }
+      catch { this.endOperation(operation); throw new Error('事项文件夹中有文件正在使用，请关闭相关文件后重试') }
     }
     try {
       this.db.transaction(() => {
@@ -365,9 +476,13 @@ export class WorkPackService {
       })()
     } catch (error) {
       if (moved) fs.renameSync(trash!, eventDir!)
+      if (operation) this.endOperation(operation)
       throw error
     }
-    if (moved) fs.rmSync(trash!, { recursive: true, force: true })
+    if (moved) {
+      try { fs.rmSync(trash!, { recursive: true, force: true }); this.endOperation(operation!) }
+      catch { /* The records are gone; the next launch removes the staged folder. */ }
+    }
     if (eventsDir && fs.existsSync(eventsDir) && !fs.readdirSync(eventsDir).length) fs.rmdirSync(eventsDir)
   }
   private hasFile(itemId: string, root: string) {

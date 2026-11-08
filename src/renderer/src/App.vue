@@ -8,10 +8,13 @@ import workpackLogo from './assets/workpack-logo.png'
 import {
   gaps,
   defaultPendingFilter,
+  findSearchTarget,
   groupPendingRows,
+  localDateInput,
   matchesCompletionFilter,
   matchesPendingQuery,
   progress,
+  projectComplete,
   type CompletionFilter,
   type PendingFilterQuery,
   type PendingGroupBy,
@@ -54,6 +57,7 @@ function workspaceFocusOut(event: FocusEvent) {
 }
 const storageLocations = ref<StorageLocations>({ project: '', template: '', workspace: '' })
 const storageNotice = ref('')
+const unavailableStorage = ref<(keyof StorageLocations)[]>([])
 const activeProjectId = ref<string | null>(null)
 const activeEventId = ref<string | null>(null)
 const drawerOpen = ref(false)
@@ -132,7 +136,7 @@ const modalCard = ref<HTMLElement | null>(null)
 const modalBaseline = ref('')
 
 const projectForm = reactive({ id: '', name: '', customer: '', contact: '', owner: '', note: '', directoryPath: '' })
-const eventForm = reactive({ id: '', projectId: '', templateIds: [] as string[], name: '', date: new Date().toISOString().slice(0, 10), owner: '' })
+const eventForm = reactive({ id: '', projectId: '', templateIds: [] as string[], name: '', date: localDateInput(), owner: '' })
 const templateForm = reactive({ id: '', name: '', purpose: '', categoryId: '' })
 const categoryForm = reactive({ id: '', name: '' })
 const taskForm = reactive({ itemId: '', name: '' })
@@ -193,8 +197,7 @@ const filteredProjects = computed(() => {
   const keyword = projectFilter.keyword.trim().toLowerCase()
   return snapshot.value.projects.filter(project => {
     const matchesKeyword = !keyword || [project.name, project.customer, project.owner].some(value => value.toLowerCase().includes(keyword))
-    const percent = projectProgress(project).percent
-    return matchesKeyword && matchesCompletionFilter(percent, project.events.length > 0, projectFilter.status)
+    return matchesKeyword && matchesCompletionFilter(projectComplete(project), projectFilter.status)
   })
 })
 function sortedUnique(values: string[]) {
@@ -373,7 +376,8 @@ async function refresh(showLoading: boolean | Event = true) {
     if (showLoading) loading.value = false
   }
 }
-async function run<T>(action: () => Promise<T>, success?: string): Promise<T | boolean> {
+/** `readOnly` actions such as opening a file change no data, so only a failure (e.g. a missing file) needs a refresh. */
+async function run<T>(action: () => Promise<T>, success?: string, options: { readOnly?: boolean } = {}): Promise<T | boolean> {
   if (busy.value) return false
   const drawerControl = drawerCard.value?.contains(document.activeElement) ? document.activeElement as HTMLElement : null
   const modalControl = modalCard.value?.contains(document.activeElement) ? document.activeElement as HTMLElement : null
@@ -381,11 +385,12 @@ async function run<T>(action: () => Promise<T>, success?: string): Promise<T | b
   busy.value = true
   try {
     const result = await action()
-    await refresh(false)
+    if (!options.readOnly) await refresh(false)
     const completed = result === undefined ? true : result === false || result === 0 ? false : result
     if (success && completed !== false) showToast(success)
     return completed
   } catch (error) {
+    if (options.readOnly) await refresh(false)
     showToast(error instanceof Error ? error.message : '操作失败', 'error')
     return false
   } finally {
@@ -431,12 +436,10 @@ function openEvent(project: Project, event: BusinessEvent, options?: { projectPa
 }
 function runGlobalSearch() {
   clearToast()
-  const keyword = search.value.trim().toLowerCase()
-  if (!keyword) { go('projects'); return }
-  const project = snapshot.value.projects.find(item => [item.name, item.customer, item.owner].some(value => value.toLowerCase().includes(keyword)))
-  if (project) { openProject(project); return }
-  const row = itemRows.value.find(item => [item.event.name, item.item.name, ...item.item.attachments.map(attachment => attachment.name)].some(value => value.toLowerCase().includes(keyword)))
-  if (row) { openEvent(row.project, row.event, { projectPage: true }); return }
+  if (!search.value.trim()) { go('projects'); return }
+  const target = findSearchTarget(snapshot.value.projects, search.value)
+  if (target?.event) { openEvent(target.project, target.event, { projectPage: true }); return }
+  if (target) { openProject(target.project); return }
   showToast('没有找到匹配的项目或文件', 'error')
 }
 
@@ -454,7 +457,7 @@ async function saveProject() {
   if (project) openProject(project)
 }
 
-function resetEventForm(project: Project, event?: BusinessEvent) { Object.assign(eventForm, event ? { id: event.id, projectId: project.id, templateIds: [...event.templateIds], name: event.name, date: event.date, owner: event.owner } : { id: '', projectId: project.id, templateIds: [], name: '', date: new Date().toISOString().slice(0, 10), owner: project.owner }) }
+function resetEventForm(project: Project, event?: BusinessEvent) { Object.assign(eventForm, event ? { id: event.id, projectId: project.id, templateIds: [...event.templateIds], name: event.name, date: event.date, owner: event.owner } : { id: '', projectId: project.id, templateIds: [], name: '', date: localDateInput(), owner: project.owner }) }
 function openEventModal(project = activeProject.value, event?: BusinessEvent) { if (!project) return; clearToast(); resetEventForm(project, event); modal.value = 'event'; markModalClean() }
 async function saveEvent() {
   if (!eventForm.name.trim() || (!eventForm.id && !eventForm.templateIds.length) || !eventForm.owner.trim()) { showToast('请填写事项名称、选择文件并填写经办人', 'error'); return }
@@ -510,7 +513,11 @@ async function saveItem() {
 }
 function openTaskModal(item: Item) { Object.assign(taskForm,{itemId:item.id,name:''}); modal.value='task'; markModalClean() }
 async function saveTask() { const result=await run(() => window.workpack.saveDocumentTask({...taskForm}),'已添加'); if(result) modal.value=null }
-async function toggleTask(id:string,done:boolean,control:HTMLElement) { await keepFocus(() => run(() => window.workpack.setDocumentTaskDone({id,done})),control) }
+async function toggleTask(id:string,done:boolean,control:HTMLElement) {
+  const saved = await keepFocus(() => run(() => window.workpack.setDocumentTaskDone({id,done})),control)
+  // A rejected "准备文件" usually means the attachment went missing on disk.
+  if (saved === false) await refresh(false)
+}
 async function removeTask(id:string) { await run(() => window.workpack.deleteDocumentTask(id),'已删除') }
 async function removeItem(item: Item) {
   if (!window.confirm(`删除清单项“${item.name}”？附件记录也会移除。`)) return
@@ -528,10 +535,10 @@ async function keepFocus<T>(action: () => Promise<T>, control: HTMLElement | nul
   return result
 }
 async function importAttachments(id: string) { await run(() => window.workpack.importAttachments(id), '上传完成') }
-async function openAttachment(id: string) { await run(() => window.workpack.openAttachment(id)) }
+async function openAttachment(id: string) { await run(() => window.workpack.openAttachment(id), undefined, { readOnly: true }) }
 async function relocateAttachment(id: string) { await run(() => window.workpack.relocateAttachment(id), '已重新关联') }
 async function removeAttachment(id: string) { if (window.confirm('移除附件记录？原文件不会删除。')) await run(() => window.workpack.removeAttachment(id), '已移除') }
-async function openProjectFolder(project: Project) { await run(() => window.workpack.openProject(project.id)) }
+async function openProjectFolder(project: Project) { await run(() => window.workpack.openProject(project.id), undefined, { readOnly: true }) }
 async function relocateProject(project: Project) { const moved = await run(() => window.workpack.relocateProject(project.id), '已重新定位'); if (moved) await refresh() }
 
 function handleWorkspaceOutside(event: MouseEvent) {
@@ -544,6 +551,7 @@ async function chooseStorage(kind: keyof StorageLocations) {
     const result = await window.workpack.chooseStorageLocation(kind)
     if (!result) return
     storageLocations.value = result.locations
+    unavailableStorage.value = result.unavailable
     storageNotice.value = result.warning ?? ''
     await refresh(false)
     showToast('存储位置已更新')
@@ -568,6 +576,11 @@ watch(drawerOpen, open => { if (open) focusDrawer() })
 onMounted(() => {
   refresh()
   window.workpack.storageLocations().then(value => { storageLocations.value = value }).catch(() => {})
+  window.workpack.unavailableStorage().then(kinds => {
+    unavailableStorage.value = kinds
+    const labels = storageKinds.filter(kind => kinds.includes(kind.key)).map(kind => kind.label)
+    if (labels.length) showToast(`${labels.join('、')}当前不可用，请连接所在磁盘或在设置中重新选择`, 'error')
+  }).catch(() => {})
   document.addEventListener('click', handleModalClick, true)
   document.addEventListener('click', handleWorkspaceOutside)
   document.addEventListener('keydown', searchShortcut)
@@ -597,8 +610,8 @@ onBeforeUnmount(() => {
           </template>
           <section v-else class="whats-new" aria-label="最近更新">
             <div class="news-heading"><button ref="newsBack" type="button" class="icon-button" aria-label="返回工作空间菜单" @click="showWorkspaceNews(false)"><UiIcon name="back" /></button><h3>最近更新</h3></div>
-            <time datetime="2026-11-07">2026年11月7日</time>
-            <ul><li>浅色工作区与紧凑列表</li><li>侧栏支持折叠、返回与前进</li><li>统一字体、图标及控件尺寸</li><li>减淡分隔线，精简页面布局</li></ul>
+            <time datetime="2026-11-08">2026年11月8日</time>
+            <ul><li>模板迁移支持中断后重试</li><li>工作空间丢失时可重新定位</li><li>修复文件进度与待办状态</li><li>加快列表加载与文件操作</li></ul>
           </section>
         </div>
       </div>
@@ -678,7 +691,7 @@ onBeforeUnmount(() => {
 
           <section v-else-if="view === 'settings'" class="page-section settings-page">
             <div class="page-heading"><h1>设置</h1></div><nav class="status-tabs settings-nav" aria-label="设置分类"><span class="active">存储</span></nav>
-            <div class="settings-content"><div v-if="storageNotice" class="warning-banner" role="status"><UiIcon name="warning" /><span>{{ storageNotice }}</span></div><div v-for="location in storageKinds" :key="location.key" class="storage-row"><h2>{{ location.label }}</h2><div class="storage-control"><div class="path-field"><span :title="storageLocations[location.key]">{{ storageLocations[location.key] }}</span><button class="icon-button" :aria-label="`复制${location.label}`" :disabled="!storageLocations[location.key]" @click="copyPath(storageLocations[location.key])"><UiIcon name="copy" /></button></div><button class="button secondary" :disabled="busy" @click="chooseStorage(location.key)">更改位置</button></div></div>
+            <div class="settings-content"><div v-if="storageNotice" class="warning-banner" role="status"><UiIcon name="warning" /><span>{{ storageNotice }}</span></div><div v-for="location in storageKinds" :key="location.key" class="storage-row"><h2>{{ location.label }}<span v-if="unavailableStorage.includes(location.key)" class="availability warning"><i></i>当前不可用</span></h2><div class="storage-control"><div class="path-field"><span :title="storageLocations[location.key]">{{ storageLocations[location.key] }}</span><button class="icon-button" :aria-label="`复制${location.label}`" :disabled="!storageLocations[location.key]" @click="copyPath(storageLocations[location.key])"><UiIcon name="copy" /></button></div><button class="button secondary" :disabled="busy" @click="chooseStorage(location.key)">更改位置</button></div></div>
               <div class="migration-notice"><UiIcon name="info" /><div><strong>更换位置前请留意</strong><p>更换后，原目录仍会保留数据文件。迁回原目录前，需要先处理旧数据文件。</p><details><summary>查看迁移说明<UiIcon name="back" /></summary><p>更换位置后会保留原目录中的 workpack-v3.sqlite。迁回原目录前，请先备份并移走该文件及同名的 -wal、-shm 文件，再选择原目录。</p></details></div></div>
             </div>
           </section>

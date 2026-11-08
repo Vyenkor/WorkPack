@@ -68,9 +68,29 @@ class InstallerConfigTest(unittest.TestCase):
         self.assertNotIn('Delete "$APPDATA\\WorkPack\\workpack.sqlite"', cleanup)
         self.assertNotIn('Delete "$APPDATA\\WorkPack\\workpack.sqlite-wal"', cleanup)
         self.assertIn('Delete "$APPDATA\\WorkPack\\storage.json"', cleanup)
+        self.assertIn('Delete "$APPDATA\\WorkPack\\workspace.initialized"', cleanup)
         self.assertNotIn('RMDir /r', cleanup)
         self.assertNotIn('templates', cleanup.lower())
         self.assertNotIn('$INSTDIR', cleanup)
+
+    def test_workspace_cleanup_targets_the_uninstalling_users_appdata(self):
+        text = INCLUDE.read_text(encoding="utf-8-sig")
+        header = text[text.index("!macro customHeader"):]
+        # NSIS 不能在宏内定义宏，切换宏须在 customHeader 之外。
+        self.assertNotIn("!macro WorkPackUseUserAppData", header)
+        use = text[text.index("!macro WorkPackUseUserAppData"):text.index("!macroend", text.index("!macro WorkPackUseUserAppData"))]
+        restore = text[text.index("!macro WorkPackRestoreAppData"):text.index("!macroend", text.index("!macro WorkPackRestoreAppData"))]
+        self.assertIn('$installMode == "all"', use)
+        self.assertIn("SetShellVarContext current", use)
+        self.assertIn("SetShellVarContext all", restore)
+        for function in ["Function un.onUninstSuccess", "Function un.WorkPackDataPageCreate"]:
+            with self.subTest(function=function):
+                body = header[header.index(function):header.index("FunctionEnd", header.index(function))]
+                switch = body.index("!insertmacro WorkPackUseUserAppData")
+                first_use = body.index("$APPDATA\\WorkPack")
+                back = body.index("!insertmacro WorkPackRestoreAppData")
+                self.assertLess(switch, first_use)
+                self.assertGreater(back, body.rindex("$APPDATA\\WorkPack"))
 
     def test_package_only_ships_what_the_installed_app_needs(self):
         package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))

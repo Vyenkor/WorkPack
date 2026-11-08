@@ -90,8 +90,8 @@ WorkPack-<版本>-Setup.exe /S /currentuser /D=C:\Apps\WorkPack
 2. 在对应提交上打标签并推送，例如：
 
 ```bash
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.3.1
+git push origin v0.3.1
 ```
 
 流水线核对标签与包版本，完成 Windows 测试、构建和安装检查后创建 GitHub Release，上传安装包。发布记录使用实际完成的功能和验证结果。

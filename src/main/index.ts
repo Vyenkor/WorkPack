@@ -3,7 +3,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
 import { WorkPackService } from './service'
-import { StorageManager, type StorageKind } from './storage'
+import { StorageManager, WorkspaceMissingError, type StorageKind, type WorkspaceRecovery } from './storage'
 
 let service: WorkPackService
 let storage: StorageManager
@@ -66,13 +66,36 @@ function registerIPC() {
   handle('setDocumentTaskDone', value => service.setDocumentTaskDone(value))
   handle('deleteDocumentTask', value => service.deleteDocumentTask(stringId.parse(value)))
   handle('storageLocations', () => ({ ...storage.locations }))
+  handle('unavailableStorage', () => storage.unavailable())
   handle('chooseStorageLocation', async value => {
     const kind = z.enum(['project', 'template', 'workspace']).parse(value) as StorageKind
     const folder = await selectFolder()
     if (!folder) return null
-    try { return storage.change(kind, folder) }
+    try { return await storage.change(kind, folder) }
     finally { service = storage.service }
   })
+}
+
+/** Ask before replacing a configured workspace whose database is missing. Returns null when the user quits. */
+function openStorage(): StorageManager | null {
+  const system = app.getPath('userData'), projects = path.join(app.getPath('documents'), 'WorkPack', '项目')
+  let recovery: WorkspaceRecovery | undefined
+  for (;;) {
+    try { return new StorageManager(system, projects, recovery) }
+    catch (error) {
+      if (!(error instanceof WorkspaceMissingError)) throw error
+      const choice = dialog.showMessageBoxSync({
+        type: 'warning', title: 'WorkPack', noLink: true, defaultId: 0, cancelId: 2,
+        buttons: ['重新选择文件夹…', '在原位置新建空工作空间', '退出'],
+        message: error.message,
+        detail: '工作空间文件夹可能被移动、改名，或所在磁盘没有连接。请选择包含 workpack-v3.sqlite 的文件夹；新建空工作空间不会改动原有数据。'
+      })
+      if (choice === 2) return null
+      if (choice === 1) { recovery = { create: true }; continue }
+      const selected = dialog.showOpenDialogSync({ title: '选择包含 workpack-v3.sqlite 的文件夹', properties: ['openDirectory'] })
+      recovery = selected?.[0] ? { locate: selected[0] } : undefined
+    }
+  }
 }
 
 const hasInstanceLock = app.requestSingleInstanceLock()
@@ -86,7 +109,9 @@ if (!hasInstanceLock) {
     window.focus()
   })
   app.whenReady().then(() => {
-    storage = new StorageManager(app.getPath('userData'), path.join(app.getPath('documents'), 'WorkPack', '项目'))
+    const opened = openStorage()
+    if (!opened) { app.quit(); return }
+    storage = opened
     service = storage.service
     window = new BrowserWindow({
       title: 'WorkPack', width: 1440, height: 960, minWidth: 1050, minHeight: 700,

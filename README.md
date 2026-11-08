@@ -76,4 +76,4 @@ npm run test:e2e
 npm run dist
 ```
 
-构建、数据目录、实测截图复现及版本发布流程见[开发指南](docs/DEVELOPMENT.md)。界面规范见 [DESIGN.md](DESIGN.md)，协作约定见 [AGENT.md](AGENT.md)。
+构建、数据目录、实测截图复现及版本发布流程见[开发指南](docs/DEVELOPMENT.md)。界面规范见 [DESIGN.md](DESIGN.md)，协作约定见 [AGENT.md](AGENT.md)。产品范围及后续开发安排见[产品规划](Agent/Codex/产品规划/00_规划索引.md)。

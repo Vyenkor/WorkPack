@@ -117,11 +117,40 @@ export class WorkPackService {
       CREATE TABLE IF NOT EXISTS document_tasks (id TEXT PRIMARY KEY, item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE, name TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS document_tasks_item ON document_tasks(item_id, position);
       CREATE INDEX IF NOT EXISTS assets_template ON assets(template_id);
-      CREATE INDEX IF NOT EXISTS event_templates_template ON event_templates(template_id);`)
+      CREATE INDEX IF NOT EXISTS event_templates_template ON event_templates(template_id);
+      CREATE TABLE IF NOT EXISTS pending_operations (id TEXT PRIMARY KEY, kind TEXT NOT NULL, payload TEXT NOT NULL);`)
     this.ensureItemTemplateLink()
     this.db.transaction(() => {
       for (const event of this.all('events')) this.reconcileEventTemplates(event.id)
     })()
+    this.recoverOperations()
+  }
+  /** Recorded before a folder is moved; removed in the same transaction that commits the records. */
+  private beginOperation(kind: string, payload: Record<string, string>) {
+    const operation = randomUUID()
+    this.db.prepare('INSERT INTO pending_operations VALUES (?, ?, ?)').run(operation, kind, JSON.stringify(payload))
+    return operation
+  }
+  private endOperation(operation: string) { this.db.prepare('DELETE FROM pending_operations WHERE id=?').run(operation) }
+  /** Settles folder moves interrupted by a crash. Each step can be repeated; an unreachable folder keeps its record for the next launch. */
+  private recoverOperations() {
+    for (const operation of this.all('pending_operations')) {
+      let settled = false
+      try { settled = this.recover(operation.kind, JSON.parse(operation.payload)) } catch { /* The folder may be offline or in use. */ }
+      if (settled) this.endOperation(operation.id)
+    }
+  }
+  private recover(kind: string, p: Record<string, string>): boolean {
+    if (!folderPresent(p.root)) return false
+    if (kind === 'delete-event') {
+      const kept = this.db.prepare('SELECT 1 FROM events WHERE id=?').get(p.eventId)
+      if (!fs.existsSync(p.trash)) return true
+      if (!kept) { fs.rmSync(p.trash, { recursive: true, force: true }); return true }
+      if (fs.existsSync(p.eventDir)) return false
+      fs.renameSync(p.trash, p.eventDir)
+      return true
+    }
+    return false
   }
   /** Items created before the file link existed are matched once by name within the matter. */
   private ensureItemTemplateLink() {
@@ -402,11 +431,12 @@ export class WorkPackService {
     const eventsDir = root ? inside(root, '事项') : null
     const eventDir = eventsDir ? inside(eventsDir, `${event.date}_${event.id}`) : null
     const trash = eventDir ? inside(eventsDir!, `.deleting_${event.id}`) : null
-    let moved = false
+    let moved = false, operation: string | null = null
     if (eventDir && trash && fs.existsSync(eventDir)) {
       this.assertNothingManagedInside(eventDir, root!)
+      operation = this.beginOperation('delete-event', { eventId: event.id, root: root!, eventDir, trash })
       try { fs.renameSync(eventDir, trash); moved = true }
-      catch { throw new Error('事项文件夹中有文件正在使用，请关闭相关文件后重试') }
+      catch { this.endOperation(operation); throw new Error('事项文件夹中有文件正在使用，请关闭相关文件后重试') }
     }
     try {
       this.db.transaction(() => {
@@ -417,9 +447,13 @@ export class WorkPackService {
       })()
     } catch (error) {
       if (moved) fs.renameSync(trash!, eventDir!)
+      if (operation) this.endOperation(operation)
       throw error
     }
-    if (moved) fs.rmSync(trash!, { recursive: true, force: true })
+    if (moved) {
+      try { fs.rmSync(trash!, { recursive: true, force: true }); this.endOperation(operation!) }
+      catch { /* The records are gone; the next launch removes the staged folder. */ }
+    }
     if (eventsDir && fs.existsSync(eventsDir) && !fs.readdirSync(eventsDir).length) fs.rmdirSync(eventsDir)
   }
   private hasFile(itemId: string, root: string) {

@@ -11,8 +11,8 @@ function workspace() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-issues-'))
   const system = path.join(root, 'system'), projects = path.join(root, 'projects')
   fs.mkdirSync(projects)
-  const manager = new StorageManager(system, projects)
-  return { root, system, projects, manager, cleanup: () => { try { manager.close() } catch { /* Already closed by the test. */ } fs.rmSync(root, { recursive: true, force: true }) } }
+  const w = { root, system, projects, manager: new StorageManager(system, projects), cleanup: () => { try { w.manager.close() } catch { /* Already closed by the test. */ } fs.rmSync(root, { recursive: true, force: true }) } }
+  return w
 }
 function file(root: string, name: string, content = 'content') {
   const target = path.join(root, name)
@@ -80,6 +80,77 @@ describe('#50 configured workspace without its database', () => {
 function plan(manager: StorageManager, sql: string, ...params: unknown[]) {
   return (manager.service.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as Array<{ detail: string }>).map(row => row.detail).join('\n')
 }
+
+function reopen(w: ReturnType<typeof workspace>) {
+  w.manager.close()
+  w.manager = new StorageManager(w.system, w.projects)
+  return w.manager.service
+}
+function pendingOperations(manager: StorageManager) {
+  return (manager.service.db.prepare('SELECT kind FROM pending_operations').all() as Array<{ kind: string }>).map(row => row.kind)
+}
+
+describe('#39 deleting a matter across a crash', () => {
+  it('puts the folder back when the process stops after staging it and before the records are deleted', () => {
+    const w = workspace()
+    try {
+      const { eventDir, eventId } = seedEvent(w.manager, w.root)
+      const trash = path.join(path.dirname(eventDir), `.deleting_${eventId}`)
+      const rename = fs.renameSync
+      const renames = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => { if (String(to) === eventDir) throw new Error('进程中断'); rename(from, to) })
+      const transaction = vi.spyOn(w.manager.service.db, 'transaction').mockImplementation(() => (() => { throw new Error('进程中断') }) as never)
+      try { expect(() => w.manager.service.deleteEvent(eventId)).toThrow('进程中断') }
+      finally { renames.mockRestore(); transaction.mockRestore() }
+      expect(fs.existsSync(trash)).toBe(true)
+      expect(pendingOperations(w.manager)).toEqual(['delete-event'])
+
+      const service = reopen(w)
+      expect(fs.existsSync(eventDir)).toBe(true)
+      expect(fs.existsSync(trash)).toBe(false)
+      expect(pendingOperations(w.manager)).toEqual([])
+      expect(service.snapshot().projects[0].events[0].items[0].attachments[0].exists).toBe(true)
+      service.deleteEvent(eventId)
+      expect(fs.existsSync(eventDir)).toBe(false)
+      expect(fs.existsSync(trash)).toBe(false)
+    } finally { w.cleanup() }
+  })
+  it('finishes removing the staged folder when the process stops after the records are deleted', () => {
+    const w = workspace()
+    try {
+      const { eventDir, eventId } = seedEvent(w.manager, w.root)
+      const trash = path.join(path.dirname(eventDir), `.deleting_${eventId}`)
+      const remove = vi.spyOn(fs, 'rmSync').mockImplementation(() => { throw new Error('进程中断') })
+      try { w.manager.service.deleteEvent(eventId) }
+      finally { remove.mockRestore() }
+      expect(w.manager.service.snapshot().projects[0].events).toEqual([])
+      expect(fs.existsSync(trash)).toBe(true)
+
+      reopen(w)
+      expect(fs.existsSync(trash)).toBe(false)
+      expect(pendingOperations(w.manager)).toEqual([])
+      reopen(w)
+      expect(pendingOperations(w.manager)).toEqual([])
+    } finally { w.cleanup() }
+  })
+  it('keeps the record while the project folder is offline', () => {
+    const w = workspace()
+    try {
+      const { eventId, project } = seedEvent(w.manager, w.root)
+      const remove = vi.spyOn(fs, 'rmSync').mockImplementation(() => { throw new Error('进程中断') })
+      try { w.manager.service.deleteEvent(eventId) }
+      finally { remove.mockRestore() }
+      w.manager.close()
+      fs.renameSync(project.folder, `${project.folder}-offline`)
+      w.manager = new StorageManager(w.system, w.projects)
+      expect(pendingOperations(w.manager)).toEqual(['delete-event'])
+      w.manager.close()
+      fs.renameSync(`${project.folder}-offline`, project.folder)
+      w.manager = new StorageManager(w.system, w.projects)
+      expect(pendingOperations(w.manager)).toEqual([])
+      expect(fs.existsSync(path.join(project.folder, '事项', `.deleting_${eventId}`))).toBe(false)
+    } finally { w.cleanup() }
+  })
+})
 
 describe('#41 bounded-memory template verification', () => {
   it('hashes files larger than one chunk correctly', () => {

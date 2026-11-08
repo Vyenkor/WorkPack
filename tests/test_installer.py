@@ -75,8 +75,10 @@ class InstallerConfigTest(unittest.TestCase):
     def test_workspace_cleanup_targets_the_uninstalling_users_appdata(self):
         text = INCLUDE.read_text(encoding="utf-8-sig")
         header = text[text.index("!macro customHeader"):]
-        use = header[header.index("!macro WorkPackUseUserAppData"):header.index("!macroend", header.index("!macro WorkPackUseUserAppData"))]
-        restore = header[header.index("!macro WorkPackRestoreAppData"):header.index("!macroend", header.index("!macro WorkPackRestoreAppData"))]
+        # NSIS 不能在宏内定义宏，切换宏须在 customHeader 之外。
+        self.assertNotIn("!macro WorkPackUseUserAppData", header)
+        use = text[text.index("!macro WorkPackUseUserAppData"):text.index("!macroend", text.index("!macro WorkPackUseUserAppData"))]
+        restore = text[text.index("!macro WorkPackRestoreAppData"):text.index("!macroend", text.index("!macro WorkPackRestoreAppData"))]
         self.assertIn('$installMode == "all"', use)
         self.assertIn("SetShellVarContext current", use)
         self.assertIn("SetShellVarContext all", restore)

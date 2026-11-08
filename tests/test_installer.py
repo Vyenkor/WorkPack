@@ -68,6 +68,7 @@ class InstallerConfigTest(unittest.TestCase):
         self.assertNotIn('Delete "$APPDATA\\WorkPack\\workpack.sqlite"', cleanup)
         self.assertNotIn('Delete "$APPDATA\\WorkPack\\workpack.sqlite-wal"', cleanup)
         self.assertIn('Delete "$APPDATA\\WorkPack\\storage.json"', cleanup)
+        self.assertIn('Delete "$APPDATA\\WorkPack\\workspace.initialized"', cleanup)
         self.assertNotIn('RMDir /r', cleanup)
         self.assertNotIn('templates', cleanup.lower())
         self.assertNotIn('$INSTDIR', cleanup)

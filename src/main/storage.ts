@@ -112,16 +112,19 @@ export class StorageManager {
   constructor(systemDirectory: string, defaultProjectDirectory: string, recovery?: WorkspaceRecovery) {
     fs.mkdirSync(systemDirectory, { recursive: true })
     this.configPath = path.join(systemDirectory, 'storage.json')
+    // Without a pointer file, this marker tells a missing default database apart from a first launch.
+    const initializedPath = path.join(systemDirectory, 'workspace.initialized')
     this.defaults = { project: defaultProjectDirectory, template: path.join(systemDirectory, 'templates'), workspace: systemDirectory }
-    const configured = fs.existsSync(this.configPath)
+    const configured = fs.existsSync(this.configPath), initialized = fs.existsSync(initializedPath)
     const stored = configured ? locationsSchema.parse(JSON.parse(fs.readFileSync(this.configPath, 'utf8'))) : { ...this.defaults }
     if (recovery && 'locate' in recovery) stored.workspace = recovery.locate
-    const mustExist = configured && !(recovery && 'create' in recovery)
+    const mustExist = (configured || initialized) && !(recovery && 'create' in recovery)
     this.locations = this.canonicalize(stored, mustExist)
     this.clearCommittedMarker(this.locations.workspace)
     // A manifest in the folder the pointer already names belongs to a move that committed.
     try { fs.rmSync(this.templateManifestPath(this.locations.template), { force: true }) } catch { /* An offline folder is checked on a later launch. */ }
     this.service = this.open(this.locations, mustExist)
+    if (!initialized) try { fs.writeFileSync(initializedPath, '') } catch { /* Launch goes on; the next one writes the marker again. */ }
     if (recovery && 'locate' in recovery) {
       try { this.write(this.locations) }
       catch (error) { this.service.close(); throw error }

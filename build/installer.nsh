@@ -83,6 +83,7 @@
         Delete "$APPDATA\WorkPack\workpack-v3.sqlite-shm"
         Delete "$APPDATA\WorkPack\workpack-v3.sqlite-journal"
         Delete "$APPDATA\WorkPack\storage.json"
+        Delete "$APPDATA\WorkPack\workspace.initialized"
         RMDir "$APPDATA\WorkPack"
         !insertmacro WorkPackRestoreAppData
       ${EndIf}

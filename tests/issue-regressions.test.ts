@@ -40,10 +40,41 @@ describe('#50 configured workspace without its database', () => {
     w.manager.close()
     return { ...w, custom: fs.realpathSync(custom) }
   }
+  function removeDatabase(directory: string) {
+    for (const suffix of ['', '-wal', '-shm']) fs.rmSync(path.join(directory, `workpack-v3.sqlite${suffix}`), { force: true })
+  }
   it('creates the database on first launch only', () => {
     const w = workspace()
     try { expect(fs.existsSync(path.join(w.system, 'workpack-v3.sqlite'))).toBe(true) }
     finally { w.cleanup() }
+  })
+  it('refuses to replace a lost database in the default workspace that was never moved', () => {
+    const w = workspace()
+    try {
+      w.manager.service.saveLibraryFile({ name: '签收单', purpose: '', categoryId: null })
+      w.manager.close()
+      expect(fs.existsSync(path.join(w.system, 'storage.json'))).toBe(false)
+      removeDatabase(w.system)
+      expect(() => new StorageManager(w.system, w.projects)).toThrow(WorkspaceMissingError)
+      expect(fs.existsSync(path.join(w.system, 'workpack-v3.sqlite'))).toBe(false)
+      w.manager = new StorageManager(w.system, w.projects, { create: true })
+      expect(w.manager.locations.workspace).toBe(fs.realpathSync(w.system))
+      expect(w.manager.service.snapshot().templates).toEqual([])
+      w.manager.close()
+      w.manager = new StorageManager(w.system, w.projects)
+      expect(w.manager.service.snapshot().templates).toEqual([])
+    } finally { w.cleanup() }
+  })
+  it('marks a default workspace created by an earlier version on its next launch', () => {
+    const w = workspace()
+    try {
+      w.manager.close()
+      fs.rmSync(path.join(w.system, 'workspace.initialized'))
+      w.manager = new StorageManager(w.system, w.projects)
+      w.manager.close()
+      removeDatabase(w.system)
+      expect(() => new StorageManager(w.system, w.projects)).toThrow(WorkspaceMissingError)
+    } finally { w.cleanup() }
   })
   it('refuses to start with an empty database when the folder was renamed, and can be pointed at the moved folder', async () => {
     const w = await moved()

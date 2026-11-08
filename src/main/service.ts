@@ -48,12 +48,12 @@ export class WorkPackService {
   db: Database.Database
   templateRoot: string
   projectRoot?: string
-  constructor(readonly dataDirectory: string, readonly copyFile = fs.copyFileSync, locations: { templateRoot?: string; projectRoot?: string } = {}) {
-    fs.mkdirSync(dataDirectory, { recursive: true })
+  constructor(readonly dataDirectory: string, readonly copyFile = fs.copyFileSync, locations: { templateRoot?: string; projectRoot?: string; databaseMustExist?: boolean } = {}) {
+    if (!locations.databaseMustExist) fs.mkdirSync(dataDirectory, { recursive: true })
     this.templateRoot = locations.templateRoot ?? path.join(dataDirectory, 'templates')
     this.projectRoot = locations.projectRoot
     fs.mkdirSync(this.templateRoot, { recursive: true })
-    this.db = new Database(path.join(dataDirectory, libraryDatabaseFile))
+    this.db = new Database(path.join(dataDirectory, libraryDatabaseFile), { fileMustExist: Boolean(locations.databaseMustExist) })
     this.db.pragma('foreign_keys = ON')
     // WAL keeps recent commits in workpack-v3.sqlite-wal. Copying only the main file while this connection is open can miss them.
     this.db.pragma('journal_mode = WAL')

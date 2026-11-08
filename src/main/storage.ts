@@ -80,33 +80,52 @@ function rejectUnsuitable(kind: StorageKind, directory: string): string | undefi
   return undefined
 }
 
+/** A configured workspace whose database is gone. Launch must not replace it with an empty one. */
+export class WorkspaceMissingError extends Error {
+  constructor(readonly workspace: string) { super(`找不到工作空间数据库：${path.join(workspace, libraryDatabaseFile)}`) }
+}
+/**
+ * `locate` points the configuration at a folder that already holds the database.
+ * `create` starts an empty database in the configured folder at the user's request.
+ */
+export type WorkspaceRecovery = { locate: string } | { create: true }
+
 /** The pointer remains in userData; the database and template files can live elsewhere. */
 export class StorageManager {
   readonly configPath: string
   readonly defaults: StorageLocations
   locations: StorageLocations
   service: WorkPackService
-  constructor(systemDirectory: string, defaultProjectDirectory: string) {
+  constructor(systemDirectory: string, defaultProjectDirectory: string, recovery?: WorkspaceRecovery) {
     fs.mkdirSync(systemDirectory, { recursive: true })
     this.configPath = path.join(systemDirectory, 'storage.json')
     this.defaults = { project: defaultProjectDirectory, template: path.join(systemDirectory, 'templates'), workspace: systemDirectory }
-    const stored = fs.existsSync(this.configPath) ? locationsSchema.parse(JSON.parse(fs.readFileSync(this.configPath, 'utf8'))) : { ...this.defaults }
-    this.locations = this.canonicalize(stored)
+    const configured = fs.existsSync(this.configPath)
+    const stored = configured ? locationsSchema.parse(JSON.parse(fs.readFileSync(this.configPath, 'utf8'))) : { ...this.defaults }
+    if (recovery && 'locate' in recovery) stored.workspace = recovery.locate
+    const mustExist = configured && !(recovery && 'create' in recovery)
+    this.locations = this.canonicalize(stored, mustExist)
     this.clearCommittedMarker(this.locations.workspace)
-    this.service = this.open(this.locations)
+    this.service = this.open(this.locations, mustExist)
+    if (recovery && 'locate' in recovery) {
+      try { this.write(this.locations) }
+      catch (error) { this.service.close(); throw error }
+    }
   }
-  private canonicalize(locations: StorageLocations): StorageLocations {
+  private canonicalize(locations: StorageLocations, workspaceMustExist: boolean): StorageLocations {
     const next = { ...locations }
     for (const key of ['project', 'template', 'workspace'] as const) {
       if (!path.isAbsolute(next[key])) throw new Error('存储配置中的路径必须是绝对路径')
-      fs.mkdirSync(next[key], { recursive: true })
+      if (key === 'workspace' && workspaceMustExist) {
+        if (!fs.existsSync(this.databasePath(next[key]))) throw new WorkspaceMissingError(next[key])
+      } else fs.mkdirSync(next[key], { recursive: true })
       next[key] = fs.realpathSync(next[key])
       if (!fs.statSync(next[key]).isDirectory()) throw new Error('存储位置必须是文件夹')
     }
     return next
   }
-  private open(locations: StorageLocations) {
-    return new WorkPackService(locations.workspace, undefined, { templateRoot: locations.template, projectRoot: locations.project })
+  private open(locations: StorageLocations, databaseMustExist = false) {
+    return new WorkPackService(locations.workspace, undefined, { templateRoot: locations.template, projectRoot: locations.project, databaseMustExist })
   }
   private write(locations: StorageLocations) {
     const temp = `${this.configPath}.${randomUUID()}.tmp`

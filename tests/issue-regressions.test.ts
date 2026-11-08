@@ -31,11 +31,11 @@ function seedEvent(manager: StorageManager, root: string) {
 }
 
 describe('#50 configured workspace without its database', () => {
-  function moved() {
+  async function moved() {
     const w = workspace()
     const custom = path.join(w.root, 'custom-workspace')
     fs.mkdirSync(custom)
-    w.manager.change('workspace', custom)
+    await w.manager.change('workspace', custom)
     w.manager.service.saveLibraryFile({ name: '签收单', purpose: '', categoryId: null })
     w.manager.close()
     return { ...w, custom: fs.realpathSync(custom) }
@@ -45,8 +45,8 @@ describe('#50 configured workspace without its database', () => {
     try { expect(fs.existsSync(path.join(w.system, 'workpack-v3.sqlite'))).toBe(true) }
     finally { w.cleanup() }
   })
-  it('refuses to start with an empty database when the folder was renamed, and can be pointed at the moved folder', () => {
-    const w = moved()
+  it('refuses to start with an empty database when the folder was renamed, and can be pointed at the moved folder', async () => {
+    const w = await moved()
     try {
       const renamed = path.join(w.root, 'renamed-workspace')
       fs.renameSync(w.custom, renamed)
@@ -61,8 +61,8 @@ describe('#50 configured workspace without its database', () => {
       finally { reopened.close() }
     } finally { fs.rmSync(w.root, { recursive: true, force: true }) }
   })
-  it('refuses to start when only the database file was moved away, and creates a new one only on request', () => {
-    const w = moved()
+  it('refuses to start when only the database file was moved away, and creates a new one only on request', async () => {
+    const w = await moved()
     try {
       fs.renameSync(path.join(w.custom, 'workpack-v3.sqlite'), path.join(w.root, 'set-aside.sqlite'))
       for (const suffix of ['-wal', '-shm']) fs.rmSync(path.join(w.custom, `workpack-v3.sqlite${suffix}`), { force: true })
@@ -226,52 +226,52 @@ describe('#44 template move interrupted before the pointer is written', () => {
     }
     return service.snapshot().templates
   }
-  function interruptMove(w: ReturnType<typeof workspace>, target: string) {
+  async function interruptMove(w: ReturnType<typeof workspace>, target: string, message = '进程中断') {
     const write = vi.spyOn(w.manager as unknown as { write: () => void }, 'write').mockImplementation(() => { throw new Error('进程中断') })
     const remove = vi.spyOn(fs, 'rmSync').mockImplementation(() => { throw new Error('进程中断') })
-    try { expect(() => w.manager.change('template', target)).toThrow('进程中断') }
+    try { await expect(w.manager.change('template', target)).rejects.toThrow(message) }
     finally { write.mockRestore(); remove.mockRestore() }
   }
-  it('retries the same destination by removing only its own copies', () => {
+  it('retries the same destination by removing only its own copies', async () => {
     const w = workspace()
     try {
       const templates = seedTemplates(w)
       const target = path.join(w.root, 'nas-templates')
       fs.mkdirSync(target)
-      interruptMove(w, target)
+      await interruptMove(w, target)
       expect(w.manager.locations.template).toBe(fs.realpathSync(path.join(w.system, 'templates')))
       expect(fs.existsSync(path.join(target, templates[0].assets[0].path))).toBe(true)
       expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(true)
 
       w.manager.close()
       w.manager = new StorageManager(w.system, w.projects)
-      w.manager.change('template', target)
+      await w.manager.change('template', target)
       expect(w.manager.locations.template).toBe(fs.realpathSync(target))
       expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(false)
       for (const template of w.manager.service.snapshot().templates) expect(template.assets[0].exists).toBe(true)
     } finally { w.cleanup() }
   })
-  it('keeps a file the user put in place of a copy and reports the conflict', () => {
+  it('keeps a file the user put in place of a copy and reports the conflict', async () => {
     const w = workspace()
     try {
       const templates = seedTemplates(w)
       const target = path.join(w.root, 'nas-templates')
       fs.mkdirSync(target)
-      interruptMove(w, target)
+      await interruptMove(w, target)
       const own = path.join(target, templates[0].assets[0].path)
       fs.writeFileSync(own, '用户自己的文件')
-      expect(() => w.manager.change('template', target)).toThrow('已有同名文件')
+      await expect(w.manager.change('template', target)).rejects.toThrow('已有同名文件')
       expect(fs.readFileSync(own, 'utf8')).toBe('用户自己的文件')
       expect(fs.existsSync(path.join(target, templates[1].assets[0].path))).toBe(false)
     } finally { w.cleanup() }
   })
-  it('drops a manifest left in the folder the pointer already names', () => {
+  it('drops a manifest left in the folder the pointer already names', async () => {
     const w = workspace()
     try {
       seedTemplates(w)
       const target = path.join(w.root, 'nas-templates')
       fs.mkdirSync(target)
-      w.manager.change('template', target)
+      await w.manager.change('template', target)
       fs.writeFileSync(path.join(target, '.workpack-templates.migrating'), JSON.stringify({ source: w.system, files: [] }))
       w.manager.close()
       w.manager = new StorageManager(w.system, w.projects)
@@ -281,18 +281,48 @@ describe('#44 template move interrupted before the pointer is written', () => {
 })
 
 describe('#41 bounded-memory template verification', () => {
-  it('hashes files larger than one chunk correctly', () => {
+  it('hashes files larger than one chunk correctly', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-digest-'))
     try {
       for (const size of [0, 1, (1 << 20) - 1, 1 << 20, (3 << 20) + 17]) {
         const content = Buffer.alloc(size, size % 251)
         const target = path.join(root, `${size}.bin`)
         fs.writeFileSync(target, content)
-        expect(fileDigest(target)).toBe(createHash('sha256').update(content).digest('hex'))
+        expect(await fileDigest(target)).toBe(createHash('sha256').update(content).digest('hex'))
       }
     } finally { fs.rmSync(root, { recursive: true, force: true }) }
   })
-  it('moves a large template without reading it whole into memory', () => {
+  it('keeps the main process responsive while a large template is copied and verified', async () => {
+    const w = workspace()
+    const copy = vi.spyOn(fs, 'copyFileSync'), read = vi.spyOn(fs, 'readSync')
+    try {
+      const service = w.manager.service
+      service.saveLibraryFile({ name: '大文件', purpose: '', categoryId: null })
+      const template = service.snapshot().templates[0]
+      service.importLibraryFile(template.id, [file(w.root, '大文件.bin', 'x'.repeat((8 << 20) + 3))])
+      service.saveLibraryFile({ name: '其他', purpose: '', categoryId: null })
+      const empty = service.snapshot().templates.find(t => t.name === '其他')!
+      const target = path.join(w.root, 'templates-next')
+      fs.mkdirSync(target)
+      copy.mockClear(); read.mockClear()
+      let ticks = 0
+      const timer = setInterval(() => { ticks++ }, 0)
+      const moving = w.manager.change('template', target)
+      try {
+        await expect(w.manager.change('template', path.join(w.root, 'projects'))).rejects.toThrow('正在更改')
+        expect(() => service.importLibraryFile(empty.id, [file(w.root, '其他.docx')])).toThrow('正在迁移')
+        await moving
+      } finally { clearInterval(timer) }
+      expect(ticks).toBeGreaterThan(0)
+      expect(copy).not.toHaveBeenCalled()
+      expect(read).not.toHaveBeenCalled()
+      expect(fs.statSync(path.join(target, template.id, '大文件.bin')).size).toBe((8 << 20) + 3)
+      expect(w.manager.locations.template).toBe(fs.realpathSync(target))
+      service.importLibraryFile(empty.id, [file(w.root, '其他.docx')])
+      expect(fs.existsSync(path.join(target, empty.id, '其他.docx'))).toBe(true)
+    } finally { copy.mockRestore(); read.mockRestore(); w.cleanup() }
+  })
+  it('moves a large template without reading it whole into memory', async () => {
     const w = workspace()
     const read = vi.spyOn(fs, 'readFileSync')
     try {
@@ -303,7 +333,7 @@ describe('#41 bounded-memory template verification', () => {
       const target = path.join(w.root, 'templates-next')
       fs.mkdirSync(target)
       read.mockClear()
-      w.manager.change('template', target)
+      await w.manager.change('template', target)
       expect(read.mock.calls.filter(([name]) => String(name).endsWith('大文件.bin'))).toEqual([])
       expect(fs.statSync(path.join(target, template.id, '大文件.bin')).size).toBe((2 << 20) + 5)
     } finally { read.mockRestore(); w.cleanup() }
@@ -467,7 +497,7 @@ describe('#55 file names produced for duplicates', () => {
 })
 
 describe('#43 offline project and template locations', () => {
-  it('starts with the database when configured folders are offline, creates nothing there, and can be pointed elsewhere', () => {
+  it('starts with the database when configured folders are offline, creates nothing there, and can be pointed elsewhere', async () => {
     const w = workspace()
     const nas = path.join(w.root, 'nas'), drive = path.join(w.root, 'drive')
     for (const dir of [nas, drive]) fs.mkdirSync(dir)
@@ -475,8 +505,8 @@ describe('#43 offline project and template locations', () => {
     service.saveLibraryFile({ name: '借用单', purpose: '', categoryId: null })
     const template = service.snapshot().templates[0]
     service.importLibraryFile(template.id, [file(w.root, '借用单.docx')])
-    w.manager.change('template', nas)
-    w.manager.change('project', drive)
+    await w.manager.change('template', nas)
+    await w.manager.change('project', drive)
     const projectId = w.manager.service.saveProject({ name: '项目甲', customer: '客户', contact: '', owner: '张三', note: '' })
     w.manager.close()
     const offlineNas = `${nas}-offline`
@@ -494,7 +524,7 @@ describe('#43 offline project and template locations', () => {
       expect(() => reopened.service.saveProject({ name: '项目乙', customer: '客户', contact: '', owner: '张三', note: '' })).toThrow('项目存储位置当前不可用')
       reopened.service.removeTemplateAsset(snapshot.templates[0].assets[0].id)
       expect(() => reopened.service.importLibraryFile(template.id, [file(w.root, '新借用单.docx')])).toThrow('模板存储位置当前不可用')
-      const relocated = reopened.change('template', offlineNas)
+      const relocated = await reopened.change('template', offlineNas)
       expect(relocated.unavailable).toEqual(['project'])
       reopened.service.importLibraryFile(template.id, [file(w.root, '新借用单.docx')])
       expect(reopened.service.snapshot().templates[0].assets[0].exists).toBe(true)
@@ -503,15 +533,15 @@ describe('#43 offline project and template locations', () => {
 })
 
 describe('#49 storage locations nested in managed folders', () => {
-  it('rejects storage locations inside a project folder', () => {
+  it('rejects storage locations inside a project folder', async () => {
     const w = workspace()
     try {
       const { eventDir, project } = seedEvent(w.manager, w.root)
       const nested = path.join(eventDir, 'templates')
       fs.mkdirSync(nested)
       for (const kind of ['template', 'workspace', 'project'] as const) {
-        expect(() => w.manager.change(kind, nested)).toThrow('项目文件夹')
-        expect(() => w.manager.change(kind, project.folder)).toThrow('项目文件夹')
+        await expect(w.manager.change(kind, nested)).rejects.toThrow('项目文件夹')
+        await expect(w.manager.change(kind, project.folder)).rejects.toThrow('项目文件夹')
       }
       expect(w.manager.locations.template).toBe(fs.realpathSync(path.join(w.system, 'templates')))
     } finally { w.cleanup() }

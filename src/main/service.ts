@@ -81,6 +81,7 @@ export class WorkPackService {
   db: Database.Database
   templateRoot: string
   projectRoot?: string
+  templateMoveInProgress = false
   constructor(readonly dataDirectory: string, readonly copyFile = fs.copyFileSync, locations: { templateRoot?: string; projectRoot?: string; databaseMustExist?: boolean } = {}) {
     if (!locations.databaseMustExist) fs.mkdirSync(dataDirectory, { recursive: true })
     this.templateRoot = locations.templateRoot ?? path.join(dataDirectory, 'templates')
@@ -326,6 +327,7 @@ export class WorkPackService {
     if (sources.length !== 1) throw new Error('每个文件模板只能导入一份文件')
     if (this.db.prepare('SELECT 1 FROM assets WHERE template_id=? LIMIT 1').get(value)) throw new Error('请先移除原模板文件记录，再导入新文件')
     if (!folderPresent(this.templateRoot)) throw new Error('模板存储位置当前不可用，请连接所在磁盘或在设置中重新选择')
+    if (this.templateMoveInProgress) throw new Error('模板正在迁移到新位置，请等待完成后再导入')
     this.atomic((files, dirs) => {
       const target = this.mkdir(this.templateRoot, value, dirs)
       for (const source of sources) {

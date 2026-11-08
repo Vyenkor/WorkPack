@@ -6,7 +6,7 @@ import { StorageManager } from '../src/main/storage'
 import { WorkPackService } from '../src/main/service'
 
 describe('storage settings', () => {
-  it('creates projects under the selected root and copies templates and the live database before switching', () => {
+  it('creates projects under the selected root and copies templates and the live database before switching', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workpack-storage-'))
     const system = path.join(root, 'system'), projects = path.join(root, 'projects')
     const nextProjects = path.join(root, 'next-projects'), templates = path.join(root, 'templates'), workspace = path.join(root, 'workspace')
@@ -18,59 +18,59 @@ describe('storage settings', () => {
       const source = path.join(root, '借用单.docx')
       fs.writeFileSync(source, 'template content')
       manager.service.importLibraryFile(file.id, [source])
-      manager.change('project', nextProjects)
+      await manager.change('project', nextProjects)
       const projectId = manager.service.saveProject({ name: '项目乙', customer: '客户', owner: '李四', contact: '', note: '', templateIds: [] })
       expect(manager.service.projectPath(projectId)).toBe(path.join(nextProjects, '项目乙'))
       const originalTemplate = path.join(system, 'templates', file.id, '借用单.docx')
       const collisionRoot = path.join(root, 'collision')
       fs.mkdirSync(path.join(collisionRoot, file.id), { recursive: true })
       fs.writeFileSync(path.join(collisionRoot, file.id, '借用单.docx'), 'other')
-      expect(() => manager.change('template', collisionRoot)).toThrow('已有同名文件')
+      await expect(manager.change('template', collisionRoot)).rejects.toThrow('已有同名文件')
       expect(manager.locations.template).toBe(path.join(system, 'templates'))
       expect(fs.readFileSync(path.join(collisionRoot, file.id, '借用单.docx'), 'utf8')).toBe('other')
-      manager.change('template', templates)
+      await manager.change('template', templates)
       expect(fs.readFileSync(path.join(templates, file.id, '借用单.docx'))).toEqual(fs.readFileSync(originalTemplate))
       expect(fs.existsSync(originalTemplate)).toBe(true)
-      manager.change('workspace', workspace)
+      await manager.change('workspace', workspace)
       expect(manager.service.snapshot().templates[0].name).toBe('设备借用单')
       expect(manager.service.snapshot().projects[0].id).toBe(projectId)
       expect(fs.existsSync(path.join(system, 'workpack-v3.sqlite'))).toBe(true)
       expect(fs.existsSync(path.join(workspace, 'workpack-v3.sqlite'))).toBe(true)
-      expect(() => manager.change('workspace', system)).toThrow('迁回前请先把 workpack-v3.sqlite')
+      await expect(manager.change('workspace', system)).rejects.toThrow('迁回前请先把 workpack-v3.sqlite')
     } finally { manager.close() }
     const reopened = new StorageManager(system, projects)
     try { expect(reopened.locations).toEqual({ project: fs.realpathSync(nextProjects), template: fs.realpathSync(templates), workspace: fs.realpathSync(workspace) }) }
     finally { reopened.close(); fs.rmSync(root, { recursive: true, force: true }) }
   })
 
-  it('rejects drive roots, system folders, and sync folders, and warns for project files in a sync folder', () => {
+  it('rejects drive roots, system folders, and sync folders, and warns for project files in a sync folder', async () => {
     const { root, manager } = temporary()
     try {
-      expect(() => manager.change('project', path.parse(root).root)).toThrow('磁盘根目录')
-      expect(() => manager.change('template', systemDirectory())).toThrow('系统目录')
-      expect(() => manager.change('project', os.homedir())).toThrow('用户主目录')
-      expect(() => manager.change('workspace', os.tmpdir())).toThrow('临时目录')
+      await expect(manager.change('project', path.parse(root).root)).rejects.toThrow('磁盘根目录')
+      await expect(manager.change('template', systemDirectory())).rejects.toThrow('系统目录')
+      await expect(manager.change('project', os.homedir())).rejects.toThrow('用户主目录')
+      await expect(manager.change('workspace', os.tmpdir())).rejects.toThrow('临时目录')
       const locked = path.join(root, 'locked')
       fs.mkdirSync(locked)
       fs.chmodSync(locked, 0o555)
       try {
         // NTFS keeps the owner writable when chmod does not change the ACL.
-        if (!directoryWritable(locked)) expect(() => manager.change('project', locked)).toThrow('没有写入权限')
+        if (!directoryWritable(locked)) await expect(manager.change('project', locked)).rejects.toThrow('没有写入权限')
       } finally { try { fs.chmodSync(locked, 0o755) } catch { /* Cleanup removes the directory either way. */ } }
       const synced = path.join(root, 'OneDrive', '工作空间')
       fs.mkdirSync(synced, { recursive: true })
-      expect(() => manager.change('workspace', synced)).toThrow('OneDrive')
+      await expect(manager.change('workspace', synced)).rejects.toThrow('OneDrive')
       expect(fs.existsSync(path.join(synced, 'workpack-v3.sqlite'))).toBe(false)
       const project = path.join(root, 'Dropbox', '项目')
       fs.mkdirSync(project, { recursive: true })
-      const moved = manager.change('project', project)
+      const moved = await manager.change('project', project)
       expect(moved.warning).toMatch(/Dropbox/)
       expect(moved.locations.project).toBe(fs.realpathSync(project))
       expect(manager.locations.workspace).toBe(fs.realpathSync(path.join(root, 'system')))
     } finally { cleanup(manager, root) }
   })
 
-  it('replaces a crashed workspace copy, keeps an unrelated database, and canonicalizes the stored path', () => {
+  it('replaces a crashed workspace copy, keeps an unrelated database, and canonicalizes the stored path', async () => {
     const { root, system, manager } = temporary()
     const workspace = path.join(root, 'workspace')
     fs.mkdirSync(workspace)
@@ -80,7 +80,7 @@ describe('storage settings', () => {
       fs.writeFileSync(marker, JSON.stringify({ source: manager.locations.workspace }))
       fs.writeFileSync(path.join(workspace, 'workpack-v3.sqlite'), 'residue')
       fs.writeFileSync(path.join(workspace, 'workpack-v3.sqlite-wal'), 'wal')
-      manager.change('workspace', workspace)
+      await manager.change('workspace', workspace)
       expect(fs.existsSync(marker)).toBe(false)
       expect(fs.readFileSync(path.join(workspace, 'workpack-v3.sqlite')).equals(Buffer.from('residue'))).toBe(false)
       expect(manager.service.snapshot().templates[0].name).toBe('设备借用单')
@@ -101,14 +101,14 @@ describe('storage settings', () => {
       fs.writeFileSync(path.join(foreignRoot, '.workpack-v3.sqlite.migrating'), JSON.stringify({ source: '/other/workspace' }))
       const again = new StorageManager(system, path.join(root, 'projects'))
       try {
-        expect(() => again.change('workspace', foreignRoot)).toThrow('迁回前请先把 workpack-v3.sqlite')
+        await expect(again.change('workspace', foreignRoot)).rejects.toThrow('迁回前请先把 workpack-v3.sqlite')
         expect(fs.readFileSync(path.join(foreignRoot, 'workpack-v3.sqlite'), 'utf8')).toBe('foreign')
         expect(again.locations.workspace).toBe(fs.realpathSync(workspace))
       } finally { again.close() }
     } finally { fs.rmSync(root, { recursive: true, force: true }) }
   })
 
-  it('loads a symlinked workspace path as its real directory and can move back after the old database is set aside', () => {
+  it('loads a symlinked workspace path as its real directory and can move back after the old database is set aside', async () => {
     const { root, system, manager } = temporary()
     const realWorkspace = path.join(root, 'real-workspace')
     const link = path.join(root, 'link-workspace')
@@ -116,7 +116,7 @@ describe('storage settings', () => {
     fs.symlinkSync(realWorkspace, link)
     try {
       seed(manager)
-      manager.change('workspace', link)
+      await manager.change('workspace', link)
       expect(manager.locations.workspace).toBe(fs.realpathSync(realWorkspace))
       manager.close()
       const configPath = path.join(system, 'storage.json')
@@ -126,21 +126,21 @@ describe('storage settings', () => {
       const reopened = new StorageManager(system, path.join(root, 'projects'))
       try {
         expect(reopened.locations.workspace).toBe(fs.realpathSync(realWorkspace))
-        reopened.change('workspace', realWorkspace)
+        await reopened.change('workspace', realWorkspace)
         expect(reopened.locations.workspace).toBe(fs.realpathSync(realWorkspace))
         expect(reopened.service.snapshot().templates[0].name).toBe('设备借用单')
         for (const name of ['workpack-v3.sqlite', 'workpack-v3.sqlite-wal', 'workpack-v3.sqlite-shm']) {
           const file = path.join(system, name)
           if (fs.existsSync(file)) fs.renameSync(file, `${file}.bak`)
         }
-        reopened.change('workspace', system)
+        await reopened.change('workspace', system)
         expect(reopened.locations.workspace).toBe(fs.realpathSync(system))
         expect(reopened.service.snapshot().templates[0].name).toBe('设备借用单')
       } finally { reopened.close() }
     } finally { fs.rmSync(root, { recursive: true, force: true }) }
   })
 
-  it('drops an unfinished workspace copy when closing the old database or writing the pointer fails', () => {
+  it('drops an unfinished workspace copy when closing the old database or writing the pointer fails', async () => {
     const { root, system, manager } = temporary()
     const blocked = path.join(root, 'blocked')
     const retried = path.join(root, 'retried')
@@ -151,7 +151,7 @@ describe('storage settings', () => {
       const originalClose = manager.service.close.bind(manager.service)
       const close = vi.spyOn(manager.service, 'close').mockImplementation(() => { throw new Error('关闭数据库失败') })
       try {
-        expect(() => manager.change('workspace', blocked)).toThrow('关闭数据库失败')
+        await expect(manager.change('workspace', blocked)).rejects.toThrow('关闭数据库失败')
         expect(manager.locations.workspace).toBe(fs.realpathSync(system))
         expect(fs.existsSync(path.join(system, 'storage.json'))).toBe(false)
         expect(workspaceResidue(blocked)).toEqual([])
@@ -160,7 +160,7 @@ describe('storage settings', () => {
 
       const failingClose = vi.spyOn(manager.service, 'close').mockImplementation(() => { originalClose(); throw new Error('关闭数据库失败') })
       try {
-        expect(() => manager.change('workspace', blocked)).toThrow('关闭数据库失败')
+        await expect(manager.change('workspace', blocked)).rejects.toThrow('关闭数据库失败')
         expect(manager.locations.workspace).toBe(fs.realpathSync(system))
         expect(fs.existsSync(path.join(system, 'storage.json'))).toBe(false)
         expect(workspaceResidue(blocked)).toEqual([])
@@ -168,20 +168,20 @@ describe('storage settings', () => {
       } finally { failingClose.mockRestore() }
 
       fs.mkdirSync(manager.configPath)
-      expect(() => manager.change('workspace', blocked)).toThrow()
+      await expect(manager.change('workspace', blocked)).rejects.toThrow()
       expect(manager.locations.workspace).toBe(fs.realpathSync(system))
       expect(fs.statSync(manager.configPath).isDirectory()).toBe(true)
       expect(workspaceResidue(blocked)).toEqual([])
       expect(manager.service.snapshot().templates[0].name).toBe('设备借用单')
       fs.rmSync(manager.configPath, { recursive: true, force: true })
-      manager.change('workspace', retried)
+      await manager.change('workspace', retried)
       expect(manager.locations.workspace).toBe(fs.realpathSync(retried))
       expect(manager.service.snapshot().templates[0].name).toBe('设备借用单')
       expect(fs.existsSync(path.join(retried, '.workpack-v3.sqlite.migrating'))).toBe(false)
     } finally { cleanup(manager, root) }
   })
 
-  it('removes a new database when checking it fails and rejects template files that escape through a symlink', () => {
+  it('removes a new database when checking it fails and rejects template files that escape through a symlink', async () => {
     const { root, system, manager } = temporary()
     const workspace = path.join(root, 'workspace')
     const templates = path.join(root, 'templates')
@@ -195,7 +195,7 @@ describe('storage settings', () => {
     }
     try {
       seed(manager)
-      expect(() => manager.change('workspace', workspace)).toThrow('新库校验失败')
+      await expect(manager.change('workspace', workspace)).rejects.toThrow('新库校验失败')
       expect(manager.locations.workspace).toBe(fs.realpathSync(system))
       expect(workspaceResidue(workspace)).toEqual([])
       WorkPackService.prototype.snapshot = original
@@ -207,7 +207,7 @@ describe('storage settings', () => {
       const stored = path.join(system, 'templates', file.id, 'outside.docx')
       fs.rmSync(stored)
       fs.symlinkSync(outside, stored)
-      expect(() => manager.change('template', templates)).toThrow('符号链接')
+      await expect(manager.change('template', templates)).rejects.toThrow('符号链接')
       expect(manager.locations.template).toBe(fs.realpathSync(path.join(system, 'templates')))
       expect(fs.existsSync(path.join(templates, file.id, 'outside.docx'))).toBe(false)
     } finally {

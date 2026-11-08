@@ -21,12 +21,10 @@ function isDirectory(value: string) { try { return fs.statSync(value).isDirector
 function isFile(value: string) { try { return fs.statSync(value).isFile() } catch { return false } }
 const templateManifestSchema = z.object({ source: z.string(), files: z.array(z.object({ path: z.string(), sha256: z.string() })) })
 type TemplateManifest = z.infer<typeof templateManifestSchema>
-/** Hashes in fixed-size chunks so memory stays bounded however large a template is. */
-export function fileDigest(file: string) {
-  const hash = createHash('sha256'), chunk = Buffer.alloc(1 << 20), fd = fs.openSync(file, 'r')
-  try {
-    for (let read; (read = fs.readSync(fd, chunk, 0, chunk.length, null)) > 0;) hash.update(chunk.subarray(0, read))
-  } finally { fs.closeSync(fd) }
+/** Streams in fixed-size chunks so memory stays bounded and the main process keeps handling events however large a template is. */
+export async function fileDigest(file: string) {
+  const hash = createHash('sha256')
+  for await (const chunk of fs.createReadStream(file, { highWaterMark: 1 << 20 })) hash.update(chunk as Buffer)
   return hash.digest('hex')
 }
 function isDriveRoot(directory: string) {
@@ -107,6 +105,7 @@ export class StorageManager {
   readonly defaults: StorageLocations
   locations: StorageLocations
   service: WorkPackService
+  private changing = false
   constructor(systemDirectory: string, defaultProjectDirectory: string, recovery?: WorkspaceRecovery) {
     fs.mkdirSync(systemDirectory, { recursive: true })
     this.configPath = path.join(systemDirectory, 'storage.json')
@@ -256,13 +255,13 @@ export class StorageManager {
     } catch { return null }
   }
   /** Removes copies left by an interrupted move from the same source. Files that differ from the recorded copy are kept. */
-  private clearTemplateResidue(directory: string, sourceRoot: string) {
+  private async clearTemplateResidue(directory: string, sourceRoot: string) {
     const manifest = this.readTemplateManifest(directory)
     if (manifest?.source !== sourceRoot) return
     for (const file of manifest.files) {
       let target: string
       try { target = inside(directory, file.path, '模板') } catch { continue }
-      if (!isFile(target) || fileDigest(target) !== file.sha256) continue
+      if (!isFile(target) || await fileDigest(target) !== file.sha256) continue
       fs.rmSync(target)
       for (let dir = path.dirname(target); dir !== directory && isSameOrInside(dir, directory) && !fs.readdirSync(dir).length; dir = path.dirname(dir)) fs.rmdirSync(dir)
     }
@@ -270,7 +269,7 @@ export class StorageManager {
   }
   /** Project and template folders that cannot be reached right now, such as a disconnected drive. */
   unavailable(): StorageKind[] { return (['project', 'template'] as const).filter(kind => !isDirectory(this.locations[kind])) }
-  private changeTemplates(directory: string, next: StorageLocations, warning?: string): StorageChangeResult {
+  private async changeTemplates(directory: string, next: StorageLocations, warning?: string): Promise<StorageChangeResult> {
     const sourceRoot = this.locations.template
     if (!isDirectory(sourceRoot)) {
       // Nothing can be copied from an unreachable folder; point at the folder the user chose instead.
@@ -279,12 +278,13 @@ export class StorageManager {
       this.locations = next
       return this.result(warning)
     }
-    const plan = this.service.snapshot().templates.flatMap(template => template.assets).map(asset => {
+    const plan: Array<{ asset: { name: string; path: string }; source: string; target: string; sha256: string }> = []
+    for (const asset of this.service.snapshot().templates.flatMap(template => template.assets)) {
       const source = inside(sourceRoot, asset.path, '模板')
       if (!asset.exists) throw new Error(`模板文件已失效：${asset.name}`)
-      return { asset, source, target: inside(directory, asset.path, '模板'), sha256: fileDigest(source) }
-    })
-    this.clearTemplateResidue(directory, sourceRoot)
+      plan.push({ asset, source, target: inside(directory, asset.path, '模板'), sha256: await fileDigest(source) })
+    }
+    await this.clearTemplateResidue(directory, sourceRoot)
     this.writeTemplateManifest(directory, { source: sourceRoot, files: plan.map(file => ({ path: file.asset.path, sha256: file.sha256 })) })
     const createdFiles: string[] = []
     const createdDirs: string[] = []
@@ -299,9 +299,13 @@ export class StorageManager {
           if (!fs.existsSync(current)) { fs.mkdirSync(current); createdDirs.push(current) }
           else if (!fs.statSync(current).isDirectory() || fs.lstatSync(current).isSymbolicLink()) throw new Error('目标目录包含非普通文件夹')
         }
-        fs.copyFileSync(source, target, fs.constants.COPYFILE_EXCL)
+        try { await fs.promises.copyFile(source, target, fs.constants.COPYFILE_EXCL) }
+        catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST' && fs.existsSync(target)) createdFiles.push(target)
+          throw error
+        }
         createdFiles.push(target)
-        if (fileDigest(target) !== sha256) throw new Error(`模板文件校验失败：${asset.name}`)
+        if (await fileDigest(target) !== sha256) throw new Error(`模板文件校验失败：${asset.name}`)
       }
       this.write(next)
     } catch (error) {
@@ -315,7 +319,13 @@ export class StorageManager {
     this.locations = next
     return this.result(warning)
   }
-  change(kind: StorageKind, selected: string): StorageChangeResult {
+  async change(kind: StorageKind, selected: string): Promise<StorageChangeResult> {
+    if (this.changing) throw new Error('存储位置正在更改，请等待完成后再试')
+    this.changing = true
+    try { return await this.applyChange(kind, selected) }
+    finally { this.changing = false }
+  }
+  private async applyChange(kind: StorageKind, selected: string): Promise<StorageChangeResult> {
     const directory = selectedDirectory(selected)
     if (directory === this.locations[kind]) return this.result()
     const warning = rejectUnsuitable(kind, directory)
@@ -328,7 +338,10 @@ export class StorageManager {
       return this.result(warning)
     }
     if (kind === 'workspace') return this.changeWorkspace(directory, next, warning)
-    return this.changeTemplates(directory, next, warning)
+    const service = this.service
+    service.templateMoveInProgress = true
+    try { return await this.changeTemplates(directory, next, warning) }
+    finally { service.templateMoveInProgress = false }
   }
   close() { this.service.close() }
 }

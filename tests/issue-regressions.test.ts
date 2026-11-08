@@ -96,6 +96,24 @@ describe('#46 document_tasks lookups by item', () => {
   })
 })
 
+describe('#48 library lookups by template', () => {
+  it('uses indexes for import, matter creation and template deletion, including in an existing database', () => {
+    const w = workspace()
+    try {
+      w.manager.service.db.exec('DROP INDEX assets_template; DROP INDEX event_templates_template')
+      w.manager.close()
+      const reopened = new StorageManager(w.system, w.projects)
+      try {
+        const id = '00000000-0000-4000-8000-000000000000'
+        expect(plan(reopened, 'SELECT 1 FROM event_templates WHERE template_id=? LIMIT 1', id)).toMatch(/event_templates_template/)
+        expect(plan(reopened, 'SELECT 1 FROM assets WHERE template_id=? LIMIT 1', id)).toMatch(/assets_template/)
+        expect(plan(reopened, 'SELECT * FROM assets WHERE template_id=? ORDER BY rowid LIMIT 1', id)).toMatch(/assets_template/)
+        expect(plan(reopened, 'DELETE FROM templates WHERE id=?', id)).not.toMatch(/SCAN assets/)
+      } finally { reopened.close() }
+    } finally { fs.rmSync(w.root, { recursive: true, force: true }) }
+  })
+})
+
 describe('#56 project rename that only changes letter case', () => {
   it('renames Alpha to ALPHA, still rejects a folder owned by something else, and rolls back on failure', () => {
     const w = workspace()

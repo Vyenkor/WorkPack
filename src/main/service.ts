@@ -105,7 +105,9 @@ export class WorkPackService {
       CREATE TABLE IF NOT EXISTS library_meta (template_id TEXT PRIMARY KEY REFERENCES templates(id) ON DELETE CASCADE, category_id TEXT REFERENCES library_categories(id) ON DELETE SET NULL, purpose TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS event_templates (event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE, template_id TEXT NOT NULL, PRIMARY KEY(event_id, template_id));
       CREATE TABLE IF NOT EXISTS document_tasks (id TEXT PRIMARY KEY, item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE, name TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL);
-      CREATE INDEX IF NOT EXISTS document_tasks_item ON document_tasks(item_id, position);`)
+      CREATE INDEX IF NOT EXISTS document_tasks_item ON document_tasks(item_id, position);
+      CREATE INDEX IF NOT EXISTS assets_template ON assets(template_id);
+      CREATE INDEX IF NOT EXISTS event_templates_template ON event_templates(template_id);`)
     this.ensureItemTemplateLink()
     this.db.transaction(() => {
       for (const event of this.all('events')) this.reconcileEventTemplates(event.id)

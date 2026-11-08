@@ -121,7 +121,7 @@ export class StorageManager {
     const mustExist = (configured || initialized) && !(recovery && 'create' in recovery)
     this.locations = this.canonicalize(stored, mustExist)
     this.clearCommittedMarker(this.locations.workspace)
-    // A manifest in the folder the pointer already names belongs to a move that committed.
+    // An older offline relocation may point at an unfinished move; only clean proven published aliases.
     this.clearCommittedTemplateManifest(this.locations.template)
     this.service = this.open(this.locations, mustExist)
     if (!initialized) try { fs.writeFileSync(initializedPath, '') } catch { /* Launch goes on; the next one writes the marker again. */ }
@@ -265,10 +265,16 @@ export class StorageManager {
   private clearCommittedTemplateManifest(directory: string) {
     try {
       const manifest = this.readTemplateManifest(directory)
+      let unfinished = false
       if (manifest?.publication === 'link') for (const file of manifest.files) {
-        if (file.staging) fs.rmSync(inside(directory, file.staging, '模板'), { force: true })
+        if (!file.staging) continue
+        const staging = inside(directory, file.staging, '模板')
+        if (!fs.existsSync(staging)) continue
+        const target = inside(directory, file.path, '模板')
+        if (!isFile(staging) || !isFile(target) || !this.sameFile(staging, target)) { unfinished = true; continue }
+        fs.rmSync(staging, { force: true })
       }
-      fs.rmSync(this.templateManifestPath(directory), { force: true })
+      if (!unfinished) fs.rmSync(this.templateManifestPath(directory), { force: true })
     } catch { /* Keep the manifest so the next launch can finish cleaning its staging files. */ }
   }
   private sameFile(left: string, right: string) {
@@ -304,6 +310,8 @@ export class StorageManager {
   private async changeTemplates(directory: string, next: StorageLocations, warning?: string): Promise<StorageChangeResult> {
     const sourceRoot = this.locations.template
     if (!isDirectory(sourceRoot)) {
+      // Do not reclassify an unfinished move as committed when its source cannot be read.
+      if (fs.existsSync(this.templateManifestPath(directory))) throw new Error('所选目录包含未完成的模板迁移，请先恢复原模板存储位置后重试')
       // Nothing can be copied from an unreachable folder; point at the folder the user chose instead.
       this.write(next)
       this.service.templateRoot = directory

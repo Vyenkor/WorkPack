@@ -442,6 +442,60 @@ describe('#44 template move interrupted before the pointer is written', () => {
       expect(fs.existsSync(path.join(target, '.workpack-templates.migrating'))).toBe(false)
     } finally { w.cleanup() }
   })
+  async function unpublishedCopy(w: ReturnType<typeof workspace>) {
+    const source = path.join(w.root, 'source-templates'), target = path.join(w.root, 'destination')
+    fs.mkdirSync(source); fs.mkdirSync(target)
+    await w.manager.change('template', source)
+    seedTemplates(w)
+    for (const name of ['甲.docx', '乙.docx']) fs.rmSync(path.join(w.root, name))
+    const publish = vi.spyOn(fs.promises, 'link').mockRejectedValue(new Error('interrupted before publication'))
+    const remove = vi.spyOn(fs, 'rmSync').mockImplementation(() => { throw new Error('interrupted') })
+    try { await expect(w.manager.change('template', target)).rejects.toThrow('interrupted') }
+    finally { publish.mockRestore(); remove.mockRestore() }
+    const manifest = path.join(target, '.workpack-templates.migrating')
+    const entries = (JSON.parse(fs.readFileSync(manifest, 'utf8')) as { files: Array<{ path: string; staging: string }> }).files
+    return { source, target, manifest, staging: path.join(target, entries[0].staging), final: path.join(target, entries[0].path) }
+  }
+  it('#58 refuses an offline switch to an unfinished destination and allows retry after the source returns', async () => {
+    const w = workspace()
+    try {
+      const move = await unpublishedCopy(w), offline = `${move.source}-offline`
+      w.manager.close(); fs.renameSync(move.source, offline)
+      w.manager = new StorageManager(w.system, w.projects)
+      const config = fs.readFileSync(w.manager.configPath, 'utf8')
+      await expect(w.manager.change('template', move.target)).rejects.toThrow('未完成的模板迁移')
+      expect(fs.readFileSync(w.manager.configPath, 'utf8')).toBe(config)
+      expect(w.manager.locations.template).toBe(move.source)
+      reopen(w)
+      expect(fs.readFileSync(move.staging, 'utf8')).toBe('甲内容')
+      expect(fs.existsSync(move.manifest)).toBe(true)
+      fs.renameSync(offline, move.source)
+      await w.manager.change('template', move.target)
+      expect(fs.readFileSync(move.final, 'utf8')).toBe('甲内容')
+      expect(fs.existsSync(move.staging)).toBe(false)
+      expect(fs.existsSync(move.manifest)).toBe(false)
+    } finally { w.cleanup() }
+  })
+  it.each(['missing', 'different file'])('#58 retains the only staging copy when an earlier version points at an unfinished directory: %s', async scenario => {
+    const w = workspace()
+    try {
+      const move = await unpublishedCopy(w)
+      w.manager.close()
+      fs.rmSync(move.source, { recursive: true, force: true })
+      if (scenario === 'different file') fs.writeFileSync(move.final, '甲内容')
+      const config = JSON.parse(fs.readFileSync(path.join(w.system, 'storage.json'), 'utf8'))
+      config.template = move.target
+      fs.writeFileSync(path.join(w.system, 'storage.json'), JSON.stringify(config))
+      w.manager = new StorageManager(w.system, w.projects)
+      for (let n = 0; n < 2; n++) {
+        expect(fs.readFileSync(move.staging, 'utf8')).toBe('甲内容')
+        expect(fs.existsSync(move.manifest)).toBe(true)
+        if (scenario === 'different file') expect(fs.readFileSync(move.final, 'utf8')).toBe('甲内容')
+        else expect(fs.existsSync(move.final)).toBe(false)
+        reopen(w)
+      }
+    } finally { w.cleanup() }
+  })
   it('drops a manifest left in the folder the pointer already names', async () => {
     const w = workspace()
     try {

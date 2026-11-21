@@ -456,24 +456,116 @@ describe('#44 template move interrupted before the pointer is written', () => {
     const entries = (JSON.parse(fs.readFileSync(manifest, 'utf8')) as { files: Array<{ path: string; staging: string }> }).files
     return { source, target, manifest, staging: path.join(target, entries[0].staging), final: path.join(target, entries[0].path) }
   }
-  it('#58 refuses an offline switch to an unfinished destination and allows retry after the source returns', async () => {
+  it.each(['missing', 'different file'])('#58/#63 refuses an offline switch with an unpublished staging copy and allows retry after recovery: %s', async scenario => {
     const w = workspace()
     try {
       const move = await unpublishedCopy(w), offline = `${move.source}-offline`
+      if (scenario === 'different file') {
+        fs.writeFileSync(move.final, '甲内容')
+        expect(fs.statSync(move.final, { bigint: true }).ino).not.toBe(fs.statSync(move.staging, { bigint: true }).ino)
+      }
+      const manifest = fs.readFileSync(move.manifest, 'utf8')
       w.manager.close(); fs.renameSync(move.source, offline)
       w.manager = new StorageManager(w.system, w.projects)
       const config = fs.readFileSync(w.manager.configPath, 'utf8')
       await expect(w.manager.change('template', move.target)).rejects.toThrow('未完成的模板迁移')
       expect(fs.readFileSync(w.manager.configPath, 'utf8')).toBe(config)
       expect(w.manager.locations.template).toBe(move.source)
+      expect(w.manager.service.templateRoot).toBe(move.source)
       reopen(w)
       expect(fs.readFileSync(move.staging, 'utf8')).toBe('甲内容')
-      expect(fs.existsSync(move.manifest)).toBe(true)
+      expect(fs.readFileSync(move.manifest, 'utf8')).toBe(manifest)
+      if (scenario === 'different file') {
+        expect(fs.readFileSync(move.final, 'utf8')).toBe('甲内容')
+        fs.rmSync(move.final) // Remove the unrelated test file before retrying the migration.
+      } else expect(fs.existsSync(move.final)).toBe(false)
       fs.renameSync(offline, move.source)
       await w.manager.change('template', move.target)
       expect(fs.readFileSync(move.final, 'utf8')).toBe('甲内容')
       expect(fs.existsSync(move.staging)).toBe(false)
       expect(fs.existsSync(move.manifest)).toBe(false)
+    } finally { w.cleanup() }
+  })
+  it('#63 adopts published hard links while the source is offline and cleans only aliases on restart', async () => {
+    const w = workspace()
+    try {
+      const source = path.join(w.root, 'source-templates'), target = path.join(w.root, 'destination')
+      fs.mkdirSync(source); fs.mkdirSync(target)
+      await w.manager.change('template', source)
+      seedTemplates(w)
+      await interruptMove(w, target)
+      const manifest = path.join(target, '.workpack-templates.migrating'), recorded = fs.readFileSync(manifest, 'utf8')
+      const entries = (JSON.parse(recorded) as { files: Array<{ path: string; staging: string }> }).files
+      expect(entries).toHaveLength(2)
+      const copies = entries.map(entry => {
+        const final = path.join(target, entry.path), staging = path.join(target, entry.staging)
+        const identity = fs.statSync(final, { bigint: true })
+        expect(fs.statSync(staging, { bigint: true })).toMatchObject({ dev: identity.dev, ino: identity.ino })
+        return { final, staging, identity, content: fs.readFileSync(final, 'utf8') }
+      })
+      w.manager.close(); fs.renameSync(source, `${source}-offline`)
+      w.manager = new StorageManager(w.system, w.projects)
+      expect(w.manager.unavailable()).toContain('template')
+      const changed = await w.manager.change('template', target)
+      expect(changed.locations.template).toBe(fs.realpathSync(target))
+      expect(changed.unavailable).not.toContain('template')
+      expect(w.manager.service.templateRoot).toBe(fs.realpathSync(target))
+      expect(JSON.parse(fs.readFileSync(w.manager.configPath, 'utf8')).template).toBe(fs.realpathSync(target))
+      expect(fs.readFileSync(manifest, 'utf8')).toBe(recorded)
+      for (const copy of copies) expect(fs.existsSync(copy.staging)).toBe(true)
+      for (let n = 0; n < 2; n++) {
+        reopen(w)
+        for (const copy of copies) {
+          expect(fs.readFileSync(copy.final, 'utf8')).toBe(copy.content)
+          expect(fs.statSync(copy.final, { bigint: true })).toMatchObject({ dev: copy.identity.dev, ino: copy.identity.ino })
+          expect(fs.existsSync(copy.staging)).toBe(false)
+        }
+        expect(fs.existsSync(manifest)).toBe(false)
+        expect(w.manager.service.snapshot().templates.flatMap(t => t.assets).every(asset => asset.exists)).toBe(true)
+      }
+    } finally { w.cleanup() }
+  })
+  it('#63 adopts a destination with only a manifest left and drops it on restart', async () => {
+    const w = workspace()
+    try {
+      const move = await unpublishedCopy(w), manifest = fs.readFileSync(move.manifest, 'utf8')
+      fs.rmSync(move.staging) // Simulate rollback removing the last staged copy before its manifest.
+      w.manager.close(); fs.renameSync(move.source, `${move.source}-offline`)
+      w.manager = new StorageManager(w.system, w.projects)
+      const changed = await w.manager.change('template', move.target)
+      expect(changed.locations.template).toBe(fs.realpathSync(move.target))
+      expect(w.manager.service.templateRoot).toBe(fs.realpathSync(move.target))
+      expect(JSON.parse(fs.readFileSync(w.manager.configPath, 'utf8')).template).toBe(fs.realpathSync(move.target))
+      expect(fs.readFileSync(move.manifest, 'utf8')).toBe(manifest)
+      reopen(w)
+      expect(w.manager.locations.template).toBe(fs.realpathSync(move.target))
+      expect(fs.existsSync(move.manifest)).toBe(false)
+      expect(fs.existsSync(move.staging)).toBe(false)
+      expect(fs.existsSync(move.final)).toBe(false)
+    } finally { w.cleanup() }
+  })
+  it.each(['invalid manifest', 'same path'])('#63 preserves unverified staging files during offline selection and startup: %s', async scenario => {
+    const w = workspace()
+    try {
+      const move = await unpublishedCopy(w)
+      const parsed = JSON.parse(fs.readFileSync(move.manifest, 'utf8'))
+      parsed.files[0].path = parsed.files[0].staging
+      const manifest = scenario === 'invalid manifest' ? '{invalid' : JSON.stringify(parsed)
+      fs.writeFileSync(move.manifest, manifest)
+      w.manager.close(); fs.renameSync(move.source, `${move.source}-offline`)
+      w.manager = new StorageManager(w.system, w.projects)
+      const config = fs.readFileSync(w.manager.configPath, 'utf8')
+      await expect(w.manager.change('template', move.target)).rejects.toThrow('未完成的模板迁移')
+      expect(fs.readFileSync(w.manager.configPath, 'utf8')).toBe(config)
+      expect(w.manager.locations.template).toBe(move.source)
+      expect(w.manager.service.templateRoot).toBe(move.source)
+      expect(fs.readFileSync(move.staging, 'utf8')).toBe('甲内容')
+      expect(fs.readFileSync(move.manifest, 'utf8')).toBe(manifest)
+      w.manager.close()
+      fs.writeFileSync(w.manager.configPath, JSON.stringify({ ...JSON.parse(config), template: move.target }))
+      w.manager = new StorageManager(w.system, w.projects)
+      expect(fs.readFileSync(move.staging, 'utf8')).toBe('甲内容')
+      expect(fs.readFileSync(move.manifest, 'utf8')).toBe(manifest)
     } finally { w.cleanup() }
   })
   it.each(['missing', 'different file'])('#58 retains the only staging copy when an earlier version points at an unfinished directory: %s', async scenario => {

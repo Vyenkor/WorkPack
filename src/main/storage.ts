@@ -262,17 +262,32 @@ export class StorageManager {
       return parsed.success ? parsed.data : null
     } catch { return null }
   }
+  /** A staging name is disposable only when a distinct final name identifies the same file. */
+  private templateStagingState(directory: string, file: TemplateManifest['files'][number]) {
+    if (!file.staging) return null
+    const staging = inside(directory, file.staging, '模板')
+    const stat = fs.statSync(staging, { throwIfNoEntry: false })
+    if (!stat) return null
+    const target = inside(directory, file.path, '模板')
+    return { staging, published: path.relative(staging, target) !== '' && stat.isFile() && isFile(target) && this.sameFile(staging, target) }
+  }
+  private hasUnfinishedTemplateMigration(directory: string) {
+    try {
+      if (!fs.statSync(this.templateManifestPath(directory), { throwIfNoEntry: false })) return false
+      const manifest = this.readTemplateManifest(directory)
+      return !manifest || manifest.files.some(file => this.templateStagingState(directory, file)?.published === false)
+    } catch { return true /* Unreadable or unsafe paths cannot prove that the copies were published. */ }
+  }
   private clearCommittedTemplateManifest(directory: string) {
     try {
       const manifest = this.readTemplateManifest(directory)
+      if (!manifest) return
       let unfinished = false
-      if (manifest?.publication === 'link') for (const file of manifest.files) {
-        if (!file.staging) continue
-        const staging = inside(directory, file.staging, '模板')
-        if (!fs.existsSync(staging)) continue
-        const target = inside(directory, file.path, '模板')
-        if (!isFile(staging) || !isFile(target) || !this.sameFile(staging, target)) { unfinished = true; continue }
-        fs.rmSync(staging, { force: true })
+      for (const file of manifest.files) {
+        const state = this.templateStagingState(directory, file)
+        if (!state) continue
+        if (!state.published) { unfinished = true; continue }
+        fs.rmSync(state.staging, { force: true })
       }
       if (!unfinished) fs.rmSync(this.templateManifestPath(directory), { force: true })
     } catch { /* Keep the manifest so the next launch can finish cleaning its staging files. */ }
@@ -311,7 +326,7 @@ export class StorageManager {
     const sourceRoot = this.locations.template
     if (!isDirectory(sourceRoot)) {
       // Do not reclassify an unfinished move as committed when its source cannot be read.
-      if (fs.existsSync(this.templateManifestPath(directory))) throw new Error('所选目录包含未完成的模板迁移，请先恢复原模板存储位置后重试')
+      if (this.hasUnfinishedTemplateMigration(directory)) throw new Error('所选目录包含未完成的模板迁移，请先恢复原模板存储位置后重试')
       // Nothing can be copied from an unreachable folder; point at the folder the user chose instead.
       this.write(next)
       this.service.templateRoot = directory
